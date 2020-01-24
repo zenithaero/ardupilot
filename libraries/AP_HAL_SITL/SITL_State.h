@@ -162,6 +162,7 @@ private:
     bool _read_rc_sitl_input();
     void _fdm_input_local(void);
     void _output_to_flightgear(void);
+    void _output_to_Zenith3D(void);
     void _simulator_servos(struct sitl_input &input);
     void _simulator_output(bool synthetic_clock_mode);
     uint16_t _airspeed_sensor(float airspeed);
@@ -274,6 +275,8 @@ private:
 
     // output socket for flightgear viewing
     SocketAPM fg_socket{true};
+    // output socket for Zenith3D viewing
+    SocketAPM z3d_socket{true};
     
     const char *defaults_path = HAL_PARAM_DEFAULTS_PATH;
 

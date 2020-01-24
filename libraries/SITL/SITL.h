@@ -36,6 +36,7 @@ struct sitl_fdm {
     Location home;
     double latitude, longitude; // degrees
     double altitude;  // MSL
+    Vector3f position; // meters, NED from origin
     double heading;   // degrees
     double speedN, speedE, speedD; // m/s
     double xAccel, yAccel, zAccel;       // m/s/s in body frame

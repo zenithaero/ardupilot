@@ -245,7 +245,7 @@ def kill_tasks():
             return kill_tasks_cygwin(victim_names)
         if under_macos() and os.environ.get('DISPLAY'):
             # use special macos kill routine if Display is on
-            return kill_tasks_macos()
+            kill_tasks_macos()
 
         try:
             kill_tasks_psutil(victim_names)
@@ -481,6 +481,7 @@ def run_in_terminal_window(autotest, name, cmd):
     """Execute the run_in_terminal_window.sh command for cmd"""
     global windowID
     runme = [os.path.join(autotest, "run_in_terminal_window.sh"), name]
+    runme.extend(['cd {};'.format(os.getcwd())])
     runme.extend(cmd)
     progress_cmd("Run " + name, runme)
 
@@ -679,36 +680,16 @@ def start_mavproxy(opts, stuff):
     # Parsing the arguments to pass to mavproxy, split args on space
     # and "=" signs and ignore those signs within quotation marks
     if opts.mavproxy_args:
-        # It would be great if this could be done with regex
-        mavargs = opts.mavproxy_args.split(" ")
-        # Find the arguments with '=' in them and split them up
-        for i, x in enumerate(mavargs):
-            if '=' in x:
-                mavargs[i] = x.split('=')[0]
-                mavargs.insert(i+1, x.split('=')[1])
-        # Use this flag to tell if parsing character inbetween a pair
-        # of quotation marks
-        inString = False
-        beginStringIndex = []
-        endStringIndex = []
-        # Iterate through the arguments, looking for the arguments
-        # that begin with a quotation mark and the ones that end with
-        # a quotation mark
-        for i, x in enumerate(mavargs):
-            if not inString and x[0] == "\"":
-                beginStringIndex.append(i)
-                mavargs[i] = x[1:]
-                inString = True
-            elif inString and x[-1] == "\"":
-                endStringIndex.append(i)
-                inString = False
-                mavargs[i] = x[:-1]
-        # Replace the list items with one string to be passed into mavproxy
-        for begin, end in zip(beginStringIndex, endStringIndex):
-            replacement = " ".join(mavargs[begin:end+1])
-            mavargs[begin] = replacement
-            mavargs = mavargs[0:begin+1] + mavargs[end+1:]
+        mavargs = opts.mavproxy_args
+        sub_args = re.findall(r"\".*?\"", mavargs)
+        # print("found", sub_args)
+        for arg in sub_args:
+            rep = arg.replace(" ", "<space>").replace("\"", "")
+            mavargs = mavargs.replace(arg, rep, 1)
+        mavargs = mavargs.split(" ")
+        mavargs = [m.replace("<space>", " ") for m in mavargs]
         cmd.extend(mavargs)
+        # print(mavargs); exit(-1)
 
     # compatibility pass-through parameters (for those that don't want
     # to use -C :-)
@@ -718,6 +699,8 @@ def start_mavproxy(opts, stuff):
         cmd.append('--map')
     if opts.console:
         cmd.append('--console')
+    if opts.joystick:
+        cmd.append('--joystick')
     if opts.aircraft is not None:
         cmd.extend(['--aircraft', opts.aircraft])
     if opts.moddebug:
@@ -978,6 +961,10 @@ group.add_option("", "--console",
                  default=False,
                  action='store_true',
                  help="load console module on startup")
+group.add_option("", "--joystick",
+                 default=False,
+                 action='store_true',
+                 help="load joystick module on startup")
 group.add_option("", "--aircraft",
                  default=None,
                  help="store state and logs in named directory")

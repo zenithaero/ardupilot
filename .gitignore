@@ -123,3 +123,6 @@ segv_*out
 /ArduPlane/scripts/
 /ArduSub/scripts/
 persistent.dat
+
+*.code-workspace
+maps_cache/

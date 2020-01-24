@@ -207,7 +207,7 @@ class VehicleInfo(object):
             },
             "jsbsim": {
                 "waf_target": "bin/arduplane",
-                "default_params_filename": "default_params/plane-jsbsim.parm",
+                "default_params_filename": "default_params/z1-jsbsim.parm",
             },
             "scrimmage-plane" : {
                 "make_target": "sitl",
@@ -217,6 +217,13 @@ class VehicleInfo(object):
             "calibration": {
                 "extra_mavlink_cmds": "module load sitl_calibration;",
             },
+            "ASWING": {
+                "waf_target": "bin/arduplane",
+            },
+            "Z1": {
+                "waf_target": "bin/arduplane",
+                "default_params_filename": "default_params/z1.parm",
+            }
         },
     },
     "APMrover2": {
