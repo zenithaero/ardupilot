@@ -42,6 +42,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Z1 simulation")
     parser.add_argument("--joystick", action="store_true", help="load joystick module")
     parser.add_argument("--fp", action="store_true", help="load flight plan")
+    # parser.add_argument("--speedup", action="store_true", help="enable speedup")
     parser.add_argument("--speedup", action="store_true", help="enable speedup")
     parser.add_argument("--clear", action="store_true", help="clear sim data")
     args = parser.parse_args()
