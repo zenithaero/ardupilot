@@ -13,7 +13,7 @@ import json
 import argparse
 from scipy import io as scipyio
 
-ROOT_DIR = os.path.join(os.path.dirname(__file__), "../../..")
+ROOT_DIR = os.path.join(os.path.dirname(__file__), "../..")
 MAVLOG_PATH = os.path.join(ROOT_DIR, "modules/mavlink/pymavlink/tools/mavlogdump.py")
 
 if __name__ == "__main__":
