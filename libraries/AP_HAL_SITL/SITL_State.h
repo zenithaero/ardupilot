@@ -106,6 +106,9 @@ public:
                            Location &loc,
                            float &yaw_degrees);
 
+    /* parse a state string */
+    static bool parse_state(const char *state_str, SITL::Aircraft::state_t &state);
+
 private:
     void _parse_command_line(int argc, char * const argv[]);
     void _set_param_default(const char *parm);

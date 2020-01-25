@@ -43,6 +43,18 @@ public:
     // called directly after constructor:
     virtual void set_start_location(const Location &start_loc, const float start_yaw);
 
+    typedef struct {
+        double lat;
+        double lng;
+        double alt;
+        double pitch;
+        double roll;
+        double yaw;
+        double spd;
+    } state_t;
+
+    virtual void set_start_state(state_t state);
+
     /*
       set simulation speedup
      */
