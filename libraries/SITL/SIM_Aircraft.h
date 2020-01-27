@@ -31,22 +31,26 @@
 #include "SIM_Buzzer.h"
 #include <Filter/Filter.h>
 
-namespace SITL {
+namespace SITL
+{
 
 /*
   parent class for all simulator types
  */
-class Aircraft {
+class Aircraft
+{
 public:
     Aircraft(const char *frame_str);
 
     // called directly after constructor:
     virtual void set_start_location(const Location &start_loc, const float start_yaw);
 
-    typedef struct {
+    typedef struct
+    {
         double lat;
         double lng;
         double alt;
+        double agl;
         double pitch;
         double roll;
         double yaw;
@@ -54,6 +58,13 @@ public:
     } state_t;
 
     virtual void set_start_state(state_t state);
+
+    typedef struct
+    {
+        state_t init_state;
+    } test_case_t;
+
+    virtual void set_test_case(test_case_t test_case);
 
     /*
       set simulation speedup
@@ -63,19 +74,21 @@ public:
     /*
       set instance number
      */
-    void set_instance(uint8_t _instance) {
+    void set_instance(uint8_t _instance)
+    {
         instance = _instance;
     }
 
     /*
       set directory for additional files such as aircraft models
      */
-    void set_autotest_dir(const char *_autotest_dir) {
+    void set_autotest_dir(const char *_autotest_dir)
+    {
         autotest_dir = _autotest_dir;
     }
 
     /*  Create and set in/out socket for extenal simulator */
-    virtual void set_interface_ports(const char* address, const int port_in, const int port_out) {};
+    virtual void set_interface_ports(const char *address, const int port_in, const int port_out){};
 
     /*
       step the FDM by one time step
@@ -96,39 +109,45 @@ public:
     // get frame rate of model in Hz
     float get_rate_hz(void) const { return rate_hz; }
 
-    const Vector3f &get_gyro(void) const {
+    const Vector3f &get_gyro(void) const
+    {
         return gyro;
     }
 
-    const Vector3f &get_velocity_ef(void) const {
+    const Vector3f &get_velocity_ef(void) const
+    {
         return velocity_ef;
     }
 
-    const Vector3f &get_velocity_air_ef(void) const {
+    const Vector3f &get_velocity_air_ef(void) const
+    {
         return velocity_air_ef;
     }
 
-    const Matrix3f &get_dcm(void) const {
+    const Matrix3f &get_dcm(void) const
+    {
         return dcm;
     }
 
-    const Vector3f &get_mag_field_bf(void) const {
+    const Vector3f &get_mag_field_bf(void) const
+    {
         return mag_bf;
     }
 
     float gross_mass() const { return mass + external_payload_mass; }
 
-    virtual void set_config(const char* config) {
+    virtual void set_config(const char *config)
+    {
         config_ = config;
     }
-
 
     const Location &get_location() const { return location; }
 
     const Vector3f &get_position() const { return position; }
     const float &get_range() const { return range; }
 
-    void get_attitude(Quaternion &attitude) const {
+    void get_attitude(Quaternion &attitude) const
+    {
         attitude.from_rotation_matrix(dcm);
     }
 
@@ -147,44 +166,46 @@ protected:
     Location home;
     bool home_is_set;
     Location location;
+    test_case_t test_case;
 
     float ground_level;
     float home_yaw;
     float frame_height;
-    Matrix3f dcm;                        // rotation matrix, APM conventions, from body to earth
-    Vector3f gyro;                       // rad/s
-    Vector3f gyro_prev;                  // rad/s
-    Vector3f ang_accel;                  // rad/s/s
-    Vector3f velocity_ef;                // m/s, earth frame
-    Vector3f wind_ef;                    // m/s, earth frame
-    Vector3f velocity_air_ef;            // velocity relative to airmass, earth frame
-    Vector3f velocity_air_bf;            // velocity relative to airmass, body frame
-    Vector3f position;                   // meters, NED from origin
-    float mass;                          // kg
-    float external_payload_mass = 0.0f;  // kg
-    Vector3f accel_body;                 // m/s/s NED, body frame
-    float airspeed;                      // m/s, apparent airspeed
-    float airspeed_pitot;                // m/s, apparent airspeed, as seen by fwd pitot tube
+    Matrix3f dcm;                       // rotation matrix, APM conventions, from body to earth
+    Vector3f gyro;                      // rad/s
+    Vector3f gyro_prev;                 // rad/s
+    Vector3f ang_accel;                 // rad/s/s
+    Vector3f velocity_ef;               // m/s, earth frame
+    Vector3f wind_ef;                   // m/s, earth frame
+    Vector3f velocity_air_ef;           // velocity relative to airmass, earth frame
+    Vector3f velocity_air_bf;           // velocity relative to airmass, body frame
+    Vector3f position;                  // meters, NED from origin
+    float mass;                         // kg
+    float external_payload_mass = 0.0f; // kg
+    Vector3f accel_body;                // m/s/s NED, body frame
+    float airspeed;                     // m/s, apparent airspeed
+    float airspeed_pitot;               // m/s, apparent airspeed, as seen by fwd pitot tube
     float battery_voltage = -1.0f;
     float battery_current = 0.0f;
     uint8_t num_motors = 1;
     float rpm[12];
     uint8_t rcin_chan_count = 0;
     float rcin[8];
-    float range = -1.0f;                 // rangefinder detection in m
+    float range = -1.0f; // rangefinder detection in m
 
-    struct {
+    struct
+    {
         // data from simulated laser scanner, if available
         struct vector3f_array points;
         struct float_array ranges;
     } scanner;
-    
+
     // Wind Turbulence simulated Data
     float turbulence_azimuth = 0.0f;
-    float turbulence_horizontal_speed = 0.0f;  // m/s
-    float turbulence_vertical_speed = 0.0f;    // m/s
+    float turbulence_horizontal_speed = 0.0f; // m/s
+    float turbulence_vertical_speed = 0.0f;   // m/s
 
-    Vector3f mag_bf;  // local earth magnetic field vector in Gauss, earth frame
+    Vector3f mag_bf; // local earth magnetic field vector in Gauss, earth frame
 
     uint64_t time_now_us;
 
@@ -208,7 +229,8 @@ protected:
     enum Rotation last_imu_rotation;
     Matrix3f ahrs_rotation_inv;
 
-    enum GroundBehaviour {
+    enum GroundBehaviour
+    {
         GROUND_BEHAVIOR_NONE = 0,
         GROUND_BEHAVIOR_NO_MOVEMENT,
         GROUND_BEHAVIOR_FWD_ONLY,
@@ -223,7 +245,7 @@ protected:
     virtual bool on_ground() const;
 
     // returns height above ground level in metres
-    float hagl() const;  // metres
+    float hagl() const; // metres
 
     /* update location from position */
     void update_position(void);
@@ -276,7 +298,8 @@ private:
     uint32_t last_ground_contact_ms;
     const uint32_t min_sleep_time;
 
-    struct {
+    struct
+    {
         bool enabled;
         Vector3f accel_body;
         Vector3f gyro;

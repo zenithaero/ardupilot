@@ -42,6 +42,7 @@
 // #include <SITL/SIM_Frsky_SPortPassthrough.h>
 
 #include <AP_HAL/utility/Socket.h>
+#include "json11.h"
 
 class HAL_SITL;
 
@@ -106,8 +107,8 @@ public:
                            Location &loc,
                            float &yaw_degrees);
 
-    /* parse a state string */
-    static bool parse_state(const char *state_str, SITL::Aircraft::state_t &state);
+    /* parse a test case from file */
+    static bool parse_test_case(const char *test_case_fname, SITL::Aircraft::test_case_t &test_case);
 
 private:
     void _parse_command_line(int argc, char * const argv[]);

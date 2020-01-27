@@ -108,16 +108,17 @@ class SimData:
 if __name__ == "__main__":
     udp = UdpSocket("127.0.0.1:5507")
     tlast = time.time()
+    print("Waiting for connection")
     while True:
         buf = udp.recv(1024)
         if time.time() - tlast > 1.0:
             data = SimData.parse(buf)
             print(
-                "n",
-                data["pos_n"],
-                "e",
-                data["pos_e"],
-                "d",
-                data["pos_d"]
+                "home_alt",
+                data["home_alt"],
+                "alt",
+                data["alt"],
+                "agl",
+                data["agl"]
             )
             tlast = time.time()

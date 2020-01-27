@@ -45,6 +45,7 @@ if __name__ == "__main__":
     parser.add_argument("--speedup", action="store_true", help="enable speedup")
     parser.add_argument("--clear", action="store_true", help="clear sim data")
     parser.add_argument("--jsbsim", action="store_true", help="enable speedup")
+    parser.add_argument("--test", action="store_true", help="enable test case")
     args = parser.parse_args()
 
     # Clear data if needed
@@ -58,20 +59,13 @@ if __name__ == "__main__":
     # Build sim command
     script = [SIM_PATH]
     frame = "plane" if args.jsbsim else "Z1"
-    sim_args = [
-        "-v",
-        "ArduPlane",
-        "-f",
-        frame,
-        "--no-rebuild",
-        # "--aircraft",
-        # "ArduPlane",
-        # "--wipe-eeprom",
-    ]
+    sim_args = ["-v", "ArduPlane", "-f", frame, "--no-rebuild", "--wipe-eeprom"]
     if args.joystick:
         sim_args += ["--joystick"]
     if args.speedup:
         sim_args += ["--speedup", "10"]
+    if args.test:
+        sim_args += ["--test-case", "test_case.txt"]
     mav_arg_list = [
         "--logfile logs/flight.tlog",
         '--cmd-imu-ready "wp load {}"'.format(FP_PATH),

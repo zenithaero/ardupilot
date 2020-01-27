@@ -40,6 +40,7 @@
 #include <stdio.h>
 
 #include "json11.h"
+#include <fstream>
 
 extern const AP_HAL::HAL &hal;
 
@@ -175,7 +176,7 @@ void SITL_State::_parse_command_line(int argc, char *const argv[])
     _synthetic_clock_mode = false;
     // default to CMAC
     const char *home_str = nullptr;
-    const char *state_str = nullptr;
+    const char *test_case_fname = nullptr;
     const char *model_str = nullptr;
     _use_fg_view = true;
     char *autotest_dir = nullptr;
@@ -231,7 +232,7 @@ void SITL_State::_parse_command_line(int argc, char *const argv[])
         {"param", true, 0, 'P'},
         {"synthetic-clock", false, 0, 'S'},
         {"home", true, 0, 'O'},
-        {"state", true, 0, 'x'},
+        {"test-case", true, 0, 't'},
         {"model", true, 0, 'M'},
         {"config", true, 0, 'c'},
         {"fg", true, 0, 'F'},
@@ -329,8 +330,8 @@ void SITL_State::_parse_command_line(int argc, char *const argv[])
         case 'O':
             home_str = gopt.optarg;
             break;
-        case 'x':
-            state_str = gopt.optarg;
+        case 't':
+            test_case_fname = gopt.optarg;
             break;
         case 'M':
             model_str = gopt.optarg;
@@ -413,15 +414,16 @@ void SITL_State::_parse_command_line(int argc, char *const argv[])
                 }
                 sitl_model->set_start_location(home, home_yaw);
             }
-            if (state_str != nullptr)
+            if (test_case_fname != nullptr)
             {
-                Aircraft::state_t state;
-                if (!parse_state(state_str, state))
+                Aircraft::test_case_t test_case;
+                if (!parse_test_case(test_case_fname, test_case))
                 {
-                    printf("Failed to parse state string (%s)\n", state_str);
+                    printf("Failed to parse test case at (%s)\n", test_case_fname);
                     exit(1);
                 }
-                sitl_model->set_start_state(state);
+                printf("Successfully parsed test case\n");
+                sitl_model->set_test_case(test_case);
             }
             sitl_model->set_interface_ports(simulator_address, simulator_port_in, simulator_port_out);
             sitl_model->set_speedup(speedup);
@@ -540,12 +542,18 @@ bool SITL_State::parse_home(const char *home_str, Location &loc, float &yaw_degr
     return true;
 }
 
-/*
-  parse a state string
- */
-bool SITL_State::parse_state(const char *state_str, Aircraft::state_t &state)
+/* parse a test case from file */
+bool SITL_State::parse_test_case(const char *test_case_fname, Aircraft::test_case_t &test_case)
 {
-    std::string json_str(state_str);
+
+    std::ifstream file(test_case_fname);
+    if (!file.is_open())
+    {
+        printf("Failed to open test case file: %s\n", test_case_fname);
+        return false;
+    }
+    std::string file_str{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    std::string json_str(file_str);
     std::string err;
     json11::Json json = json11::Json::parse(json_str, err);
     if (err.length() > 0)
@@ -553,13 +561,15 @@ bool SITL_State::parse_state(const char *state_str, Aircraft::state_t &state)
         printf("Failed to parse state: %s\n", err.c_str());
         return false;
     }
-    state.lat = json["lat"].number_value();
-    state.lng = json["lng"].number_value();
-    state.alt = json["alt"].number_value();
-    state.pitch = json["pitch"].number_value();
-    state.roll = json["roll"].number_value();
-    state.yaw = json["yaw"].number_value();
-    state.spd = json["spd"].number_value();
+    // Populate init state
+    test_case.init_state.lat = json["lat"].number_value();
+    test_case.init_state.lng = json["lng"].number_value();
+    test_case.init_state.alt = json["alt"].number_value();
+    test_case.init_state.agl = json["agl"].number_value();
+    test_case.init_state.pitch = json["pitch"].number_value();
+    test_case.init_state.roll = json["roll"].number_value();
+    test_case.init_state.yaw = json["yaw"].number_value();
+    test_case.init_state.spd = json["spd"].number_value();
     return true;
 }
 

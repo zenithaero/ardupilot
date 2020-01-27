@@ -21,6 +21,7 @@ import tempfile
 import textwrap
 import time
 import shlex
+import json
 
 from pymavlink import mavextra
 from pysim import vehicleinfo
@@ -539,7 +540,7 @@ def start_antenna_tracker(autotest, opts):
     os.chdir(oldpwd)
 
 
-def start_vehicle(binary, autotest, opts, stuff, loc=None):
+def start_vehicle(binary, autotest, opts, stuff, loc=None, test_case=None):
     """Run the ArduPilot binary"""
 
     cmd_name = opts.vehicle
@@ -592,6 +593,8 @@ def start_vehicle(binary, autotest, opts, stuff, loc=None):
     cmd.append("-I" + str(opts.instance))
     if loc is not None:
         cmd.extend(["--home", loc])
+    if opts.test_case:
+        cmd.extend(["--test-case", opts.test_case])
     if opts.wipe_eeprom:
         cmd.append("-w")
     cmd.extend(["--model", stuff["model"]])
@@ -869,6 +872,10 @@ group_sim.add_option("-l", "--custom-location",
                      type='string',
                      default=None,
                      help="set custom start location (lat,lon,alt,heading)")
+group_sim.add_option("--test-case",
+                     type='string',
+                     default=None,
+                     help="set a test case path")
 group_sim.add_option("-S", "--speedup",
                      default=1,
                      type='int',

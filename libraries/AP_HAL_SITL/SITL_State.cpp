@@ -611,7 +611,7 @@ void SITL_State::_output_to_Zenith3D(void)
     bufSet(buf, &idx, lng);
     double alt = state.altitude; // above sea level (meters)
     bufSet(buf, &idx, alt);
-    float agl = state.altitude; // above ground level (meters)
+    float agl = state.altitude - state.home.alt / 0.01; // above ground level (meters)
     bufSet(buf, &idx, agl);
     float phi = radians(state.rollDeg); // roll (radians)
     bufSet(buf, &idx, phi);
