@@ -627,6 +627,9 @@ def start_vehicle(binary, autotest, opts, stuff, loc=None, test_case=None):
         cmd.extend(["--defaults", path])
     if opts.mcast:
         cmd.extend(["--uartA mcast:"])
+    
+    # Enable logs
+    cmd.extend(['--param', 'LOG_DISARMED=1'])
 
     run_in_terminal_window(autotest, cmd_name, cmd)
 

@@ -24,10 +24,6 @@ Z1::Z1(const char *frame_str) : Aircraft(frame_str)
 
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
 
-    if (strstr(frame_str, "-dspoilers"))
-    {
-        dspoilers = true;
-    }
     if (strstr(frame_str, "-launch"))
     {
         have_launcher = true;
@@ -200,30 +196,9 @@ void Z1::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, V
     float aileron = filtered_servo_angle(input, 0);
     float elevator = filtered_servo_angle(input, 1);
     float rudder = filtered_servo_angle(input, 3);
+    // printf("ail %.2f elev %.2f rud %.2f\n", aileron, elevator, rudder);
     if (!launch_start_ms && input.servos[6] > 1700)
         launch_start_ms = now;
-
-    // // fake a vtail plane
-    // float ch1 = elevator;
-    // float ch2 = rudder;
-    // // this matches VTAIL_OUTPUT==2
-    // elevator = (ch2 - ch1) / 2.0f;
-    // rudder = (ch2 + ch1) / 2.0f;
-
-    if (dspoilers)
-    {
-        // fake a differential spoiler plane. Use outputs 1, 2, 4 and 5
-        float dspoiler1_left = filtered_servo_angle(input, 0);
-        float dspoiler1_right = filtered_servo_angle(input, 1);
-        float dspoiler2_left = filtered_servo_angle(input, 3);
-        float dspoiler2_right = filtered_servo_angle(input, 4);
-        float elevon_left = (dspoiler1_left + dspoiler2_left) / 2;
-        float elevon_right = (dspoiler1_right + dspoiler2_right) / 2;
-        aileron = (elevon_right - elevon_left) / 2;
-        elevator = (elevon_left + elevon_right) / 2;
-        rudder = fabsf(dspoiler1_right - dspoiler2_right) / 2 - fabsf(dspoiler1_left - dspoiler2_left) / 2;
-    }
-    //printf("Aileron: %.1f elevator: %.1f rudder: %.1f\n", aileron, elevator, rudder);
 
     float thrust = filtered_servo_range(input, 2);
 
@@ -236,7 +211,6 @@ void Z1::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, V
 
     if (launch_start_ms > 0 && now - launch_start_ms < launch_time * 1000)
     {
-        printf("LAUNCH FORCE\n");
         // Simulate launch setup
         float launch_accel = launch_speed / launch_time;
         force.x += launch_accel;

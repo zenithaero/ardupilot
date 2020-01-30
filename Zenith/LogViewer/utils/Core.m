@@ -173,8 +173,8 @@ classdef Core < handle
         end
 
         function [t, x] = trim(obj, time, vect, useCache)
-            if ~exist('useCache', 'var'); useCache = 1; end
-            key = @(k) obj.vars.key(sprintf('%d_%d_%s', k, round(time(end)), length(time)));
+            if ~exist('useCache', 'var'); useCache = 0; end
+            key = @(k) obj.vars.key(sprintf('%s', k));
             if ~(useCache && isfield(obj.vars, key('idx')))
                 % Find id & time range and cache them
                 idx = [1, length(time)];

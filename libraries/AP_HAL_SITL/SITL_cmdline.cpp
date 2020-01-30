@@ -41,6 +41,7 @@
 
 #include "json11.h"
 #include <fstream>
+#include <iostream>
 
 extern const AP_HAL::HAL &hal;
 
@@ -416,14 +417,14 @@ void SITL_State::_parse_command_line(int argc, char *const argv[])
             }
             if (test_case_fname != nullptr)
             {
-                Aircraft::test_case_t test_case;
                 if (!parse_test_case(test_case_fname, test_case))
                 {
                     printf("Failed to parse test case at (%s)\n", test_case_fname);
                     exit(1);
                 }
                 printf("Successfully parsed test case\n");
-                sitl_model->set_test_case(test_case);
+
+                sitl_model->set_start_state(test_case.init_state);
             }
             sitl_model->set_interface_ports(simulator_address, simulator_port_in, simulator_port_out);
             sitl_model->set_speedup(speedup);
@@ -543,7 +544,7 @@ bool SITL_State::parse_home(const char *home_str, Location &loc, float &yaw_degr
 }
 
 /* parse a test case from file */
-bool SITL_State::parse_test_case(const char *test_case_fname, Aircraft::test_case_t &test_case)
+bool SITL_State::parse_test_case(const char *test_case_fname, SITL_State::test_case_t &test_case)
 {
 
     std::ifstream file(test_case_fname);
@@ -562,14 +563,41 @@ bool SITL_State::parse_test_case(const char *test_case_fname, Aircraft::test_cas
         return false;
     }
     // Populate init state
-    test_case.init_state.lat = json["lat"].number_value();
-    test_case.init_state.lng = json["lng"].number_value();
-    test_case.init_state.alt = json["alt"].number_value();
-    test_case.init_state.agl = json["agl"].number_value();
-    test_case.init_state.pitch = json["pitch"].number_value();
-    test_case.init_state.roll = json["roll"].number_value();
-    test_case.init_state.yaw = json["yaw"].number_value();
-    test_case.init_state.spd = json["spd"].number_value();
+    json11::Json init_state = json["init_state"];
+    test_case.init_state.lat = init_state["lat"].number_value();
+    test_case.init_state.lng = init_state["lng"].number_value();
+    test_case.init_state.alt = init_state["alt"].number_value();
+    test_case.init_state.agl = init_state["agl"].number_value();
+    test_case.init_state.pitch = init_state["pitch"].number_value();
+    test_case.init_state.roll = init_state["roll"].number_value();
+    test_case.init_state.yaw = init_state["yaw"].number_value();
+    test_case.init_state.spd = init_state["spd"].number_value();
+
+    // Populate channel inputs
+    std::vector<json11::Json> inputs = json["inputs"].array_items();
+    test_case.inputs.clear();
+    for (json11::Json x : inputs) {
+        channel_input_t input = {
+            .channel = x["channel"].int_value(),
+        };
+        for (json11::Json t : x["time"].array_items())
+            input.time.push_back(t.number_value());
+        for (json11::Json v : x["value"].array_items())
+            input.value.push_back(v.number_value());
+        test_case.inputs.push_back(input);
+        // Print values (TEMP)
+        // std::cout << "channel " << input.channel << " time values: ";
+        // std::for_each(input.time.begin(),  input.time.end(), [](const double &e) {
+        //     std::cout << e << " ";
+        // });
+        // std::cout << std::endl;
+        // std::cout << "channel " << input.channel << " vector values: ";
+        // std::for_each(input.value.begin(),  input.value.end(), [](const double &e) {
+        //     std::cout << e << " ";
+        // });
+        // std::cout << std::endl;
+    }
+
     return true;
 }
 

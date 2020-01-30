@@ -682,6 +682,9 @@ void SITL_State::_fdm_input_local(void)
     // construct servos structure for FDM
     _simulator_servos(input);
 
+    // run test case
+    _run_test_case(input);
+
     // update the model
     sitl_model->update_model(input);
 
@@ -698,6 +701,9 @@ void SITL_State::_fdm_input_local(void)
                 pwm_input[i] = 1000 + _sitl->state.rcin[i] * 1000;
             }
         }
+
+        // Display state
+        // _display_state(input, _sitl->state);
     }
 
     if (gimbal != nullptr)
@@ -995,6 +1001,72 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
     // fake battery2 as just a 25% gain on the first one
     voltage2_pin_value = ((voltage * 0.25f / 10.1f) / 5.0f) * 1024;
     current2_pin_value = ((_current * 0.25f / 17.0f) / 5.0f) * 1024;
+}
+
+// TODO: extract in math header
+double lerp(const std::vector<double> time, const std::vector<double> value, double t)
+{
+    // Control input
+    if (time.size() != value.size()) {
+        printf("Error: the two vectors must be the same size\n");
+        return t;
+    }
+    if (time.size() == 0) {
+        printf("Error: empty vectors\n");
+        return t;
+    }
+    // Find proper time index
+    size_t k;
+    for (k = 0; k < time.size(); k++)
+        if (time[k] >= t)
+            break;
+    // Now interpolate value based on time
+    k = MIN(k, time.size() - 1);
+    size_t kprev = k == 0 ? 0 : k - 1;
+    double deltaTime = MAX(time[k] - time[kprev], DBL_EPSILON);
+    double alpha = CLAMP((t - time[kprev]) / deltaTime, 0, 1); 
+    return value[kprev] + (value[k] - value[kprev]) * alpha;
+}
+
+/*
+  Run test case if any
+ */
+void SITL_State::_run_test_case(struct sitl_input &input)
+{
+    // Return if there is no test case
+    if (test_case.inputs.size() == 0)
+        return;
+    // Zero out servo output
+    for (int i = 0; i < SITL_NUM_CHANNELS; i++)
+        input.servos[i] = 1500;
+    // Copy test inputs over
+    for (channel_input_t channel_input : test_case.inputs)
+    {
+        // Check channel validity
+        int channel = channel_input.channel;
+        if (channel < 0 || channel > SITL_NUM_CHANNELS)
+        {
+            printf("Error: channel (%d) out of range\n", channel);
+        }
+        // Interpolate value based on time
+        uint32_t now = AP_HAL::millis();
+        double val = lerp(channel_input.time, channel_input.value, now / 1000.0);
+        input.servos[channel] = 1500 + 500 * val;
+    }
+}
+
+void SITL_State::_display_state(struct sitl_input &input, struct SITL::sitl_fdm &fdm) {
+    uint32_t now = AP_HAL::millis();
+    if (now % 1000 == 0) {
+        double d2r = M_PI / 180;
+        // Display state
+        printf("state: {");
+        for (size_t k = 0; k < 8; k++)
+            printf("ch_%lu: %.3f, ", k, (input.servos[k] - 1500.0) / 500.0);
+        printf("roll: %.3f, pitch: %.3f, yaw: %.3f ", fdm.rollDeg * d2r, fdm.pitchDeg * d2r, fdm.yawDeg * d2r);
+        printf("spd: %.3f", fdm.airspeed);
+        printf("}\n");
+    }
 }
 
 void SITL_State::init(int argc, char *const argv[])

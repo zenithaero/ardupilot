@@ -106,9 +106,24 @@ public:
     static bool parse_home(const char *home_str,
                            Location &loc,
                            float &yaw_degrees);
+    
+    typedef struct
+    {
+        int channel;
+        std::vector<double> time;
+        std::vector<double> value;
+    } channel_input_t;
+
+    typedef struct
+    {
+        SITL::Aircraft::state_t init_state;
+        std::vector<channel_input_t> inputs;
+    } test_case_t;
+
+    test_case_t test_case;
 
     /* parse a test case from file */
-    static bool parse_test_case(const char *test_case_fname, SITL::Aircraft::test_case_t &test_case);
+    static bool parse_test_case(const char *test_case_fname, test_case_t &test_case);
 
 private:
     void _parse_command_line(int argc, char * const argv[]);
@@ -168,6 +183,8 @@ private:
     void _output_to_flightgear(void);
     void _output_to_Zenith3D(void);
     void _simulator_servos(struct sitl_input &input);
+    void _run_test_case(struct sitl_input &input);
+    void _display_state(struct sitl_input &input, struct SITL::sitl_fdm &state);
     void _simulator_output(bool synthetic_clock_mode);
     uint16_t _airspeed_sensor(float airspeed);
     uint16_t _ground_sonar();

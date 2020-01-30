@@ -155,7 +155,7 @@ void Plane::calc_airspeed_errors()
         // Normal airspeed target
         target_airspeed_cm = aparm.airspeed_cruise_cm;
     }
-
+    
     // Set target to current airspeed + ground speed undershoot,
     // but only when this is faster than the target airspeed commanded
     // above.

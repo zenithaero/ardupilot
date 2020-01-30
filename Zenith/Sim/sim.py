@@ -65,7 +65,7 @@ if __name__ == "__main__":
     if args.speedup:
         sim_args += ["--speedup", "10"]
     if args.test:
-        sim_args += ["--test-case", "test_case.txt"]
+        sim_args += ["--test-case", "test_case.json"]
     mav_arg_list = [
         "--logfile logs/flight.tlog",
         '--cmd-imu-ready "wp load {}"'.format(FP_PATH),

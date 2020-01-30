@@ -56,13 +56,14 @@ for k = 1:prod(loopSize)
         aglScaling = 1;
         if core.isPlot('3d_map'); aglScaling = 3; end
         
-        [N, E, agl, ~, NCmd, ECmd, aglCmd, ~] = getPosVar(core, log);
+        [N, E, agl, ~] = getPosVar(core, log);
         
         % Load map
         mapPaddingPercent = 0.2; minLength = 20; % [m]
         [boundN, boundE] = deal([min(N), max(N)], [min(E), max(E)]);
         [padN, padE] = deal(max(diff(boundN)*mapPaddingPercent, minLength/2), max(diff(boundE)*mapPaddingPercent, minLength/2));
         [boundN, boundE] = deal(boundN + [-padN, padN], boundE + [-padE, padE]);
+        origLL = [log.ORGN.Lat(end) / toDeg, log.ORGN.Lng(end) / toDeg];
         [mapN, mapE, mapImg] = load_google_map(origLL, boundN, boundE);
         
         core.subplotInit(rows);
@@ -74,8 +75,11 @@ for k = 1:prod(loopSize)
         axis xy; hold on
         
         % Plot command
-        plot3(ECmd, NCmd, aglCmd * aglScaling, '-.g', 'linewidth', 2);
-        scatter3(ECmd, NCmd, aglCmd * aglScaling, 100, 'b', 'filled');
+        if isfield(log, 'CMD')
+            [NCmd, ECmd, aglCmd, ~] = getPosCmd(core, log);
+            plot3(ECmd, NCmd, aglCmd * aglScaling, '-.g', 'linewidth', 2);
+            scatter3(ECmd, NCmd, aglCmd * aglScaling, 100, 'b', 'filled');
+        end
 
         plot3(E, N, agl * aglScaling, 'r', 'linewidth', 2);
         legend('Cmd', 'Pos');
@@ -93,32 +97,43 @@ for k = 1:prod(loopSize)
         core.figureInit();
         rows = [2, 3]; % [column 1, column 2]...
         
-        [N, E, agl, t, NCmd, ECmd, aglCmd, tCmd] = getPosVar(core, log);
+        [N, E, agl, t] = getPosVar(core, log);
+        if isfield(log, 'CMD')
+            [NCmd, ECmd, aglCmd, tCmd] = getPosCmd(core, log);
+        end
         % [X, Y] = Helpers.NEtoXY(N, E, estimator.yaw);
 
         % N pos
         core.subplotInit(rows);
-        core.plotCurve(tCmd, NCmd, 'nCmd', '-.');
+        if isfield(log, 'CMD')
+            core.plotCurve(tCmd, NCmd, 'nCmd', '-.');
+        end
         core.plotCurve(t, N, 'N', '-', 2);
         core.subplotFinalize('time (s)', 'm', 'N pos');
         
         % E pos
         core.subplotInit(rows);
-        core.plotCurve(tCmd, ECmd, 'ECmd', '-.');
+        if isfield(log, 'CMD')
+            core.plotCurve(tCmd, ECmd, 'ECmd', '-.');
+        end
         core.plotCurve(t, E, 'E', '-', 2);
         core.subplotFinalize('time (s)', 'm', 'E pos');
         
         % Alt
         core.subplotInit(rows);
-        core.plotCurve(tCmd, aglCmd, 'aglCmd', '-.');
+        if isfield(log, 'CMD')
+            core.plotCurve(tCmd, aglCmd, 'aglCmd', '-.');
+        end
         core.plotCurve(t, agl, 'agl', '-', 2);
         core.subplotFinalize('time (s)', 'm', 'AGL');
 
         % Velocity
         core.subplotInit(rows);
-        core.plotCurve(log.TECS.timestamp, log.TECS.spdem, 'spCmd', '-.');
-        core.plotCurve(log.TECS.timestamp, log.TECS.sp, 'sp', '-');
-        core.subplotFinalize('', 'm/s', 'Speed');
+        if isfield(log, 'TECS')
+            core.plotCurve(log.TECS.timestamp, log.TECS.spdem, 'spCmd', '-.');
+            core.plotCurve(log.TECS.timestamp, log.TECS.sp, 'sp', '-');
+            core.subplotFinalize('', 'm/s', 'Speed');
+        end
 
         % Pitch
         core.subplotInit(rows);
@@ -132,18 +147,25 @@ for k = 1:prod(loopSize)
         core.figureInit();
         rows = [2, 2]; % [column 1, column 2]...
         
-        [N, E, agl, t, NCmd, ECmd, aglCmd, tCmd] = getPosVar(core, log);
+        [N, E, agl, t] = getPosVar(core, log);
+        if isfield(log, 'CMD')
+            [NCmd, ECmd, aglCmd, tCmd] = getPosCmd(core, log);
+        end
         % [X, Y] = Helpers.NEtoXY(N, E, estimator.yaw);
 
         % N pos
         core.subplotInit(rows);
-        core.plotCurve(tCmd, NCmd, 'nCmd', '-.');
+        if isfield(log, 'CMD')
+            core.plotCurve(tCmd, NCmd, 'nCmd', '-.');
+        end
         core.plotCurve(t, N, 'N', '-', 2);
         core.subplotFinalize('time (s)', 'm', 'N pos');
         
         % E pos
         core.subplotInit(rows);
-        core.plotCurve(tCmd, ECmd, 'ECmd', '-.');
+        if isfield(log, 'CMD')
+            core.plotCurve(tCmd, ECmd, 'ECmd', '-.');
+        end
         core.plotCurve(t, E, 'E', '-', 2);
         core.subplotFinalize('time (s)', 'm', 'E pos');
 
@@ -237,9 +259,8 @@ for k = 1:prod(loopSize)
 end
 
 % Helper functions
-function [N, E, agl, t, NCmd, ECmd, aglCmd, tCmd] = getPosVar(core, log)
+function [N, E, agl, t] = getPosVar(core, log)
     pos = log.POS;
-    cmd = log.CMD;
     toRad = pi/180;
     
     % Trim position
@@ -249,7 +270,12 @@ function [N, E, agl, t, NCmd, ECmd, aglCmd, tCmd] = getPosVar(core, log)
     [~, E] = core.trim(pos.timestamp, E);
     [~, agl] = core.trim(log.NKF5.timestamp, log.NKF5.HAGL);
     [t, N, E, agl] = Core.align(t, N, E, agl);
+end
 
+function [NCmd, ECmd, aglCmd, tCmd] = getPosCmd(core, log)
+    cmd = log.CMD;
+    toRad = pi/180;
+    
     % Trim commands
     [NCmd, ECmd] = Helpers.LLtoNE(origLL(1), origLL(2), cmd.Lat * toRad, cmd.Lng * toRad);
     [tCmd, NCmd] = core.trim(cmd.timestamp, NCmd);

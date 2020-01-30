@@ -215,6 +215,12 @@ static inline auto MAX(const A &one, const B &two) -> decltype(one > two ? one :
     return one > two ? one : two;
 }
 
+template<typename V, typename A, typename B>
+static inline V CLAMP(const V &val, const A &min, const B &max)
+{
+    return MIN(max, MAX(min, val));
+}
+
 inline uint32_t hz_to_nsec(uint32_t freq)
 {
     return AP_NSEC_PER_SEC / freq;

@@ -59,13 +59,6 @@ public:
 
     virtual void set_start_state(state_t state);
 
-    typedef struct
-    {
-        state_t init_state;
-    } test_case_t;
-
-    virtual void set_test_case(test_case_t test_case);
-
     /*
       set simulation speedup
      */
@@ -166,7 +159,6 @@ protected:
     Location home;
     bool home_is_set;
     Location location;
-    test_case_t test_case;
 
     float ground_level;
     float home_yaw;

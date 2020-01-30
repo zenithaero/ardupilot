@@ -82,7 +82,6 @@ protected:
     } coefficient;
 
     float thrust_scale;
-    bool dspoilers;
     // Launcher
     bool have_launcher;
     float launch_speed;

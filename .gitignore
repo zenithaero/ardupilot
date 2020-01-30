@@ -124,5 +124,14 @@ segv_*out
 /ArduSub/scripts/
 persistent.dat
 
+# Zenith
 *.code-workspace
 maps_cache/
+AntennaTracker/
+APMrover2/
+ArduCopter/
+ArduSub/
+benchmarks/
+docs/
+modules/
+tests/

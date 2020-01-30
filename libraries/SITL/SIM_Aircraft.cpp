@@ -113,7 +113,7 @@ void Aircraft::set_start_state(const Aircraft::state_t state)
     location = home;
     position.z = -state.agl;
     ground_level = state.alt;
-    dcm.from_euler(state.pitch, state.roll, state.yaw);
+    dcm.from_euler(state.roll, state.pitch, state.yaw);
     velocity_ef = dcm * Vector3f(state.spd, 0.f, 0.f);
 
     ::printf("Start state: [lat: %.2f deg, lon: %.2f deg, agl: %.2f m, pitch: %.2f rad, roll: %.2f rad, yaw: %.2f rad, spd: %.2f m/s]\n",
@@ -124,12 +124,6 @@ void Aircraft::set_start_state(const Aircraft::state_t state)
              state.roll,
              state.yaw,
              state.spd);
-}
-
-void Aircraft::set_test_case(const Aircraft::test_case_t test)
-{
-    test_case = test;
-    set_start_state(test.init_state);
 }
 
 /*
