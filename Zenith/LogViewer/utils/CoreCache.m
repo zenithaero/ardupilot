@@ -2,7 +2,7 @@
 % Created Jan 22, 2020
 % Bertrand Bevillard <bertrand@zenithaero.com>
 
-classdef Core < handle
+classdef CoreCache < handle
     properties
         timeRange = {[], []};  % Tuple of {modeDesc, time or [] for start/end}
         mainTitle = [];        % Optional main title
@@ -17,18 +17,18 @@ classdef Core < handle
         cacheLogs = true; % keep logs in memory to speedup multiple executions
         
         % Inner structures
-        l = 0; % Log index
-        p = 0; % Plot index
+        vars = struct;
         logs = containers.Map();
-        subplotInd = 0;
-        subplotAxes = [];
     end
     
     methods
-        function obj = Core(~)
+        function obj = CoreCache(~)
         end
         
-        function init(obj)                                 
+        function init(obj)
+            % Clear structures
+            obj.vars  = struct;
+                                 
             % Load new logs automatically if needed
             if isempty(obj.logFiles)
                 dir = fileparts(mfilename('fullpath'));
@@ -45,35 +45,26 @@ classdef Core < handle
             % Clear plots
             close all;
         end
-        
-        function indices = loopIndices(obj)
-            indices = 1:prod([length(obj.logFiles), length(obj.plots)]);
-        end
-        
-        function setIndex(obj, k)
-            indices = obj.loopIndices();
-            [obj.l, obj.p] = ind2sub(indices, k);
-        end
                 
+        function log = getLog(obj, l, p)
+            [obj.vars.logFile, obj.vars.plotName] = deal(obj.logFiles{l}, obj.plots{p});
+
+            % Populate case specific fields
+            obj.vars.logKey = @(key) sprintf('%s_%s', obj.vars.logFile, key);
+            obj.vars.key = @(key) sprintf('l%d_p%d_%s', l, p, key);
+            logFile = split(obj.vars.logFile, '/'); 
+            obj.vars.logName = sprintf('%s', logFile{end});
+
+            % Load roots
+            obj.loadLogs(obj.logFiles{l});
+            log = obj.logs(obj.vars.logKey('root'));
+        end
+        
         function rtn = isPlot(obj, name)
-            rtn = strcmp(name, obj.plotName());
+            rtn = strcmp(name, obj.vars.plotName);
         end
         
-        function logName = logName(obj)
-            filename = obj.logFiles{obj.l};
-            logFile = split(filename, '/'); 
-            logName = sprintf('%s', logFile{end});
-        end
-        
-        function plotName = plotName(obj)
-            plotName = obj.plots{obj.p};
-        end
-        
-        function figName = figName(obj)
-           figName = sprintf('%s - %s', obj.logName(), obj.plotName());
-        end
-        
-        % Logs loaders ----------------------------------------------------
+        % Loaders -----------------------------------------------------------------
         function logs = findLogs(obj, folder)  %#ok<*AGROW>
             logs = {};
             cont = dir(folder);
@@ -88,47 +79,63 @@ classdef Core < handle
             end
         end
 
-        function log = getLog(obj)
-            filename = obj.logFiles{obj.l};
+        function loadLogs(obj, filename)
             if ~exist(filename, 'file'); error('%s not found', filename); end
-            if ~obj.logs.isKey(obj.l)
+            if ~obj.logs.isKey(obj.vars.logKey('root'))
                 fprintf('Loading %s...\n', filename);
-                obj.logs(int2str(obj.l)) = load(filename);
+                obj.logs(obj.vars.logKey('root')) = load(filename);
             end
-            log = obj.logs(int2str(obj.l));
         end
         
         % Figure helpers ----------------------------------------------------------
         function figureInit(obj)
             dockModes = {'normal', 'docked'};
             set(0,'DefaultFigureWindowStyle', dockModes{obj.dockFigs + 1});
-            figure('Name', obj.figName(), 'NumberTitle', 'off');
+            figHandles = get(groot, 'Children'); fig = [];
+            figName = sprintf('%s - %s', obj.vars.logName, obj.vars.plotName);
+            obj.vars.figName = figName;
+            for k = 1:length(figHandles)
+                if strcmp(figHandles(k).Name, figName) && obj.overrideFigs 
+                    fig = figHandles(k);
+                    figure(fig); 
+                    break;
+                end
+            end
+            if isempty(fig); figure('Name', figName, 'NumberTitle', 'off'); end
             set(gcf,'color','w');
-            obj.subplotAxes = [];
-            obj.subplotInd = 0;
         end
 
         function subplotInit(obj, rows, linkaxe)
             if ~exist('linkaxe', 'var'); linkaxe = true; end
-            size = [lcms(rows), length(rows)];
-            map = reshape(1:prod(size), fliplr(size))';
-            % Create index
-            index = cell(sum(rows), 1);
-            for k = 1:prod(size)
-                [i, j] = ind2sub(size, k);
-                ind = sum(rows(1:j-1)) + ceil(i/size(1)*rows(j));
-                index{ind}(end + 1) = map(k);
+            key = @(k) [obj.vars.key('subplot_'), k];
+            if ~isfield(obj.vars, key('id'))
+                obj.vars.(key('id')) = 0;
+                obj.vars.(key('ax')) = [];
+                size = [lcms(rows), length(rows)];
+                map = reshape(1:prod(size), fliplr(size))';
+                % Create index
+                index = cell(sum(rows), 1);
+                for k = 1:prod(size)
+                    [i, j] = ind2sub(size, k);
+                    ind = sum(rows(1:j-1)) + ceil(i/size(1)*rows(j));
+                    index{ind}(end + 1) = map(k);
+                end
+                obj.vars.(key('size')) = size;
+                obj.vars.(key('index')) = index;
             end
-            obj.subplotInd = obj.subplotInd + 1;
-            ax = subtightplot(size(1), size(2), obj.subplotInd, 0.05);
+            obj.vars.(key('id')) = obj.vars.(key('id')) + 1;
+            plotInd = obj.vars.(key('index')){obj.vars.(key('id'))};
+            ax = subtightplot(obj.vars.(key('size'))(1),...
+                obj.vars.(key('size'))(2), plotInd, 0.05);
             if linkaxe
-                obj.subplotAxes(end + 1) = ax;
+                obj.vars.(key('ax'))(end + 1) = ax;
             end
         end
 
         function subplotFinalize(obj, xlabelStr, ylabelStr, titleStr)
-            if ~isempty(obj.subplotAxes)
-                linkaxes(obj.subplotAxes, 'x');
+            key = @(k) [obj.vars.key('subplot_'), k];
+            if ~isempty(obj.vars.(key('ax')))
+                linkaxes(obj.vars.(key('ax')), 'x');
             end
             xlabel(xlabelStr); ylabel(ylabelStr); title(titleStr);
             grid on; hold on; legend show
@@ -140,7 +147,7 @@ classdef Core < handle
             if ~isempty(obj.mainTitle) 
                 ttl = obj.mainTitle;
                 if obj.mainTitleTags
-                   ttl = sprintf('%s - %s', ttl, obj.figName());
+                    ttl = sprintf('%s - %s', ttl, obj.vars.figName); % obj.vars.plotName);
                 end
                 suplabel(ttl, 't', [0 0 1 0.97]);
             end
@@ -152,7 +159,7 @@ classdef Core < handle
             if ~exist(dir, 'dir')
                 mkdir(dir);
             end
-            print(gcf, [dir, '/', obj.figName(), '.png'], '-dpng', '-r150')
+            print(gcf, [dir, '/', obj.vars.figName, '.png'], '-dpng', '-r150')
         end
 
         % Plot helpers ------------------------------------------------------------
@@ -165,22 +172,45 @@ classdef Core < handle
             plot(t, x, args{:}); hold on
         end
 
-        function [t, x] = trim(obj, time, vect)
-            % Find id & time range and cache them
-            idx = [1, length(time)];
-            for i = 1:2
-                found = [];
-                if obj.timeRange{i} >= 0
-                    found = find(time >= obj.timeRange{i}, 1);
+        function [t, x] = trim(obj, time, vect, useCache)
+            if ~exist('useCache', 'var'); useCache = 0; end
+            key = @(k) obj.vars.key(sprintf('%s', k));
+            if ~(useCache && isfield(obj.vars, key('idx')))
+                % Find id & time range and cache them
+                idx = [1, length(time)];
+                for i = 1:2
+                    found = [];
+                    if obj.timeRange{i} >= 0
+                        found = find(time >= obj.timeRange{i}, 1);
+                    end
+                    if ~isempty(found)
+                        idx(i) = found;
+                    end
                 end
-                if ~isempty(found)
-                    idx(i) = found;
+                obj.vars.(key('idx')) = idx(1):idx(2);
+                obj.vars.(key('time')) = time(idx(1):idx(2));
+            end
+            t = obj.vars.(key('time'));
+            x = vect(obj.vars.(key('idx')));
+        end
+
+        function plotEvents(obj, timeList, namesList, sepStyle, dir)
+            ylimits = ylim; yext = ylimits(2) - ylimits(1);
+            yLast = 0; tLast = 0; STEP = 0.05;
+            for k = 1:length(timeList)
+                if ~iscell(namesList{k}); namesList{k} = namesList(k); end
+                for i = 1:length(namesList{k})
+                    tMode = timeList(k);
+                    if tMode < obj.vars.tRange(1) || tMode > obj.vars.tRange(2); continue; end
+                    if tLast <= tMode; yLast = ylimits(1 + (1 - dir)/2) + dir*yext*STEP; tLast = 0; end
+                    plot([tMode, tMode], ylimits, sepStyle);
+                    t = text(tMode, yLast, sprintf(' %s', namesList{k}{i}), 'Interpreter', 'none');
+                    set (t, 'Clipping', 'on');
+                    tLast = max(tLast, t.Extent(1) + t.Extent(3));
+                    yLast = yLast +dir*t.Extent(4);
                 end
             end
-            range = idx(1):idx(2);
-            t = time(range);
-            x = vect(range);
-        end
+        end 
     end
     
     % Helper functions -----------------------------------

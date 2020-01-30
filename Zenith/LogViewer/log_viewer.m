@@ -36,17 +36,16 @@ core.cacheLogs    = false;  % Keep logs in memory (prevent re-loading)
 % long    - Longitudinal plot
 % lat     - Lateral plot
 % ------------------------
-core.plots = {'2d', '3d_map', 'long', 'lat'};
+core.plots = {'lat'};
 
 core.init();
 toDeg = 180/pi;
 
 % Main loop
-loopSize = [length(core.logFiles), length(core.plots)];
-for k = 1:prod(loopSize)
+for k = core.loopIndices()
     % Unpack index & init loop
-    [l, p] = ind2sub(loopSize, k);
-    log = core.getLog(l, p);
+    core.setIndex(k);
+    log = core.getLog();
     
     % Position plots ----------------------------------------------------------
     if core.isPlot('2d') || core.isPlot('2d_map') || core.isPlot('3d_map')
@@ -145,34 +144,18 @@ for k = 1:prod(loopSize)
     % Body lateral ---------------------------------------------------
     if core.isPlot('lat')
         core.figureInit();
-        rows = [2, 2]; % [column 1, column 2]...
+        rows = [2]; % [column 1, column 2]...
         
-        [N, E, agl, t] = getPosVar(core, log);
-        if isfield(log, 'CMD')
-            [NCmd, ECmd, aglCmd, tCmd] = getPosCmd(core, log);
-        end
-        % [X, Y] = Helpers.NEtoXY(N, E, estimator.yaw);
-
-        % N pos
-        core.subplotInit(rows);
-        if isfield(log, 'CMD')
-            core.plotCurve(tCmd, NCmd, 'nCmd', '-.');
-        end
-        core.plotCurve(t, N, 'N', '-', 2);
-        core.subplotFinalize('time (s)', 'm', 'N pos');
-        
-        % E pos
-        core.subplotInit(rows);
-        if isfield(log, 'CMD')
-            core.plotCurve(tCmd, ECmd, 'ECmd', '-.');
-        end
-        core.plotCurve(t, E, 'E', '-', 2);
-        core.subplotFinalize('time (s)', 'm', 'E pos');
-
         % Roll
         core.subplotInit(rows);
         core.plotCurve(log.ATT.timestamp, log.ATT.DesRoll, 'rollCmd', '-.');
         core.plotCurve(log.ATT.timestamp, log.ATT.Roll, 'roll', '-');
+        core.subplotFinalize('', 'deg', 'Roll');
+        
+        % Roll from ctrl
+        core.subplotInit(rows);
+        core.plotCurve(log.RCTL.timestamp, log.RCTL.r_cmd, 'rollCmd', '-.');
+        core.plotCurve(log.RCTL.timestamp, log.RCTL.r_meas, 'roll', '-.');
         core.subplotFinalize('', 'deg', 'Roll');
         
         % Yaw
@@ -277,6 +260,7 @@ function [NCmd, ECmd, aglCmd, tCmd] = getPosCmd(core, log)
     toRad = pi/180;
     
     % Trim commands
+    origLL = [log.ORGN.Lat(end) * toRad, log.ORGN.Lng(end) * toRad];
     [NCmd, ECmd] = Helpers.LLtoNE(origLL(1), origLL(2), cmd.Lat * toRad, cmd.Lng * toRad);
     [tCmd, NCmd] = core.trim(cmd.timestamp, NCmd);
     [~, ECmd] = core.trim(cmd.timestamp, ECmd);
