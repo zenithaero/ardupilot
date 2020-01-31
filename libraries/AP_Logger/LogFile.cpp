@@ -840,6 +840,24 @@ void AP_Logger::Write_PID(uint8_t msg_type, const PID_Info &info)
     WriteBlock(&pkt, sizeof(pkt));
 }
 
+void AP_Logger::Write_CTRL(log_RollCtrl &pkt)
+{
+    pkt.msgid = LOG_ROLL_CTRL_MSG;
+    pkt.head1 = HEAD_BYTE1;
+    pkt.head2 = HEAD_BYTE2;
+    pkt.time_us = AP_HAL::micros64();
+    WriteBlock(&pkt, sizeof(pkt));
+}
+
+void AP_Logger::Write_CTRL(log_PitchCtrl &pkt)
+{
+    pkt.msgid = LOG_PITCH_CTRL_MSG;
+    pkt.head1 = HEAD_BYTE1;
+    pkt.head2 = HEAD_BYTE2;
+    pkt.time_us = AP_HAL::micros64();
+    WriteBlock(&pkt, sizeof(pkt));
+}
+
 void AP_Logger::Write_Origin(uint8_t origin_type, const Location &loc)
 {
     const struct log_ORGN pkt{

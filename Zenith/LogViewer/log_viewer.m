@@ -154,8 +154,9 @@ for k = core.loopIndices()
         
         % Roll from ctrl
         core.subplotInit(rows);
-        core.plotCurve(log.RCTL.timestamp, log.RCTL.r_cmd, 'rollCmd', '-.');
-        core.plotCurve(log.RCTL.timestamp, log.RCTL.r_meas, 'roll', '-.');
+        core.plotCurve(log.RCTL.timestamp, log.RCTL.pCmdCl, 'pCmdClipped', '-.');
+        core.plotCurve(log.RCTL.timestamp, log.RCTL.pMeas, 'pMeas', '-');
+        core.plotCurve(log.RCTL.timestamp, log.RCTL.pErrSc, 'pErrScaled', '--');
         core.subplotFinalize('', 'deg', 'Roll');
         
         % Yaw

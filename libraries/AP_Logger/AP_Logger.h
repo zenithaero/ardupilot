@@ -307,6 +307,9 @@ public:
 
     void Write_PID(uint8_t msg_type, const PID_Info &info);
 
+    void Write_CTRL(log_RollCtrl &pkt);
+    void Write_CTRL(log_PitchCtrl &pkt);
+
     // returns true if logging of a message should be attempted
     bool should_log(uint32_t mask) const;
 

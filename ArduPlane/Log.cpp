@@ -58,6 +58,9 @@ void Plane::Log_Write_Fast(void)
     if (should_log(MASK_LOG_ATTITUDE_FAST)) {
         Log_Write_Attitude();
     }
+    // Log controls
+    logger.Write_CTRL(rollController.get_log());
+    logger.Write_CTRL(pitchController.get_log());
 }
 
 

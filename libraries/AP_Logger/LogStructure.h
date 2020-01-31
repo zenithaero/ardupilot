@@ -764,6 +764,36 @@ struct PACKED log_PID {
     float   FF;
 };
 
+struct PACKED log_RollCtrl {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float pCmd;
+    float pCmdCl;
+    float pMeas;
+    float pErrSc;
+    float sc;
+    float p;
+    float i;
+    float d;
+    float ff;
+    float out;
+};
+
+struct PACKED log_PitchCtrl {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float qCmd;
+    float qCmdCl;
+    float qMeas;
+    float qErrSc;
+    float sc;
+    float p;
+    float i;
+    float d;
+    float ff;
+    float out;
+};
+
 struct PACKED log_Current {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -1547,8 +1577,11 @@ struct PACKED log_Arm_Disarm {
     { LOG_ARM_DISARM_MSG, sizeof(log_Arm_Disarm), \
       "ARM", "QBHBB", "TimeUS,ArmState,ArmChecks,Forced,Method", "s----", "F----" }, \
     { LOG_ERROR_MSG, sizeof(log_Error), \
-      "ERR",   "QBB",         "TimeUS,Subsys,ECode", "s--", "F--" }
-
+      "ERR",   "QBB",         "TimeUS,Subsys,ECode", "s--", "F--" }, \
+    { LOG_ROLL_CTRL_MSG, sizeof(log_RollCtrl), \
+      "RCTL", "Qffffffffff", "TimeUS,pCmd,pCmdCl,pMeas,pErrSc,sc,p,i,d,ff,out", "s----------", "F----------" }, \
+    { LOG_PITCH_CTRL_MSG, sizeof(log_PitchCtrl), \
+      "PCTL", "Qffffffffff", "TimeUS,qCmd,qCmdCl,qMeas,qErrSc,sc,p,i,d,ff,out", "s----------", "F----------" } \
 
 #define LOG_SBP_STRUCTURES \
     { LOG_MSG_SBPHEALTH, sizeof(log_SbpHealth), \
@@ -1699,6 +1732,10 @@ enum LogMessages : uint8_t {
     LOG_ARM_DISARM_MSG,
     LOG_OA_BENDYRULER_MSG,
     LOG_OA_DIJKSTRA_MSG,
+
+    // Z1 Logs
+    LOG_ROLL_CTRL_MSG,
+    LOG_PITCH_CTRL_MSG,
 
     _LOG_LAST_MSG_
 };

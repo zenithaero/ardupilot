@@ -110,7 +110,10 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 	
 	// Calculate the roll rate error (deg/sec) and apply gain scaler
     float achieved_rate = ToDeg(omega_x);
+	_log.pMeas = achieved_rate;
 	float rate_error = (desired_rate - achieved_rate) * scaler;
+	_log.sc = scaler;
+	_log.pErrSc = rate_error;
 	
 	// Get an airspeed estimate - default to zero if none available
 	float aspeed;
@@ -166,6 +169,12 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
     }
 
 	_last_out += _pid_info.I;
+	// Log output
+	_log.p = _pid_info.P;
+	_log.i = _pid_info.I;
+	_log.d = _pid_info.D;
+	_log.ff = _pid_info.FF;
+	_log.out = _last_out;
 	
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);
@@ -201,6 +210,7 @@ int32_t AP_RollController::get_servo_out(int32_t angle_err, float scaler, bool d
 	
 	// Calculate the desired roll rate (deg/sec) from the angle error
 	float desired_rate = angle_err * 0.01f / gains.tau;
+	_log.pCmd = desired_rate;
 
     // Limit the demanded roll rate
     if (gains.rmax && desired_rate < -gains.rmax) {
@@ -208,7 +218,7 @@ int32_t AP_RollController::get_servo_out(int32_t angle_err, float scaler, bool d
     } else if (gains.rmax && desired_rate > gains.rmax) {
         desired_rate = gains.rmax;
     }
-
+	_log.pCmdCl = desired_rate;
     return _get_rate_out(desired_rate, scaler, disable_integrator);
 }
 
