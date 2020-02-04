@@ -49,7 +49,7 @@ class SimData:
         self._fmt = []
 
         # Get variables
-        self.VERSION_EXPECTED = 0
+        self.VERSION_EXPECTED = 1
         self.getInt("version")
         self.getDouble("pos_n")
         self.getDouble("pos_e")
@@ -61,6 +61,7 @@ class SimData:
         self.getDouble("lng")
         self.getDouble("alt")
         self.getFloat("agl")
+        self.getFloat("ias")
         self.getFloat("phi")
         self.getFloat("theta")
         self.getFloat("psi")

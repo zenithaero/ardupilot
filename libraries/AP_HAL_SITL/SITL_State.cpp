@@ -591,7 +591,7 @@ void SITL_State::_output_to_Zenith3D(void)
     char buf[1024] = {0};
     int idx = 0;
 
-    int32_t version = 0; // version
+    int32_t version = 1; // version
     bufSet(buf, &idx, version);
     double pos_n = state.position.x;
     bufSet(buf, &idx, pos_n);
@@ -611,8 +611,10 @@ void SITL_State::_output_to_Zenith3D(void)
     bufSet(buf, &idx, lng);
     double alt = state.altitude; // above sea level (meters)
     bufSet(buf, &idx, alt);
-    float agl = state.altitude - state.home.alt / 0.01; // above ground level (meters)
+    float agl = state.altitude - home_alt; // above ground level (meters)
     bufSet(buf, &idx, agl);
+    float ias = state.airspeed;
+    bufSet(buf, &idx, ias);
     float phi = radians(state.rollDeg); // roll (radians)
     bufSet(buf, &idx, phi);
     float theta = radians(state.pitchDeg); // pitch (radians)
