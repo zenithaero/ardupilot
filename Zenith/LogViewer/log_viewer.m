@@ -13,7 +13,7 @@
 if ~exist('core', 'var'); core = Core(); end
 
 % Time range presets -----
-core.timeRange = {-1, -1}; % Plots time window
+core.timeRange = {-1, 200}; % Plots time window
 % ------------------------
 
 % Figure preferences -----
@@ -36,7 +36,7 @@ core.cacheLogs    = false;  % Keep logs in memory (prevent re-loading)
 % long    - Longitudinal plot
 % lat     - Lateral plot
 % ------------------------
-core.plots = {'lat'};
+core.plots = {'2d'};
 
 core.init();
 toDeg = 180/pi;
@@ -57,18 +57,16 @@ for k = core.loopIndices()
         
         [N, E, agl, ~] = getPosVar(core, log);
         
-        % Load map
-        mapPaddingPercent = 0.2; minLength = 20; % [m]
-        [boundN, boundE] = deal([min(N), max(N)], [min(E), max(E)]);
-        [padN, padE] = deal(max(diff(boundN)*mapPaddingPercent, minLength/2), max(diff(boundE)*mapPaddingPercent, minLength/2));
-        [boundN, boundE] = deal(boundN + [-padN, padN], boundE + [-padE, padE]);
-        origLL = [log.ORGN.Lat(end) / toDeg, log.ORGN.Lng(end) / toDeg];
-        [mapN, mapE, mapImg] = load_google_map(origLL, boundN, boundE);
-        
         core.subplotInit(rows);
-        
-        % Plot map
+                
+        % Load map
         if ~core.isPlot('2d')
+            mapPaddingPercent = 0.2; minLength = 20; % [m]
+            [boundN, boundE] = deal([min(N), max(N)], [min(E), max(E)]);
+            [padN, padE] = deal(max(diff(boundN)*mapPaddingPercent, minLength/2), max(diff(boundE)*mapPaddingPercent, minLength/2));
+            [boundN, boundE] = deal(boundN + [-padN, padN], boundE + [-padE, padE]);
+            origLL = [log.ORGN.Lat(end) / toDeg, log.ORGN.Lng(end) / toDeg];
+            [mapN, mapE, mapImg] = load_google_map(origLL, boundN, boundE);
             image(mapE, mapN, mapImg); alpha(.6);
         end
         axis xy; hold on
@@ -82,7 +80,10 @@ for k = core.loopIndices()
 
         plot3(E, N, agl * aglScaling, 'r', 'linewidth', 2);
         legend('Cmd', 'Pos');
-        axis equal; xlim(sort([mapE(1), mapE(end)])); ylim(sort([mapN(1), mapN(end)]));
+        axis equal;
+        if ~core.isPlot('2d')
+            xlim(sort([mapE(1), mapE(end)])); ylim(sort([mapN(1), mapN(end)]));
+        end
         zlabelstr = 'Altitude AGL [m]';
         if aglScaling ~= 1; zlabelstr = sprintf('%s (x%.1f)', zlabelstr, aglScaling); end
         xlabel('Easting [m]'); ylabel('Northing [m]'); zlabel(zlabelstr);

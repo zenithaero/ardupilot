@@ -16,7 +16,7 @@ LOCAL_DIR = os.path.dirname(os.path.realpath(__file__))
 ROOT_DIR = os.path.join(LOCAL_DIR, "../..")
 SIM_PATH = os.path.join(ROOT_DIR, "Tools/autotest/sim_vehicle.py")
 PARSER_PATH = os.path.join(LOCAL_DIR, "log_parser.py")
-FP_PATH = os.path.join(LOCAL_DIR, "../flightplans/takeoff.txt")
+FP_PATH = os.path.join(LOCAL_DIR, "../flightplans/circuit.txt")
 
 
 def parse_logs():
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     # Build sim command
     script = [SIM_PATH]
-    frame = "plane" if args.jsbsim else "Z1"
+    frame = "jsbsim" if args.jsbsim else "Z1"
     sim_args = ["-v", "ArduPlane", "-f", frame, "--no-rebuild", "--wipe-eeprom"]
     if args.joystick:
         sim_args += ["--joystick"]
@@ -66,15 +66,22 @@ if __name__ == "__main__":
         sim_args += ["--speedup", "10"]
     if args.test:
         sim_args += ["--test-case", "test_case.json"]
-    mav_arg_list = [
-        "--logfile logs/flight.tlog",
-        '--cmd-imu-ready "wp load {}"'.format(FP_PATH),
-        '--cmd-fp-ready "mode auto; arm throttle"',
-    ]
-    mav_args = ["--mavproxy-args", json.dumps(" ".join(mav_arg_list))] if args.fp else []
-    # print(" ".join(mav_args)); exit(-1)
+        print(
+            "WARNING: test cases should set SIM_SERVO_SPEED = -1 in parms"
+        )  # TODO: create special parm for test cases
+    # Create mav args
+    mav_arg_list = ["--logfile logs/flight.tlog"]
+    if args.fp:
+        mav_arg_list += [
+            "--logfile logs/flight.tlog",
+            '--cmd-imu-ready "wp load {}"'.format(FP_PATH),
+            '--cmd-fp-ready "mode auto; arm throttle"',
+        ]
+    else:
+        mav_arg_list += ['--cmd "arm throttle"']
+    mav_args = ["--mavproxy-args", json.dumps(" ".join(mav_arg_list))]
+    # Run command
     cmd = script + sim_args + mav_args
-
     atexit.register(parse_logs)
     os.system(" ".join(cmd))
 

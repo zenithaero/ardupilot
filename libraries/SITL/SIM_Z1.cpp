@@ -262,6 +262,14 @@ void Z1::update(const struct sitl_input &input)
     update_external_payload(input);
 
     // update lat/lon/altitude
+    // TEMP: Travel in a circle
+    // float omega = 3.14f / 2;
+    // circleAngle += frame_time_us * 1.0e-6f * omega;
+    // float dist = 10.f; // m
+    // position.x = dist * cosf(circleAngle);
+    // position.y = dist * sinf(circleAngle);
+    // position.z = -1.f;
+
     update_position();
     time_advance();
 

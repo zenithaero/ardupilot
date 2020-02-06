@@ -33,6 +33,8 @@ protected:
     const float air_density = 1.225; // kg/m^3 at sea level, ISA conditions
     float alpha;
     float beta;
+    // TEMP
+    float circleAngle;
 
     struct
     {
