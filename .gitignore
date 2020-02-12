@@ -135,3 +135,5 @@ benchmarks/
 docs/
 modules/
 tests/
+curses_test
+dumpstack_*

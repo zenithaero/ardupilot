@@ -233,6 +233,10 @@ class VehicleInfo(object):
             "Z1": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "default_params/z1.parm",
+            },
+            "Z1_Matlab": {
+                "waf_target": "bin/arduplane",
+                "default_params_filename": "default_params/z1.parm",
             }
         },
     },

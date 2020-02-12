@@ -46,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("--clear", action="store_true", help="clear sim data")
     parser.add_argument("--jsbsim", action="store_true", help="enable speedup")
     parser.add_argument("--test", action="store_true", help="enable test case")
+    parser.add_argument("--debug", action="store_true", help="debug mode")
     args = parser.parse_args()
 
     # Clear data if needed
@@ -69,6 +70,8 @@ if __name__ == "__main__":
         print(
             "WARNING: test cases should set SIM_SERVO_SPEED = -1 in parms"
         )  # TODO: create special parm for test cases
+    if args.debug:
+        sim_args += ["--lldb"]
     # Create mav args
     mav_arg_list = ["--logfile logs/flight.tlog"]
     if args.fp:
