@@ -395,6 +395,7 @@ class sitl(Board):
         env.AP_LIBRARIES += [
             'AP_HAL_SITL',
             'SITL',
+            'SITL/Z1_Sim'
         ]
 
         if cfg.options.enable_sfml:

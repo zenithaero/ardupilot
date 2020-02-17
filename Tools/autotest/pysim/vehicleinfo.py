@@ -230,7 +230,7 @@ class VehicleInfo(object):
             "ASWING": {
                 "waf_target": "bin/arduplane",
             },
-            "Z1": {
+            "Z1_Wrapper": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "default_params/z1.parm",
             },

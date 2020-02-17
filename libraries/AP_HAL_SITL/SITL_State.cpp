@@ -18,7 +18,6 @@
 #include <AP_Param/AP_Param.h>
 #include <SITL/SIM_JSBSim.h>
 #include <AP_HAL/utility/Socket.h>
-#include <SITL/SIM_Z1.h>
 
 extern const AP_HAL::HAL &hal;
 
