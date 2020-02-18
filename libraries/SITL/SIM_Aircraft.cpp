@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+
 #if defined(__CYGWIN__) || defined(__CYGWIN64__)
 #include <windows.h>
 #include <time.h>
@@ -39,26 +40,27 @@ using namespace SITL;
   parent class for all simulator types
  */
 
-Aircraft::Aircraft(const char *frame_str) : ground_level(0.0f),
-                                            frame_height(0.0f),
-                                            dcm(),
-                                            gyro(),
-                                            gyro_prev(),
-                                            ang_accel(),
-                                            velocity_ef(),
-                                            mass(0.0f),
-                                            accel_body(0.0f, 0.0f, -GRAVITY_MSS),
-                                            time_now_us(0),
-                                            gyro_noise(radians(0.1f)),
-                                            accel_noise(0.3f),
-                                            rate_hz(1200.0f),
-                                            autotest_dir(nullptr),
-                                            frame(frame_str),
-                                            num_motors(1),
+Aircraft::Aircraft(const char *frame_str) :
+    ground_level(0.0f),
+    frame_height(0.0f),
+    dcm(),
+    gyro(),
+    gyro_prev(),
+    ang_accel(),
+    velocity_ef(),
+    mass(0.0f),
+    accel_body(0.0f, 0.0f, -GRAVITY_MSS),
+    time_now_us(0),
+    gyro_noise(radians(0.1f)),
+    accel_noise(0.3f),
+    rate_hz(1200.0f),
+    autotest_dir(nullptr),
+    frame(frame_str),
+    num_motors(1),
 #if defined(__CYGWIN__) || defined(__CYGWIN64__)
-                                            min_sleep_time(20000)
+    min_sleep_time(20000)
 #else
-                                            min_sleep_time(5000)
+    min_sleep_time(5000)
 #endif
 {
     // make the SIM_* variables available to simulator backends
@@ -73,7 +75,7 @@ Aircraft::Aircraft(const char *frame_str) : ground_level(0.0f),
     enum ap_var_type ptype;
     ahrs_orientation = (AP_Int8 *)AP_Param::find("AHRS_ORIENTATION", &ptype);
 
-    enum Rotation imu_rotation = ahrs_orientation ? (enum Rotation)ahrs_orientation->get() : ROTATION_NONE;
+    enum Rotation imu_rotation = ahrs_orientation?(enum Rotation)ahrs_orientation->get():ROTATION_NONE;
     ahrs_rotation_inv.from_rotation(imu_rotation);
     ahrs_rotation_inv.transpose();
     last_imu_rotation = imu_rotation;
@@ -88,9 +90,9 @@ void Aircraft::set_start_location(const Location &start_loc, const float start_y
     home_is_set = true;
 
     ::printf("Home: %f %f alt=%fm hdg=%f\n",
-             home.lat * 1e-7,
-             home.lng * 1e-7,
-             home.alt * 0.01,
+             home.lat*1e-7,
+             home.lng*1e-7,
+             home.alt*0.01,
              home_yaw);
 
     location = home;
@@ -135,15 +137,13 @@ float Aircraft::ground_height_difference() const
     if (sitl &&
         sitl->terrain_enable && terrain &&
         terrain->height_amsl(home, h1, false) &&
-        terrain->height_amsl(location, h2, false))
-    {
+        terrain->height_amsl(location, h2, false)) {
         return h2 - h1;
     }
     return 0.0f;
 }
 
-void Aircraft::set_precland(SIM_Precland *_precland)
-{
+void Aircraft::set_precland(SIM_Precland *_precland) {
     precland = _precland;
     precland->set_default_location(home.lat * 1.0e-7f, home.lng * 1.0e-7f, static_cast<int16_t>(get_home_yaw()));
 }
@@ -160,7 +160,7 @@ float Aircraft::hagl() const
 */
 bool Aircraft::on_ground() const
 {
-    return hagl() <= 0.001f; // prevent bouncing around ground
+    return hagl() <= 0.001f;  // prevent bouncing around ground
 }
 
 /*
@@ -171,7 +171,7 @@ void Aircraft::update_position(void)
     location = home;
     location.offset(position.x, position.y);
 
-    location.alt = static_cast<int32_t>(home.alt - position.z * 100.0f);
+    location.alt  = static_cast<int32_t>(home.alt - position.z * 100.0f);
 
 #if 0
     // logging of raw sitl data
@@ -204,8 +204,7 @@ void Aircraft::update_mag_field_bf()
     // calculate frame height above ground
     const float frame_height_agl = fmaxf((-position.z) + home.alt * 0.01f - ground_level, 0.0f);
 
-    if (!sitl)
-    {
+    if (!sitl) {
         // running example program
         return;
     }
@@ -230,13 +229,11 @@ void Aircraft::time_advance()
 {
     // we only advance time if it hasn't been advanced already by the
     // backend
-    if (last_time_us == time_now_us)
-    {
+    if (last_time_us == time_now_us) {
         time_now_us += frame_time_us;
     }
     last_time_us = time_now_us;
-    if (use_time_sync)
-    {
+    if (use_time_sync) {
         sync_frame_time();
     }
 }
@@ -246,9 +243,9 @@ void Aircraft::setup_frame_time(float new_rate, float new_speedup)
 {
     rate_hz = new_rate;
     target_speedup = new_speedup;
-    frame_time_us = static_cast<uint64_t>(1.0e6f / rate_hz);
+    frame_time_us = static_cast<uint64_t>(1.0e6f/rate_hz);
 
-    scaled_frame_time_us = frame_time_us / target_speedup;
+    scaled_frame_time_us = frame_time_us/target_speedup;
     last_wall_time_us = get_wall_time_us();
     achieved_rate_hz = rate_hz;
 }
@@ -256,11 +253,10 @@ void Aircraft::setup_frame_time(float new_rate, float new_speedup)
 /* adjust frame_time calculation */
 void Aircraft::adjust_frame_time(float new_rate)
 {
-    if (!is_equal(rate_hz, new_rate))
-    {
+    if (!is_equal(rate_hz, new_rate)) {
         rate_hz = new_rate;
-        frame_time_us = static_cast<uint64_t>(1.0e6f / rate_hz);
-        scaled_frame_time_us = frame_time_us / target_speedup;
+        frame_time_us = static_cast<uint64_t>(1.0e6f/rate_hz);
+        scaled_frame_time_us = frame_time_us/target_speedup;
     }
 }
 
@@ -275,16 +271,12 @@ void Aircraft::sync_frame_time(void)
     frame_counter++;
     uint64_t now = get_wall_time_us();
     if (frame_counter >= 40 &&
-        now > last_wall_time_us)
-    {
-        const float rate = frame_counter * 1.0e6f / (now - last_wall_time_us);
-        achieved_rate_hz = (0.99f * achieved_rate_hz) + (0.01f * rate);
-        if (achieved_rate_hz < rate_hz * target_speedup)
-        {
+        now > last_wall_time_us) {
+        const float rate = frame_counter * 1.0e6f/(now - last_wall_time_us);
+        achieved_rate_hz = (0.99f*achieved_rate_hz) + (0.01f * rate);
+        if (achieved_rate_hz < rate_hz * target_speedup) {
             scaled_frame_time_us *= 0.999f;
-        }
-        else
-        {
+        } else {
             scaled_frame_time_us /= 0.999f;
         }
 #if 0
@@ -295,8 +287,7 @@ void Aircraft::sync_frame_time(void)
                  static_cast<double>(scaled_frame_time_us));
 #endif
         const uint32_t sleep_time = static_cast<uint32_t>(scaled_frame_time_us * frame_counter);
-        if (sleep_time > min_sleep_time)
-        {
+        if (sleep_time > min_sleep_time) {
             usleep(sleep_time);
         }
         last_wall_time_us = now;
@@ -309,12 +300,10 @@ void Aircraft::add_noise(float throttle)
 {
     gyro += Vector3f(rand_normal(0, 1),
                      rand_normal(0, 1),
-                     rand_normal(0, 1)) *
-            gyro_noise * fabsf(throttle);
+                     rand_normal(0, 1)) * gyro_noise * fabsf(throttle);
     accel_body += Vector3f(rand_normal(0, 1),
                            rand_normal(0, 1),
-                           rand_normal(0, 1)) *
-                  accel_noise * fabsf(throttle);
+                           rand_normal(0, 1)) * accel_noise * fabsf(throttle);
 }
 
 /*
@@ -326,66 +315,63 @@ double Aircraft::rand_normal(double mean, double stddev)
 {
     static double n2 = 0.0;
     static int n2_cached = 0;
-    if (!n2_cached)
-    {
+    if (!n2_cached) {
         double x, y, r;
         do
         {
-            x = 2.0 * rand() / RAND_MAX - 1;
-            y = 2.0 * rand() / RAND_MAX - 1;
-            r = x * x + y * y;
+            x = 2.0 * rand()/RAND_MAX - 1;
+            y = 2.0 * rand()/RAND_MAX - 1;
+            r = x*x + y*y;
         } while (is_zero(r) || r > 1.0);
-        const double d = sqrt(-2.0 * log(r) / r);
+        const double d = sqrt(-2.0 * log(r)/r);
         const double n1 = x * d;
         n2 = y * d;
         const double result = n1 * stddev + mean;
         n2_cached = 1;
         return result;
-    }
-    else
-    {
+    } else {
         n2_cached = 0;
         return n2 * stddev + mean;
     }
 }
+
+
+
 
 /*
    fill a sitl_fdm structure from the simulator state
 */
 void Aircraft::fill_fdm(struct sitl_fdm &fdm)
 {
-    if (use_smoothing)
-    {
+    if (use_smoothing) {
         smooth_sensors();
     }
     fdm.timestamp_us = time_now_us;
-    if (fdm.home.lat == 0 && fdm.home.lng == 0)
-    {
+    if (fdm.home.lat == 0 && fdm.home.lng == 0) {
         // initialise home
         fdm.home = home;
     }
-    fdm.latitude = location.lat * 1.0e-7;
+    fdm.latitude  = location.lat * 1.0e-7;
     fdm.longitude = location.lng * 1.0e-7;
-    fdm.altitude = location.alt * 1.0e-2;
-    fdm.heading = degrees(atan2f(velocity_ef.y, velocity_ef.x));
-    fdm.position = position;
-    fdm.speedN = velocity_ef.x;
-    fdm.speedE = velocity_ef.y;
-    fdm.speedD = velocity_ef.z;
-    fdm.xAccel = accel_body.x;
-    fdm.yAccel = accel_body.y;
-    fdm.zAccel = accel_body.z;
-    fdm.rollRate = degrees(gyro.x);
+    fdm.altitude  = location.alt * 1.0e-2;
+    fdm.heading   = degrees(atan2f(velocity_ef.y, velocity_ef.x));
+    fdm.speedN    = velocity_ef.x;
+    fdm.speedE    = velocity_ef.y;
+    fdm.speedD    = velocity_ef.z;
+    fdm.xAccel    = accel_body.x;
+    fdm.yAccel    = accel_body.y;
+    fdm.zAccel    = accel_body.z;
+    fdm.rollRate  = degrees(gyro.x);
     fdm.pitchRate = degrees(gyro.y);
-    fdm.yawRate = degrees(gyro.z);
+    fdm.yawRate   = degrees(gyro.z);
     fdm.angAccel.x = degrees(ang_accel.x);
     fdm.angAccel.y = degrees(ang_accel.y);
     fdm.angAccel.z = degrees(ang_accel.z);
     float r, p, y;
     dcm.to_euler(&r, &p, &y);
-    fdm.rollDeg = degrees(r);
+    fdm.rollDeg  = degrees(r);
     fdm.pitchDeg = degrees(p);
-    fdm.yawDeg = degrees(y);
+    fdm.yawDeg   = degrees(y);
     fdm.quaternion.from_rotation_matrix(dcm);
     fdm.airspeed = airspeed_pitot;
     fdm.battery_voltage = battery_voltage;
@@ -401,47 +387,42 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
     fdm.scanner.points = scanner.points;
     fdm.scanner.ranges = scanner.ranges;
 
-    if (smoothing.enabled)
-    {
+    if (smoothing.enabled) {
         fdm.xAccel = smoothing.accel_body.x;
         fdm.yAccel = smoothing.accel_body.y;
         fdm.zAccel = smoothing.accel_body.z;
-        fdm.rollRate = degrees(smoothing.gyro.x);
+        fdm.rollRate  = degrees(smoothing.gyro.x);
         fdm.pitchRate = degrees(smoothing.gyro.y);
-        fdm.yawRate = degrees(smoothing.gyro.z);
-        fdm.speedN = smoothing.velocity_ef.x;
-        fdm.speedE = smoothing.velocity_ef.y;
-        fdm.speedD = smoothing.velocity_ef.z;
-        fdm.latitude = smoothing.location.lat * 1.0e-7;
+        fdm.yawRate   = degrees(smoothing.gyro.z);
+        fdm.speedN    = smoothing.velocity_ef.x;
+        fdm.speedE    = smoothing.velocity_ef.y;
+        fdm.speedD    = smoothing.velocity_ef.z;
+        fdm.latitude  = smoothing.location.lat * 1.0e-7;
         fdm.longitude = smoothing.location.lng * 1.0e-7;
-        fdm.altitude = smoothing.location.alt * 1.0e-2;
+        fdm.altitude  = smoothing.location.alt * 1.0e-2;
     }
 
-    if (ahrs_orientation != nullptr)
-    {
+    if (ahrs_orientation != nullptr) {
         enum Rotation imu_rotation = (enum Rotation)ahrs_orientation->get();
 
-        if (imu_rotation != last_imu_rotation)
-        {
+        if (imu_rotation != last_imu_rotation) {
             ahrs_rotation_inv.from_rotation(imu_rotation);
             ahrs_rotation_inv.transpose();
             last_imu_rotation = imu_rotation;
         }
-        if (imu_rotation != ROTATION_NONE)
-        {
+        if (imu_rotation != ROTATION_NONE) {
             Matrix3f m = dcm;
             m = m * ahrs_rotation_inv;
 
             m.to_euler(&r, &p, &y);
-            fdm.rollDeg = degrees(r);
+            fdm.rollDeg  = degrees(r);
             fdm.pitchDeg = degrees(p);
-            fdm.yawDeg = degrees(y);
+            fdm.yawDeg   = degrees(y);
             fdm.quaternion.from_rotation_matrix(m);
         }
     }
-
-    if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0)
-    {
+    
+    if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {
         set_speedup(sitl->speedup);
         last_speedup = sitl->speedup;
     }
@@ -452,13 +433,12 @@ uint64_t Aircraft::get_wall_time_us() const
 #if defined(__CYGWIN__) || defined(__CYGWIN64__)
     static DWORD tPrev;
     static uint64_t last_ret_us;
-    if (tPrev == 0)
-    {
+    if (tPrev == 0) {
         tPrev = timeGetTime();
         return 0;
     }
     DWORD now = timeGetTime();
-    last_ret_us += (uint64_t)((now - tPrev) * 1000UL);
+    last_ret_us += (uint64_t)((now - tPrev)*1000UL);
     tPrev = now;
     return last_ret_us;
 #else
@@ -478,10 +458,8 @@ void Aircraft::set_speedup(float speedup)
 
 void Aircraft::update_model(const struct sitl_input &input)
 {
-    if (!home_is_set)
-    {
-        if (sitl == nullptr)
-        {
+    if (!home_is_set) {
+        if (sitl == nullptr) {
             return;
         }
         Location loc;
@@ -521,8 +499,7 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
 
     // if we're on the ground, then our vertical acceleration is limited
     // to zero. This effectively adds the force of the ground on the aircraft
-    if (on_ground() && accel_earth.z > 0)
-    {
+    if (on_ground() && accel_earth.z > 0) {
         accel_earth.z = 0;
     }
 
@@ -550,21 +527,17 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
     airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
 
     // constrain height to the ground
-    if (on_ground())
-    {
-        if (!was_on_ground && AP_HAL::millis() - last_ground_contact_ms > 1000)
-        {
-            gcs().send_text(MAV_SEVERITY_INFO, "Hit ground at %f m/s", velocity_ef.z);
+    if (on_ground()) {
+        if (!was_on_ground && AP_HAL::millis() - last_ground_contact_ms > 1000) {
+            gcs().send_text(MAV_SEVERITY_INFO, "SIM Hit ground at %f m/s", velocity_ef.z);
             last_ground_contact_ms = AP_HAL::millis();
         }
         position.z = -(ground_level + frame_height - home.alt * 0.01f + ground_height_difference());
 
-        switch (ground_behavior)
-        {
+        switch (ground_behavior) {
         case GROUND_BEHAVIOR_NONE:
             break;
-        case GROUND_BEHAVIOR_NO_MOVEMENT:
-        {
+        case GROUND_BEHAVIOR_NO_MOVEMENT: {
             // zero roll/pitch, but keep yaw
             float r, p, y;
             dcm.to_euler(&r, &p, &y);
@@ -572,55 +545,46 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
             // no X or Y movement
             velocity_ef.x = 0.0f;
             velocity_ef.y = 0.0f;
-            if (velocity_ef.z > 0.0f)
-            {
+            if (velocity_ef.z > 0.0f) {
                 velocity_ef.z = 0.0f;
             }
             gyro.zero();
             use_smoothing = true;
             break;
         }
-        case GROUND_BEHAVIOR_FWD_ONLY:
-        {
+        case GROUND_BEHAVIOR_FWD_ONLY: {
             // zero roll/pitch, but keep yaw
             float r, p, y;
             dcm.to_euler(&r, &p, &y);
-            if (velocity_ef.length() < 5)
-            {
+            if (velocity_ef.length() < 5) {
                 // at high speeds don't constrain pitch, otherwise we
                 // can get stuck in takeoff
                 p = 0;
-            }
-            else
-            {
+            } else {
                 p = MAX(p, 0);
             }
             dcm.from_euler(0.0f, p, y);
             // only fwd movement
             Vector3f v_bf = dcm.transposed() * velocity_ef;
             v_bf.y = 0.0f;
-            if (v_bf.x < 0.0f)
-            {
+            if (v_bf.x < 0.0f) {
                 v_bf.x = 0.0f;
             }
             velocity_ef = dcm * v_bf;
-            if (velocity_ef.z > 0.0f)
-            {
+            if (velocity_ef.z > 0.0f) {
                 velocity_ef.z = 0.0f;
             }
             gyro.zero();
             use_smoothing = true;
             break;
         }
-        case GROUND_BEHAVIOR_TAILSITTER:
-        {
+        case GROUND_BEHAVIOR_TAILSITTER: {
             // point straight up
             float r, p, y;
             dcm.to_euler(&r, &p, &y);
             dcm.from_euler(0.0f, radians(90), y);
             // no movement
-            if (accel_earth.z > -1.1 * GRAVITY_MSS)
-            {
+            if (accel_earth.z > -1.1*GRAVITY_MSS) {
                 velocity_ef.zero();
             }
             gyro.zero();
@@ -637,21 +601,19 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
 void Aircraft::update_wind(const struct sitl_input &input)
 {
     // wind vector in earth frame
-    wind_ef = Vector3f(cosf(radians(input.wind.direction)) * cosf(radians(input.wind.dir_z)),
-                       sinf(radians(input.wind.direction)) * cosf(radians(input.wind.dir_z)),
-                       sinf(radians(input.wind.dir_z))) *
-              input.wind.speed;
+    wind_ef = Vector3f(cosf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)), 
+                       sinf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)), 
+                       sinf(radians(input.wind.dir_z))) * input.wind.speed;
 
-    const float wind_turb = input.wind.turbulence * 10.0f; // scale input.wind.turbulence to match standard deviation when using iir_coef=0.98
-    const float iir_coef = 0.98f;                          // filtering high frequencies from turbulence
+    const float wind_turb = input.wind.turbulence * 10.0f;  // scale input.wind.turbulence to match standard deviation when using iir_coef=0.98
+    const float iir_coef = 0.98f;  // filtering high frequencies from turbulence
 
-    if (wind_turb > 0 && !on_ground())
-    {
+    if (wind_turb > 0 && !on_ground()) {
 
         turbulence_azimuth = turbulence_azimuth + (2 * rand());
 
         turbulence_horizontal_speed =
-            static_cast<float>(turbulence_horizontal_speed * iir_coef + wind_turb * rand_normal(0, 1) * (1 - iir_coef));
+                static_cast<float>(turbulence_horizontal_speed * iir_coef+wind_turb * rand_normal(0, 1) * (1 - iir_coef));
 
         turbulence_vertical_speed = static_cast<float>((turbulence_vertical_speed * iir_coef) + (wind_turb * rand_normal(0, 1) * (1 - iir_coef)));
 
@@ -669,8 +631,7 @@ void Aircraft::smooth_sensors(void)
 {
     uint64_t now = time_now_us;
     Vector3f delta_pos = position - smoothing.position;
-    if (smoothing.last_update_us == 0 || delta_pos.length() > 10)
-    {
+    if (smoothing.last_update_us == 0 || delta_pos.length() > 10) {
         smoothing.position = position;
         smoothing.rotation_b2e = dcm;
         smoothing.accel_body = accel_body;
@@ -682,8 +643,7 @@ void Aircraft::smooth_sensors(void)
         return;
     }
     const float delta_time = (now - smoothing.last_update_us) * 1.0e-6f;
-    if (delta_time < 0 || delta_time > 0.1)
-    {
+    if (delta_time < 0 || delta_time > 0.1) {
         return;
     }
 
@@ -727,6 +687,7 @@ void Aircraft::smooth_sensors(void)
                                            degrees(R2), degrees(P2), degrees(Y2));
 #endif
 
+
     // integrate to get new attitude
     smoothing.rotation_b2e.rotate(smoothing.gyro * delta_time);
     smoothing.rotation_b2e.normalize();
@@ -737,7 +698,7 @@ void Aircraft::smooth_sensors(void)
 
     smoothing.location = home;
     smoothing.location.offset(smoothing.position.x, smoothing.position.y);
-    smoothing.location.alt = static_cast<int32_t>(home.alt - smoothing.position.z * 100.0f);
+    smoothing.location.alt  = static_cast<int32_t>(home.alt - smoothing.position.z * 100.0f);
 
     smoothing.last_update_us = now;
     smoothing.enabled = true;
@@ -749,8 +710,7 @@ void Aircraft::smooth_sensors(void)
  */
 float Aircraft::filtered_idx(float v, uint8_t idx)
 {
-    if (sitl->servo_speed <= 0)
-    {
+    if (sitl->servo_speed <= 0) {
         return v;
     }
     const float cutoff = 1.0f / (2 * M_PI * sitl->servo_speed);
@@ -758,13 +718,14 @@ float Aircraft::filtered_idx(float v, uint8_t idx)
     return servo_filter[idx].apply(v, frame_time_us * 1.0e-6f);
 }
 
+
 /*
   return a filtered servo input as a value from -1 to 1
   servo is assumed to be 1000 to 2000, trim at 1500
  */
 float Aircraft::filtered_servo_angle(const struct sitl_input &input, uint8_t idx)
 {
-    const float v = (input.servos[idx] - 1500) / 500.0f;
+    const float v = (input.servos[idx] - 1500)/500.0f;
     return filtered_idx(v, idx);
 }
 
@@ -774,7 +735,7 @@ float Aircraft::filtered_servo_angle(const struct sitl_input &input, uint8_t idx
  */
 float Aircraft::filtered_servo_range(const struct sitl_input &input, uint8_t idx)
 {
-    const float v = (input.servos[idx] - 1000) / 1000.0f;
+    const float v = (input.servos[idx] - 1000)/1000.0f;
     return filtered_idx(v, idx);
 }
 
@@ -789,7 +750,7 @@ void Aircraft::extrapolate_sensors(float delta_time)
 
     // work out acceleration as seen by the accelerometers. It sees the kinematic
     // acceleration (ie. real movement), plus gravity
-    accel_body = dcm.transposed() * (accel_earth + Vector3f(0, 0, -GRAVITY_MSS));
+    accel_body = dcm.transposed() * (accel_earth + Vector3f(0,0,-GRAVITY_MSS));
 
     // new velocity and position vectors
     velocity_ef += accel_earth * delta_time;
@@ -803,40 +764,34 @@ void Aircraft::update_external_payload(const struct sitl_input &input)
     external_payload_mass = 0;
 
     // update sprayer
-    if (sprayer && sprayer->is_enabled())
-    {
+    if (sprayer && sprayer->is_enabled()) {
         sprayer->update(input);
         external_payload_mass += sprayer->payload_mass();
     }
 
     // update buzzer
-    if (buzzer && buzzer->is_enabled())
-    {
+    if (buzzer && buzzer->is_enabled()) {
         buzzer->update(input);
     }
 
     // update grippers
-    if (gripper && gripper->is_enabled())
-    {
+    if (gripper && gripper->is_enabled()) {
         gripper->set_alt(hagl());
         gripper->update(input);
         external_payload_mass += gripper->payload_mass();
     }
-    if (gripper_epm && gripper_epm->is_enabled())
-    {
+    if (gripper_epm && gripper_epm->is_enabled()) {
         gripper_epm->update(input);
         external_payload_mass += gripper_epm->payload_mass();
     }
 
     // update parachute
-    if (parachute && parachute->is_enabled())
-    {
+    if (parachute && parachute->is_enabled()) {
         parachute->update(input);
         // TODO: add drag to vehicle, presumably proportional to velocity
     }
 
-    if (precland && precland->is_enabled())
-    {
+    if (precland && precland->is_enabled()) {
         precland->update(get_location(), get_position());
     }
 }
@@ -844,27 +799,21 @@ void Aircraft::update_external_payload(const struct sitl_input &input)
 void Aircraft::add_shove_forces(Vector3f &rot_accel, Vector3f &body_accel)
 {
     const uint32_t now = AP_HAL::millis();
-    if (sitl == nullptr)
-    {
+    if (sitl == nullptr) {
         return;
     }
-    if (sitl->shove.t == 0)
-    {
+    if (sitl->shove.t == 0) {
         return;
     }
-    if (sitl->shove.start_ms == 0)
-    {
+    if (sitl->shove.start_ms == 0) {
         sitl->shove.start_ms = now;
     }
-    if (now - sitl->shove.start_ms < uint32_t(sitl->shove.t))
-    {
+    if (now - sitl->shove.start_ms < uint32_t(sitl->shove.t)) {
         // FIXME: can we get a vector operation here instead?
         body_accel.x += sitl->shove.x;
         body_accel.y += sitl->shove.y;
         body_accel.z += sitl->shove.z;
-    }
-    else
-    {
+    } else {
         sitl->shove.start_ms = 0;
         sitl->shove.t = 0;
     }
@@ -872,36 +821,28 @@ void Aircraft::add_shove_forces(Vector3f &rot_accel, Vector3f &body_accel)
 
 void Aircraft::add_twist_forces(Vector3f &rot_accel)
 {
-    if (sitl == nullptr)
-    {
+    if (sitl == nullptr) {
         return;
     }
-    if (sitl->gnd_behav != -1)
-    {
+    if (sitl->gnd_behav != -1) {
         ground_behavior = (GroundBehaviour)sitl->gnd_behav.get();
     }
     const uint32_t now = AP_HAL::millis();
-    if (sitl == nullptr)
-    {
+    if (sitl == nullptr) {
         return;
     }
-    if (sitl->twist.t == 0)
-    {
+    if (sitl->twist.t == 0) {
         return;
     }
-    if (sitl->twist.start_ms == 0)
-    {
+    if (sitl->twist.start_ms == 0) {
         sitl->twist.start_ms = now;
     }
-    if (now - sitl->twist.start_ms < uint32_t(sitl->twist.t))
-    {
+    if (now - sitl->twist.start_ms < uint32_t(sitl->twist.t)) {
         // FIXME: can we get a vector operation here instead?
         rot_accel.x += sitl->twist.x;
         rot_accel.y += sitl->twist.y;
         rot_accel.z += sitl->twist.z;
-    }
-    else
-    {
+    } else {
         sitl->twist.start_ms = 0;
         sitl->twist.t = 0;
     }
