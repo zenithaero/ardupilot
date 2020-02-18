@@ -1,6 +1,8 @@
 // auto generated bindings, don't manually edit.  See README.md for details.
 #include "lua_generated_bindings.h"
 #include "lua_boxed_numerics.h"
+#include <AP_Param/AP_Param.h>
+#include <AP_ESC_Telem/AP_ESC_Telem.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <RC_Channel/RC_Channel.h>
@@ -530,6 +532,89 @@ const luaL_Reg Location_meta[] = {
     {NULL, NULL}
 };
 
+static int AP_Param_set_and_save(lua_State *L) {
+    AP_Param * ud = AP_Param::get_singleton();
+    if (ud == nullptr) {
+        return luaL_argerror(L, 1, "param not supported on this firmware");
+    }
+
+    binding_argcheck(L, 3);
+    const char * data_2 = luaL_checkstring(L, 2);
+    const float raw_data_3 = luaL_checknumber(L, 3);
+    luaL_argcheck(L, ((raw_data_3 >= MAX(-FLT_MAX, -INFINITY)) && (raw_data_3 <= MIN(FLT_MAX, INFINITY))), 3, "argument out of range");
+    const float data_3 = raw_data_3;
+    const bool data = ud->set_and_save(
+            data_2,
+            data_3);
+
+    lua_pushboolean(L, data);
+    return 1;
+}
+
+static int AP_Param_set(lua_State *L) {
+    AP_Param * ud = AP_Param::get_singleton();
+    if (ud == nullptr) {
+        return luaL_argerror(L, 1, "param not supported on this firmware");
+    }
+
+    binding_argcheck(L, 3);
+    const char * data_2 = luaL_checkstring(L, 2);
+    const float raw_data_3 = luaL_checknumber(L, 3);
+    luaL_argcheck(L, ((raw_data_3 >= MAX(-FLT_MAX, -INFINITY)) && (raw_data_3 <= MIN(FLT_MAX, INFINITY))), 3, "argument out of range");
+    const float data_3 = raw_data_3;
+    const bool data = ud->set(
+            data_2,
+            data_3);
+
+    lua_pushboolean(L, data);
+    return 1;
+}
+
+static int AP_Param_get(lua_State *L) {
+    AP_Param * ud = AP_Param::get_singleton();
+    if (ud == nullptr) {
+        return luaL_argerror(L, 1, "param not supported on this firmware");
+    }
+
+    binding_argcheck(L, 2);
+    const char * data_2 = luaL_checkstring(L, 2);
+    float data_5003 = {};
+    const bool data = ud->get(
+            data_2,
+            data_5003);
+
+    if (data) {
+        lua_pushnumber(L, data_5003);
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
+static int AP_ESC_Telem_get_usage_seconds(lua_State *L) {
+    AP_ESC_Telem * ud = AP_ESC_Telem::get_singleton();
+    if (ud == nullptr) {
+        return luaL_argerror(L, 1, "esc_telem not supported on this firmware");
+    }
+
+    binding_argcheck(L, 2);
+    const lua_Integer raw_data_2 = luaL_checkinteger(L, 2);
+    luaL_argcheck(L, ((raw_data_2 >= MAX(0, 0)) && (raw_data_2 <= MIN(NUM_SERVO_CHANNELS, UINT8_MAX))), 2, "argument out of range");
+    const uint8_t data_2 = static_cast<uint8_t>(raw_data_2);
+    uint32_t data_5003 = {};
+    const bool data = ud->get_usage_seconds(
+            data_2,
+            data_5003);
+
+    if (data) {
+        new_uint32_t(L);
+        *static_cast<uint32_t *>(luaL_checkudata(L, -1, "uint32_t")) = data_5003;
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
 static int AP_Baro_get_external_temperature(lua_State *L) {
     AP_Baro * ud = AP_Baro::get_singleton();
     if (ud == nullptr) {
@@ -710,8 +795,10 @@ static int AP_Vehicle_get_time_flying_ms(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
+    AP::scheduler().get_semaphore().take_blocking();
     const uint32_t data = ud->get_time_flying_ms();
 
+    AP::scheduler().get_semaphore().give();
         new_uint32_t(L);
         *static_cast<uint32_t *>(luaL_checkudata(L, -1, "uint32_t")) = data;
     return 1;
@@ -724,8 +811,10 @@ static int AP_Vehicle_get_likely_flying(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
+    AP::scheduler().get_semaphore().take_blocking();
     const bool data = ud->get_likely_flying();
 
+    AP::scheduler().get_semaphore().give();
     lua_pushboolean(L, data);
     return 1;
 }
@@ -737,8 +826,10 @@ static int AP_Vehicle_get_mode(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
+    AP::scheduler().get_semaphore().take_blocking();
     const uint8_t data = ud->get_mode();
 
+    AP::scheduler().get_semaphore().give();
     lua_pushinteger(L, data);
     return 1;
 }
@@ -753,10 +844,12 @@ static int AP_Vehicle_set_mode(lua_State *L) {
     const lua_Integer raw_data_2 = luaL_checkinteger(L, 2);
     luaL_argcheck(L, ((raw_data_2 >= MAX(0, 0)) && (raw_data_2 <= MIN(UINT8_MAX, UINT8_MAX))), 2, "argument out of range");
     const uint8_t data_2 = static_cast<uint8_t>(raw_data_2);
+    AP::scheduler().get_semaphore().take_blocking();
     const bool data = ud->set_mode(
             data_2,
             ModeReason::SCRIPTING);
 
+    AP::scheduler().get_semaphore().give();
     lua_pushboolean(L, data);
     return 1;
 }
@@ -1903,6 +1996,18 @@ static int AP_AHRS_get_roll(lua_State *L) {
     return 1;
 }
 
+const luaL_Reg AP_Param_meta[] = {
+    {"set_and_save", AP_Param_set_and_save},
+    {"set", AP_Param_set},
+    {"get", AP_Param_get},
+    {NULL, NULL}
+};
+
+const luaL_Reg AP_ESC_Telem_meta[] = {
+    {"get_usage_seconds", AP_ESC_Telem_get_usage_seconds},
+    {NULL, NULL}
+};
+
 const luaL_Reg AP_Baro_meta[] = {
     {"get_external_temperature", AP_Baro_get_external_temperature},
     {"get_temperature", AP_Baro_get_temperature},
@@ -2155,6 +2260,8 @@ const struct userdata_meta userdata_fun[] = {
 };
 
 const struct userdata_meta singleton_fun[] = {
+    {"param", AP_Param_meta, NULL},
+    {"esc_telem", AP_ESC_Telem_meta, NULL},
     {"baro", AP_Baro_meta, NULL},
     {"serial", AP_SerialManager_meta, NULL},
     {"rc", RC_Channels_meta, NULL},
@@ -2225,6 +2332,8 @@ void load_generated_bindings(lua_State *L) {
 }
 
 const char *singletons[] = {
+    "param",
+    "esc_telem",
     "baro",
     "serial",
     "rc",

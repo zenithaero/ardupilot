@@ -44,6 +44,9 @@ public:
     // return a bitmask of escs that are "present" which means they are responding to requests.  Bitmask matches RC outputs
     uint16_t get_present_mask() const { return _esc_present_bitmask; }
 
+    // return total usage time in seconds
+    uint32_t get_usage_seconds(uint8_t esc_id) const;
+
 private:
 
     // loop to send output to ESCs in background thread
@@ -81,12 +84,14 @@ private:
         uint16_t esc_temp;          // esc temperature in degrees
         uint16_t motor_temp;        // motor temperature in degrees
         uint16_t count;             // total number of packets sent
+        uint32_t usage_sec;         // motor's total usage in seconds
         uint32_t last_update_ms;    // system time telemetry was last update (used to calc total current)
         float current_tot_mah;      // total current in mAh
         bool new_data;              // true if new telemetry data has been filled in but not logged yet
     } _telemetry[TOSHIBACAN_MAX_NUM_ESCS];
     uint32_t _telemetry_req_ms;     // system time (in milliseconds) to request data from escs (updated at 10hz)
     uint8_t _telemetry_temp_req_counter;    // counter used to trigger temp data requests from ESCs (10x slower than other telem data)
+    uint8_t _telemetry_usage_req_counter;   // counter used to trigger usage data requests from ESCs (100x slower than other telem data)
     const float centiamp_ms_to_mah = 1.0f / 360000.0f;  // for converting centi-amps milliseconds to mAh
 
     // variables for updating bitmask of responsive escs
@@ -142,6 +147,9 @@ private:
         };
         uint8_t data[6];
     };
+
+    // helper function to create motor_request_data_cmd_t
+    motor_request_data_cmd_t get_motor_request_data_cmd(uint8_t request_id) const;
 
     // structure for replies from ESC of data1 (rpm and voltage)
     union motor_reply_data1_t {

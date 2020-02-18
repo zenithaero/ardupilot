@@ -540,11 +540,8 @@ bool RCOutput::setup_group_DMA(pwm_group &group, uint32_t bitrate, uint32_t bit_
         uint32_t clock_hz = group.pwm_drv->clock;
         target_frequency = bitrate * bit_width;
         uint32_t prescaler = clock_hz / target_frequency;
-        while ((clock_hz / prescaler) * prescaler != clock_hz && prescaler <= 0x8000) {
-            prescaler++;
-        }
         freq = clock_hz / prescaler;
-        // hal.console->printf("CLOCK=%u FREQ=%u PRE=%u BR=%u\n", clock_hz, freq/bit_width, prescaler, bitrate);
+        // hal.console->printf("CLOCK=%u BW=%u FREQ=%u PRE=%u BR=%u\n", clock_hz, bit_width, freq/bit_width, prescaler, bitrate);
         if (prescaler > 0x8000) {
             group.dma_handle->unlock();
             return false;
@@ -648,7 +645,7 @@ void RCOutput::set_group_mode(pwm_group &group)
 
         // configure timer driver for DMAR at requested rate
         if (!setup_group_DMA(group, rate, bit_period, true, dshot_buffer_length, false)) {
-            group.current_mode = MODE_PWM_NONE;
+            group.current_mode = MODE_PWM_NORMAL;
             break;
         }
 
@@ -690,22 +687,23 @@ void RCOutput::set_group_mode(pwm_group &group)
 /*
   setup output mode
  */
-void RCOutput::set_output_mode(uint16_t mask, enum output_mode mode)
+void RCOutput::set_output_mode(uint16_t mask, const enum output_mode mode)
 {
     for (uint8_t i = 0; i < NUM_GROUPS; i++ ) {
         pwm_group &group = pwm_group_list[i];
+        enum output_mode thismode = mode;
         if (((group.ch_mask << chan_offset) & mask) == 0) {
             // this group is not affected
             continue;
         }
-        if (mode_requires_dma(mode) && !group.have_up_dma) {
-            mode = MODE_PWM_NONE;
+        if (mode_requires_dma(thismode) && !group.have_up_dma) {
+            thismode = MODE_PWM_NORMAL;
         }
         if (mode > MODE_PWM_NORMAL) {
             fast_channel_mask |= group.ch_mask;
         }
-        if (group.current_mode != mode) {
-            group.current_mode = mode;
+        if (group.current_mode != thismode) {
+            group.current_mode = thismode;
             set_group_mode(group);
         }
     }

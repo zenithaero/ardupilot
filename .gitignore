@@ -136,4 +136,4 @@ docs/
 modules/
 tests/
 curses_test
-dumpstack_*
+dumpstack_*out

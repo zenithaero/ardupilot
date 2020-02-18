@@ -37,7 +37,7 @@ const AP_Param::Info Rover::var_info[] = {
     // @User: Advanced
     GSCALAR(initial_mode,        "INITIAL_MODE",     Mode::Number::MANUAL),
 
-    // @Param: SYSID_THIS_MAV
+    // @Param: SYSID_THISMAV
     // @DisplayName: MAVLink system ID of this vehicle
     // @Description: Allows setting an individual MAVLink system id for this vehicle to distinguish it from others on the same network
     // @Range: 1 255
@@ -524,7 +524,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("LOIT_TYPE", 25, ParametersG2, loit_type, 0),
 
 #if HAL_SPRAYER_ENABLED
-    // @Group: SPRAYER_
+    // @Group: SPRAY_
     // @Path: ../libraries/AC_Sprayer/AC_Sprayer.cpp
     AP_SUBGROUPINFO(sprayer, "SPRAY_", 26, ParametersG2, AC_Sprayer),
 #endif

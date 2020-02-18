@@ -228,9 +228,6 @@ private:
                            FUNCTOR_BIND_MEMBER(&Rover::handle_battery_failsafe, void, const char*, const int8_t),
                            _failsafe_priorities};
 
-    // true if the compass's initial location has been set
-    bool compass_init_location;
-
     // flyforward timer
     uint32_t flyforward_start_ms;
 
@@ -319,7 +316,7 @@ private:
     void failsafe_ekf_off_event(void);
 
     // failsafe.cpp
-    void failsafe_trigger(uint8_t failsafe_type, bool on);
+    void failsafe_trigger(uint8_t failsafe_type, const char* type_str, bool on);
     void handle_battery_failsafe(const char* type_str, const int8_t action);
 #if ADVANCED_FAILSAFE == ENABLED
     void afs_fs_check(void);

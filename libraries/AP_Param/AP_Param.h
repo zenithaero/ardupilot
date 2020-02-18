@@ -197,6 +197,11 @@ public:
         uint16_t i;
         for (i=0; info[i].type != AP_PARAM_NONE; i++) ;
         _num_vars = i;
+
+        if (_singleton != nullptr) {
+            AP_HAL::panic("AP_Param must be singleton");
+        }
+        _singleton = this;
     }
 
     // empty constructor
@@ -281,6 +286,15 @@ public:
     /// @param  value           The new value
     /// @return                 true if the variable is found
     static bool set_by_name(const char *name, float value);
+    // name helper for scripting
+    static bool set(const char *name, float value) { return set_by_name(name, value); };
+
+    /// gat a value by name, used by scripting
+    ///
+    /// @param  name            The full name of the variable to be found.
+    /// @param  value           A refernce to the variable
+    /// @return                 true if the variable is found
+    static bool get(const char *name, float &value);
 
     /// set and save a value by name
     ///
@@ -288,6 +302,8 @@ public:
     /// @param  value           The new value
     /// @return                 true if the variable is found
     static bool set_and_save_by_name(const char *name, float value);
+    // name helper for scripting
+    static bool set_and_save(const char *name, float value) { return set_and_save_by_name(name, value); };
 
     /// Find a variable by index.
     ///
@@ -479,7 +495,11 @@ public:
                              AP_HAL::BetterStream *port);
 #endif // AP_PARAM_KEY_DUMP
 
+    static AP_Param *get_singleton() { return _singleton; }
+
 private:
+    static AP_Param *_singleton;
+
     /// EEPROM header
     ///
     /// This structure is placed at the head of the EEPROM to indicate
@@ -666,11 +686,15 @@ private:
         AP_Param *param;
         bool force_save;
     };
-    static ObjectBuffer<struct param_save> save_queue;
+    static ObjectBuffer_TS<struct param_save> save_queue;
     static bool registered_save_handler;
 
     // background function for saving parameters
     void save_io_handler(void);
+};
+
+namespace AP {
+    AP_Param *param();
 };
 
 /// Template class for scalar variables.

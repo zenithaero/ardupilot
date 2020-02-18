@@ -351,7 +351,6 @@ public:
     bool loiter_start();
     void rtl_start();
     void takeoff_start(const Location& dest_loc);
-    void wp_start(const Vector3f& destination, bool terrain_alt);
     void wp_start(const Location& dest_loc);
     void land_start();
     void land_start(const Vector3f& destination);
@@ -785,7 +784,7 @@ public:
     bool requires_terrain_failsafe() const override { return true; }
 
     void set_angle(const Quaternion &q, float climb_rate_cms, bool use_yaw_rate, float yaw_rate_rads);
-    bool set_destination(const Vector3f& destination, bool use_yaw = false, float yaw_cd = 0.0, bool use_yaw_rate = false, float yaw_rate_cds = 0.0, bool yaw_relative = false);
+    bool set_destination(const Vector3f& destination, bool use_yaw = false, float yaw_cd = 0.0, bool use_yaw_rate = false, float yaw_rate_cds = 0.0, bool yaw_relative = false, bool terrain_alt = false);
     bool set_destination(const Location& dest_loc, bool use_yaw = false, float yaw_cd = 0.0, bool use_yaw_rate = false, float yaw_rate_cds = 0.0, bool yaw_relative = false);
     bool get_wp(Location &loc) override;
     void set_velocity(const Vector3f& velocity, bool use_yaw = false, float yaw_cd = 0.0, bool use_yaw_rate = false, float yaw_rate_cds = 0.0, bool yaw_relative = false, bool log_request = true);
@@ -1396,7 +1395,7 @@ public:
 
     bool requires_GPS() const override { return true; }
     bool has_manual_throttle() const override { return false; }
-    bool allows_arming(bool from_gcs) const override { return false; }
+    bool allows_arming(bool from_gcs) const override { return true; }
     bool is_autopilot() const override { return true; }
 
     // save current position as A (dest_num = 0) or B (dest_num = 1).  If both A and B have been saved move to the one specified

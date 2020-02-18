@@ -601,7 +601,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_mount(const mavlink_command_long_t
     switch (packet.command) {
 #if MOUNT == ENABLED
     case MAV_CMD_DO_MOUNT_CONTROL:
-        if(!copter.camera_mount.has_pan_control()) {
+        if (!copter.camera_mount.has_pan_control()) {
             copter.flightmode->auto_yaw.set_fixed_yaw(
                 (float)packet.param3 * 0.01f,
                 0.0f,
@@ -870,7 +870,7 @@ void GCS_MAVLINK_Copter::handle_mount_message(const mavlink_message_t &msg)
     switch (msg.msgid) {
 #if MOUNT == ENABLED
     case MAVLINK_MSG_ID_MOUNT_CONTROL:
-        if(!copter.camera_mount.has_pan_control()) {
+        if (!copter.camera_mount.has_pan_control()) {
             // if the mount doesn't do pan control then yaw the entire vehicle instead:
             copter.flightmode->auto_yaw.set_fixed_yaw(
                 mavlink_msg_mount_control_get_input_c(&msg) * 0.01f,
@@ -892,7 +892,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
     case MAVLINK_MSG_ID_HEARTBEAT:      // MAV ID: 0
     {
         // We keep track of the last time we received a heartbeat from our GCS for failsafe purposes
-        if(msg.sysid != copter.g.sysid_my_gcs) break;
+        if (msg.sysid != copter.g.sysid_my_gcs) break;
         copter.failsafe.last_heartbeat_ms = AP_HAL::millis();
         break;
     }
@@ -1085,8 +1085,9 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
          */
 
         Vector3f pos_neu_cm;  // position (North, East, Up coordinates) in centimeters
+        bool terrain_alt = false;
 
-        if(!pos_ignore) {
+        if (!pos_ignore) {
             // sanity check location
             if (!check_latlng(packet.lat_int, packet.lon_int)) {
                 break;
@@ -1102,6 +1103,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
                 int32_t(packet.alt*100),
                 frame,
             };
+            terrain_alt = (loc.get_alt_frame() == Location::AltFrame::ABOVE_TERRAIN);
             if (!loc.get_vector_from_origin_NEU(pos_neu_cm)) {
                 break;
             }
@@ -1124,7 +1126,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         } else if (pos_ignore && !vel_ignore && acc_ignore) {
             copter.mode_guided.set_velocity(Vector3f(packet.vx * 100.0f, packet.vy * 100.0f, -packet.vz * 100.0f), !yaw_ignore, yaw_cd, !yaw_rate_ignore, yaw_rate_cds, yaw_relative);
         } else if (!pos_ignore && vel_ignore && acc_ignore) {
-            copter.mode_guided.set_destination(pos_neu_cm, !yaw_ignore, yaw_cd, !yaw_rate_ignore, yaw_rate_cds, yaw_relative);
+            copter.mode_guided.set_destination(pos_neu_cm, !yaw_ignore, yaw_cd, !yaw_rate_ignore, yaw_rate_cds, yaw_relative, terrain_alt);
         }
 
         break;
@@ -1202,7 +1204,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
     {
         mavlink_set_home_position_t packet;
         mavlink_msg_set_home_position_decode(&msg, &packet);
-        if((packet.latitude == 0) && (packet.longitude == 0) && (packet.altitude == 0)) {
+        if ((packet.latitude == 0) && (packet.longitude == 0) && (packet.altitude == 0)) {
             if (!copter.set_home_to_current_location(true)) {
                 // silently ignored
             }

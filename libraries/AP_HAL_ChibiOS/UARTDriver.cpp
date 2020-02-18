@@ -256,21 +256,7 @@ void UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
          */
         if (!_device_initialised) {
             if ((SerialUSBDriver*)sdef.serial == &SDU1) {
-                sduObjectInit(&SDU1);
-                sduStart(&SDU1, &serusbcfg1);
-#if HAL_HAVE_DUAL_USB_CDC
-                sduObjectInit(&SDU2);
-                sduStart(&SDU2, &serusbcfg2);
-#endif
-                /*
-                * Activates the USB driver and then the USB bus pull-up on D+.
-                * Note, a delay is inserted in order to not have to disconnect the cable
-                * after a reset.
-                */
-                usbDisconnectBus(serusbcfg1.usbp);
-                hal.scheduler->delay_microseconds(1500);
-                usbStart(serusbcfg1.usbp, &usbcfg);
-                usbConnectBus(serusbcfg1.usbp);
+                usb_initialise();
             }
             _device_initialised = true;
         }
@@ -1445,5 +1431,35 @@ uint8_t UARTDriver::get_options(void) const
 {
     return _last_options;
 }
+
+#if HAL_USE_SERIAL_USB == TRUE
+/*
+  initialise the USB bus, called from both UARTDriver and stdio for startup debug
+  This can be called before the hal is initialised so must not call any hal functions
+ */
+void usb_initialise(void)
+{
+    static bool initialised;
+    if (initialised) {
+        return;
+    }
+    initialised = true;
+    sduObjectInit(&SDU1);
+    sduStart(&SDU1, &serusbcfg1);
+#if HAL_HAVE_DUAL_USB_CDC
+    sduObjectInit(&SDU2);
+    sduStart(&SDU2, &serusbcfg2);
+#endif
+    /*
+     * Activates the USB driver and then the USB bus pull-up on D+.
+     * Note, a delay is inserted in order to not have to disconnect the cable
+     * after a reset.
+     */
+    usbDisconnectBus(serusbcfg1.usbp);
+    chThdSleep(chTimeUS2I(1500));
+    usbStart(serusbcfg1.usbp, &usbcfg);
+    usbConnectBus(serusbcfg1.usbp);
+}
+#endif
 
 #endif //CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS

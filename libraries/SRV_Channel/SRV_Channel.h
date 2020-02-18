@@ -15,7 +15,6 @@
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
-#include <AP_RCMapper/AP_RCMapper.h>
 #include <AP_Common/Bitmask.h>
 #include <AP_Volz_Protocol/AP_Volz_Protocol.h>
 #include <AP_RobotisServo/AP_RobotisServo.h>
@@ -53,7 +52,7 @@ public:
         k_mount_roll            = 8,            ///< mount roll
         k_mount_open            = 9,            ///< mount open (deploy) / close (retract)
         k_cam_trigger           = 10,           ///< camera trigger
-        k_egg_drop              = 11,           ///< egg drop
+        k_egg_drop              = 11,           ///< egg drop, deprecated
         k_mount2_pan            = 12,           ///< mount2 yaw (pan)
         k_mount2_tilt           = 13,           ///< mount2 pitch (tilt)
         k_mount2_roll           = 14,           ///< mount2 roll
@@ -101,7 +100,7 @@ public:
         k_rcin15                = 65,
         k_rcin16                = 66,
         k_ignition              = 67,
-        k_choke                 = 68,
+        k_choke                 = 68,           /// not used
         k_starter               = 69,
         k_throttle              = 70,
         k_tracker_yaw           = 71,            ///< antennatracker yaw

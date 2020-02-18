@@ -68,7 +68,7 @@ public:
     void       set_control_in(int16_t val) { control_in = val;}
 
     void       clear_override();
-    void       set_override(const uint16_t v, const uint32_t timestamp_us);
+    void       set_override(const uint16_t v, const uint32_t timestamp_ms);
     bool       has_override() const;
 
     int16_t    stick_mixing(const int16_t servo_in);
@@ -179,6 +179,7 @@ public:
         RUNCAM_OSD_CONTROL =  79, // control RunCam OSD
         KILL_IMU1 =          100, // disable first IMU (for IMU failure testing)
         KILL_IMU2 =          101, // disable second IMU (for IMU failure testing)
+        CAM_MODE_TOGGLE =    102, // Momentary switch to cycle camera modes
         // if you add something here, make sure to update the documentation of the parameter in RC_Channel.cpp!
         // also, if you add an option >255, you will need to fix duplicate_options_exist
 
