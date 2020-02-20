@@ -34,6 +34,7 @@ struct sitl_fdm {
     // this is the structure passed between FDM models and the main SITL code
     uint64_t timestamp_us;
     Location home;
+    Vector3f position; // meters; Added for Zenith3D
     double latitude, longitude; // degrees
     double altitude;  // MSL
     double heading;   // degrees

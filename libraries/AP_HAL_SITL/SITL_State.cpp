@@ -17,6 +17,7 @@
 
 #include <AP_Param/AP_Param.h>
 #include <SITL/SIM_JSBSim.h>
+#include <SITL/SIM_Z1_Matlab.h>
 #include <AP_HAL/utility/Socket.h>
 
 extern const AP_HAL::HAL& hal;
@@ -468,42 +469,55 @@ void SITL_State::_output_to_Zenith3D(void)
 {
     // SITL::Z1SimData data{};
     const SITL::sitl_fdm &state = _sitl->state;
-    char buf[1024] = {0};
-    int idx = 0;
+    SITL::Z1_Matlab::fdm_packet pkt;
 
-    int32_t version = 2; // version
-    bufSet(buf, &idx, version);
-    double home_lat = state.home.lat * 1e-7;
-    bufSet(buf, &idx, home_lat);
-    double home_lng = state.home.lng * 1e-7;
-    bufSet(buf, &idx, home_lng);
-    double home_alt = state.home.alt * 0.01;
-    bufSet(buf, &idx, home_alt);
-    double lat = state.latitude;
-    bufSet(buf, &idx, lat);
-    double lng = state.longitude;
-    bufSet(buf, &idx, lng);
-    double alt = state.altitude; // above sea level (meters)
-    bufSet(buf, &idx, alt);
-    float agl = state.altitude - home_alt; // above ground level (meters)
-    bufSet(buf, &idx, agl);
-    float ias = state.airspeed;
-    bufSet(buf, &idx, ias);
-    float phi = radians(state.rollDeg); // roll (radians)
-    bufSet(buf, &idx, phi);
-    float theta = radians(state.pitchDeg); // pitch (radians)
-    bufSet(buf, &idx, theta);
-    float psi = radians(state.yawDeg); // yaw or true heading (radians)
-    bufSet(buf, &idx, psi);
-    float alpha = 0; // angle of attack (radians)
-    bufSet(buf, &idx, alpha);
-    float beta = 0; // side slip angle (radians)
-    bufSet(buf, &idx, beta);
-    float rpm0 = constrain_float((pwm_output[2] - 1000) * 3, 0, 3000); // Motor 1 (rpm)
-    bufSet(buf, &idx, rpm0);
-    float rpm1 = constrain_float((pwm_output[5] - 1000) * 12, 0, 12000); // Motor 2 (rpm)
-    bufSet(buf, &idx, rpm1);
-    z3d_socket.send(buf, idx);
+    // Time
+    pkt.time = _sitl->state.timestamp_us / 1e6;
+    if (pkt.time - last_send_time_s < 0.1f) // Send at 10Hz
+        return;
+    last_send_time_s = pkt.time;
+
+    // Home
+    pkt.home_lla[0] = state.home.lat * 1e-7;
+    pkt.home_lla[1] = state.home.lng * 1e-7;
+    pkt.home_lla[2] = state.home.alt * 0.01;
+
+    // Acceleration
+    pkt.accel_b[0] = 0; // Unused
+    pkt.accel_b[1] = 0; // Unused
+    pkt.accel_b[2] = 0; // Unused
+
+
+    // Body frame velocity
+    pkt.vel_b[0] = state.airspeed;
+    pkt.vel_b[1] = 0; // Unused
+    pkt.vel_b[2] = 0; // Unused
+
+    // Earth frame velocity
+    pkt.vel_e[0] = state.speedN;
+    pkt.vel_e[1] = state.speedE;
+    pkt.vel_e[2] = state.speedD;
+
+    // Position
+    pkt.pos_e[0] = state.position.x;
+    pkt.pos_e[1] = state.position.y;
+    pkt.pos_e[2] = state.position.z;
+
+    // Body rates
+    pkt.pqr[0] = 0; // Unused
+    pkt.pqr[1] = 0; // Unused
+    pkt.pqr[2] = 0; // Unused
+
+    // Euler angles
+    pkt.euler[0] = state.rollDeg * DEG_TO_RAD;
+    pkt.euler[1] = state.pitchDeg * DEG_TO_RAD;
+    pkt.euler[2] = state.yawDeg * DEG_TO_RAD;
+
+    // Motor speed
+    pkt.thr = constrain_float((float)(pwm_output[2] - 1000) / 1000, 0.f, 1.f);
+    printf("outputs %f\n", pkt.thr);
+
+    z3d_socket.send(&pkt, sizeof(pkt));
 }
 
 /*

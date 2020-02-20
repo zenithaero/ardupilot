@@ -47,6 +47,7 @@ if __name__ == "__main__":
     parser.add_argument("--test", action="store_true", help="enable test case")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument("--matlab", action="store_true", help="matlab socket communication")
+    parser.add_argument("--plane", action="store_true", help="fly regular plane")
     args = parser.parse_args()
 
     # Clear data if needed
@@ -59,7 +60,12 @@ if __name__ == "__main__":
 
     # Build sim command
     script = [SIM_PATH]
-    frame = "Z1_Matlab" if args.matlab else "Z1_Wrapper"
+    if args.matlab:
+        frame = "Z1_Matlab"
+    elif args.plane:
+        frame = "plane"
+    else:
+        frame = "Z1_Wrapper"
     sim_args = ["-v", "ArduPlane", "-f", frame, "--no-rebuild", "--wipe-eeprom"]
     if args.joystick:
         sim_args += ["--joystick"]
@@ -74,9 +80,8 @@ if __name__ == "__main__":
         sim_args += ["--lldb"]
     # Create mav args
     mav_arg_list = ["--logfile logs/flight.tlog"]
-    if args.fp:
+    if args.fp or args.plane:
         mav_arg_list += [
-            "--logfile logs/flight.tlog",
             '--cmd-imu-ready "wp load {}"'.format(FP_PATH),
             '--cmd-fp-ready "mode auto; arm throttle"',
         ]

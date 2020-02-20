@@ -56,9 +56,10 @@ void Z1_Matlab::send_servos(const struct sitl_input &input)
     {
         // Assumes that the servos are perfectly trimmed. Make sure to use settings reflecting that fact in the simulation
         // TODO: send controller output directly. Then remove the pre-scaling in the model
-        pkt.servos[i] = (input.servos[i] - 1000) / 1000.0f;
+        pkt.servos[i] = (input.servos[i] - 1500) / 500.0f;
     }
     socket_sitl.sendto(&pkt, sizeof(pkt), _Z1_Matlab_address, _Z1_Matlab_port);
+    // printf("sending servos %f %f %f %f %f ...\n", pkt.servos[0], pkt.servos[1], pkt.servos[2], pkt.servos[3], pkt.servos[4]);
 }
 
 /*
@@ -77,6 +78,7 @@ void Z1_Matlab::recv_fdm(const struct sitl_input &input)
     while (size != sizeof(pkt))
     {
         size = socket_sitl.recv(&pkt, sizeof(pkt), 100);
+        printf("received %lu expected %lu\n", size, sizeof(pkt));
         send_servos(input);
         // Reset the timestamp after a long disconnection, also catch Z1_Matlab reset
         if (get_wall_time_us() > last_wall_time_us + Z1_Matlab_TIMEOUT_US)
@@ -85,35 +87,35 @@ void Z1_Matlab::recv_fdm(const struct sitl_input &input)
         }
     }
 
-    const double deltat = pkt.timestamp - last_timestamp; // in seconds
+    const double deltat = pkt.time - last_timestamp; // in seconds
     if (deltat < 0)
     { // don't use old packet
         time_now_us += 1;
         return;
     }
-    // get imu stuff
-    accel_body = Vector3f(pkt.imu_linear_acceleration_xyz[0],
-                          pkt.imu_linear_acceleration_xyz[1],
-                          pkt.imu_linear_acceleration_xyz[2]);
 
-    gyro = Vector3f(pkt.imu_angular_velocity_rpy[0],
-                    pkt.imu_angular_velocity_rpy[1],
-                    pkt.imu_angular_velocity_rpy[2]);
+    accel_body = Vector3f(pkt.accel_b[0],
+                          pkt.accel_b[1],
+                          pkt.accel_b[2]);
 
-    // compute dcm from imu orientation
-    Quaternion quat(pkt.imu_orientation_quat[0],
-                    pkt.imu_orientation_quat[1],
-                    pkt.imu_orientation_quat[2],
-                    pkt.imu_orientation_quat[3]);
+    velocity_ef = Vector3f(pkt.vel_e[0],
+                           pkt.vel_e[1],
+                           pkt.vel_e[2]);
+
+
+    position = Vector3f(pkt.pos_e[0],
+                        pkt.pos_e[1],
+                        pkt.pos_e[2]);
+
+    gyro = Vector3f(pkt.pqr[0],
+                    pkt.pqr[1],
+                    pkt.pqr[2]);
+
+    Quaternion quat(pkt.quat[0],
+                    pkt.quat[1],
+                    pkt.quat[2],
+                    pkt.quat[3]);
     quat.rotation_matrix(dcm);
-
-    velocity_ef = Vector3f(pkt.velocity_xyz[0],
-                           pkt.velocity_xyz[1],
-                           pkt.velocity_xyz[2]);
-
-    position = Vector3f(pkt.position_xyz[0],
-                        pkt.position_xyz[1],
-                        pkt.position_xyz[2]);
 
     // auto-adjust to simulation frame rate
     time_now_us += static_cast<uint64_t>(deltat * 1.0e6);
@@ -122,8 +124,13 @@ void Z1_Matlab::recv_fdm(const struct sitl_input &input)
     {
         adjust_frame_time(static_cast<float>(1.0 / deltat));
     }
-    last_timestamp = pkt.timestamp;
+    last_timestamp = pkt.time;
+
     // printf("received packet; pos: %f %f %f\n", position.x, position.y, position.z);
+    // printf("DCM: %f %f %f; %f %f %f; %f %f %f\n", dcm.a.x, dcm.a.y, dcm.a.z, dcm.b.x, dcm.b.y, dcm.b.z, dcm.c.x, dcm.c.y, dcm.c.z);
+    // float r, p, y;
+    // dcm.to_euler(&r, &p, &y);
+    // printf("Euler: %f %f %f\n", r, p, y);
 }
 
 /*

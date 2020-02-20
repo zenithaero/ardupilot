@@ -29,25 +29,28 @@ public:
     /*  Create and set in/out socket for Z1_Matlab simulator */
     void set_interface_ports(const char* address, const int port_in, const int port_out) override;
 
+    /*
+      reply packet sent from Matlab to ArduPilot
+     */
+    struct __attribute__ ((packed)) fdm_packet {
+      float time;  // in seconds
+      double home_lla[3];
+      float accel_b[3];
+      float vel_b[3];
+      float vel_e[3];
+      float pos_e[3];
+      float pqr[3];
+      float quat[4];
+      float euler[3];
+      float thr;
+    };
 private:
     /*
-      packet sent to Z1_Matlab
+      packet sent to Matlab
      */
-    struct servo_packet {
+    struct __attribute__ ((packed)) servo_packet {
       // size matches sitl_input upstream
       float servos[16];
-    };
-
-    /*
-      reply packet sent from Z1_Matlab to ArduPilot
-     */
-    struct fdm_packet {
-      float timestamp;  // in seconds
-      float imu_angular_velocity_rpy[3];
-      float imu_linear_acceleration_xyz[3];
-      float imu_orientation_quat[4];
-      float velocity_xyz[3];
-      float position_xyz[3];
     };
 
     void recv_fdm(const struct sitl_input &input);
@@ -58,8 +61,8 @@ private:
 
     SocketAPM socket_sitl;
     const char *_Z1_Matlab_address = "127.0.0.1";
-    int _Z1_Matlab_port = 9002;
-    static const uint64_t Z1_Matlab_TIMEOUT_US = 5000000;
+    int _Z1_Matlab_port = -1;
+    static const uint64_t Z1_Matlab_TIMEOUT_US = 5e6;
 };
 
 }  // namespace SITL

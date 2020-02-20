@@ -297,6 +297,7 @@ private:
     SocketAPM fg_socket{true};
     // output socket for Zenith3D viewing
     SocketAPM z3d_socket{true};
+    float last_send_time_s = 0.f;
     
     const char *defaults_path = HAL_PARAM_DEFAULTS_PATH;
 
