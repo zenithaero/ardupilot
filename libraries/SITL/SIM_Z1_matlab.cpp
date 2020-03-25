@@ -56,8 +56,15 @@ void Z1_Matlab::send_servos(const struct sitl_input &input)
     {
         // Assumes that the servos are perfectly trimmed. Make sure to use settings reflecting that fact in the simulation
         // TODO: send controller output directly. Then remove the pre-scaling in the model
-        pkt.servos[i] = (input.servos[i] - 1500) / 500.0f;
+        pkt.servos[i] = (input.servos[i] - 1500.f) / 500.f;
+        // TEMP
+        // pkt.servos[i] = (float)(time_now_us);
     }
+    pkt.servos[0] = servoPos;
+    servoPos += 1;
+    // time_now_us ++;
+    printf("send throttle %f\n", pkt.servos[2]);
+    // printf("servos sent %f to %d\n", pkt.servos[0], _Z1_Matlab_port);
     socket_sitl.sendto(&pkt, sizeof(pkt), _Z1_Matlab_address, _Z1_Matlab_port);
     // printf("sending servos %f %f %f %f %f ...\n", pkt.servos[0], pkt.servos[1], pkt.servos[2], pkt.servos[3], pkt.servos[4]);
 }
@@ -78,7 +85,7 @@ void Z1_Matlab::recv_fdm(const struct sitl_input &input)
     while (size != sizeof(pkt))
     {
         size = socket_sitl.recv(&pkt, sizeof(pkt), 100);
-        printf("received %lu expected %lu\n", size, sizeof(pkt));
+        // printf("received %lu expected %lu\n", size, sizeof(pkt));
         send_servos(input);
         // Reset the timestamp after a long disconnection, also catch Z1_Matlab reset
         if (get_wall_time_us() > last_wall_time_us + Z1_Matlab_TIMEOUT_US)
@@ -124,6 +131,10 @@ void Z1_Matlab::recv_fdm(const struct sitl_input &input)
     {
         adjust_frame_time(static_cast<float>(1.0 / deltat));
     }
+
+    printf("got frame after: %llums; deltaTime: %f; time %f \n", (get_wall_time_us() - last_wall_us) / 1000, deltat, (float)time_now_us / 1e6);
+
+    last_wall_us = get_wall_time_us();
     last_timestamp = pkt.time;
 
     // printf("received packet; pos: %f %f %f\n", position.x, position.y, position.z);
@@ -173,6 +184,11 @@ void Z1_Matlab::update(const struct sitl_input &input)
     // update magnetic field
     update_mag_field_bf();
     drain_sockets();
+
+    float r, p, y;
+    dcm.to_euler(&r, &p, &y);
+    // printf("Pos %f %f %f; vel %f %f %f; accel_body %f %f %f; euler %f %f %f\n", position.x, position.y, position.z, velocity_ef.x, velocity_ef.y, velocity_ef.z, accel_body.x, accel_body.y, accel_body.z, r, p, y);
+
 }
 
 } // namespace SITL

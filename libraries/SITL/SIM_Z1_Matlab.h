@@ -34,7 +34,7 @@ public:
      */
     struct __attribute__ ((packed)) fdm_packet {
       float time;  // in seconds
-      double home_lla[3];
+      float home_lla[3];
       float accel_b[3];
       float vel_b[3];
       float vel_e[3];
@@ -58,6 +58,8 @@ private:
     void drain_sockets();
 
     double last_timestamp;
+    uint64_t last_wall_us;
+    float servoPos = 0.f;
 
     SocketAPM socket_sitl;
     const char *_Z1_Matlab_address = "127.0.0.1";

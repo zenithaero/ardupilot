@@ -21,6 +21,7 @@
 #include <AP_GPS/AP_GPS.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_NMEA_Output/AP_NMEA_Output.h>
+#include <stdio.h>
 
 extern const AP_HAL::HAL& hal;
 

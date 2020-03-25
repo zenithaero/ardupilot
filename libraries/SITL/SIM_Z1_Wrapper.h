@@ -8,7 +8,7 @@
 
 #include "SIM_Aircraft.h"
 #include <AP_HAL/utility/Socket.h>
-#include "Z1_Sim/Z1_Sim.h"
+#include <Zenith/Simulator/Simulator.h>
 
 namespace SITL
 {
@@ -35,7 +35,7 @@ private:
   void send_servos(const struct sitl_input &input);
 
   double last_timestamp;
-  Z1_SimModelClass z1Sim;
+  SimulatorModelClass z1Sim;
 };
 
 } // namespace SITL

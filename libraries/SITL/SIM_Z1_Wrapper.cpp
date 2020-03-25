@@ -28,20 +28,22 @@ Z1_Wrapper::Z1_Wrapper(const char *frame_str) : Aircraft(frame_str),
 */
 void Z1_Wrapper::send_servos(const struct sitl_input &input)
 {
-    CmdBus cmdBus = z1Sim.Z1_Sim_DW.CmdBus_e;
+    CmdBus *cmdBus = &z1Sim.Simulator_DW.CmdBus_e;
     double value[16];
     for (unsigned i = 0; i < 16; ++i)
     {
         // Assumes that the servos are perfectly trimmed. Make sure to use settings reflecting that fact in the simulation
         // TODO: send controller output directly. Then remove the pre-scaling in the model
-        value[i] = (input.servos[i] - 1000.0) / 1000.0;
+        value[i] = (input.servos[i] - 1500.f) / 500.f;
     }
 
     // Mapping
-    cmdBus.thr = value[2];
-    cmdBus.ail = value[0];
-    cmdBus.elev = value[1];
-    cmdBus.rud = value[3];
+    cmdBus->thr = value[2];
+    cmdBus->ail = value[0];
+    cmdBus->elev = value[1];
+    cmdBus->rud = value[3];
+
+    // printf("thr: %f; elev %f\n", cmdBus->thr, cmdBus->elev);
 }
 
 /*
@@ -50,7 +52,7 @@ void Z1_Wrapper::send_servos(const struct sitl_input &input)
  */
 void Z1_Wrapper::recv_fdm()
 {
-    ACBus acBus = z1Sim.Z1_Sim_DW.ACBus_o;
+    ACBus acBus = z1Sim.Simulator_DW.ACBus_o;
 
     // Retrieve time
     const double deltat = acBus.time - last_timestamp; // in seconds
@@ -84,15 +86,23 @@ void Z1_Wrapper::recv_fdm()
                         acBus.Xe[1],
                         acBus.Xe[2]);
 
+    // Simulate airspeed
+    airspeed = velocity_ef.length();
+    airspeed_pitot = constrain_float(velocity_ef * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+
     // auto-adjust to simulation frame rate
     time_now_us += static_cast<uint64_t>(deltat * 1.0e6);
 
-    if (deltat < 0.01 && deltat > 0)
-    {
-        adjust_frame_time(static_cast<float>(1.0 / deltat));
-    }
+    // if (deltat < 0.01 && deltat > 0)
+    // {
+    //     adjust_frame_time(static_cast<float>(1.0 / deltat));
+    // }
     last_timestamp = acBus.time;
-    printf("received packet; pos: %f %f %f\n", position.x, position.y, position.z);
+
+    float r, p, y;
+    dcm.to_euler(&r, &p, &y);
+    // printf("Pos %f %f %f; vel %f %f %f; accel_body %f %f %f; euler %f %f %f\n", position.x, position.y, position.z, velocity_ef.x, velocity_ef.y, velocity_ef.z, accel_body.x, accel_body.y, accel_body.z, r, p, y);
+    // printf("deltaTime: %f; time %f \n", deltat, (float)time_now_us / 1e6);
 }
 
 /*
@@ -106,7 +116,6 @@ void Z1_Wrapper::update(const struct sitl_input &input)
     recv_fdm();
 
     update_position();
-
     time_advance();
     // update magnetic field
     update_mag_field_bf();

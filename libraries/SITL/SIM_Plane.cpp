@@ -383,4 +383,9 @@ void Plane::update(const struct sitl_input &input)
 
     // update magnetic field
     update_mag_field_bf();
+
+    float r, p, y;
+    dcm.to_euler(&r, &p, &y);
+    // printf("Pos %f %f %f; vel %f %f %f; accel_body %f %f %f; euler %f %f %f\n", position.x, position.y, position.z, velocity_ef.x, velocity_ef.y, velocity_ef.z, accel_body.x, accel_body.y, accel_body.z, r, p, y);
+    // Pos 0.000000 0.000000 -0.099976; vel 0.000000 0.000000 0.000000; accel_body 0.000000 0.000000 -9.806650; euler 0.000000 0.000000 -0.122173
 }

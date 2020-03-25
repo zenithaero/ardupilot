@@ -577,7 +577,7 @@ void Plane::update_alt()
             soaring_active = true;
         }
 #endif
-        
+        printf("alt cmd %d airspeed cmd %d\n", relative_target_altitude_cm(), target_airspeed_cm);
         SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
                                                  target_airspeed_cm,
                                                  flight_stage,

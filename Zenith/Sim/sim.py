@@ -16,7 +16,7 @@ LOCAL_DIR = os.path.dirname(os.path.realpath(__file__))
 ROOT_DIR = os.path.join(LOCAL_DIR, "../..")
 SIM_PATH = os.path.join(ROOT_DIR, "Tools/autotest/sim_vehicle.py")
 PARSER_PATH = os.path.join(LOCAL_DIR, "log_parser.py")
-FP_PATH = os.path.join(LOCAL_DIR, "../flightplans/circuit.txt")
+FP_PATH = os.path.join(LOCAL_DIR, "../flightplans/takeoff.txt")
 
 
 def parse_logs():

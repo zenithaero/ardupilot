@@ -962,7 +962,7 @@ bool Plane::verify_command_callback(const AP_Mission::Mission_Command& cmd)
 void Plane::exit_mission_callback()
 {
     if (control_mode == &mode_auto) {
-        set_mode(mode_stabilize, ModeReason::MISSION_END); // TODO: decide an appropriate behavior
+        set_mode(mode_cruise, ModeReason::MISSION_END); // TODO_ZENITH: decide an appropriate behavior
         gcs().send_text(MAV_SEVERITY_INFO, "Mission complete, changing mode to RTL");
     }
 }

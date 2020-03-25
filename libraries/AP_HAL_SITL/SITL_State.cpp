@@ -515,7 +515,6 @@ void SITL_State::_output_to_Zenith3D(void)
 
     // Motor speed
     pkt.thr = constrain_float((float)(pwm_output[2] - 1000) / 1000, 0.f, 1.f);
-    printf("outputs %f\n", pkt.thr);
 
     z3d_socket.send(&pkt, sizeof(pkt));
 }

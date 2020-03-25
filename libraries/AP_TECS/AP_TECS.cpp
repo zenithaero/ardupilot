@@ -3,6 +3,8 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Logger/AP_Logger.h>
+#include <Zenith/ZenithGains.h>
+
 
 extern const AP_HAL::HAL& hal;
 
@@ -463,6 +465,7 @@ void AP_TECS::_update_height_demand(void)
     }
 
     // Limit height rate of change
+    _maxClimbRate = ZenithGains::tecs.hDotMax;
     if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * 0.1f))
     {
         _hgt_dem = _hgt_dem_prev + _maxClimbRate * 0.1f;
@@ -558,6 +561,9 @@ void AP_TECS::_detect_underspeed(void)
 
 void AP_TECS::_update_energies(void)
 {
+
+    _TAS_dem_adj = 20;
+    _hgt_dem_adj = 25;
     // Calculate specific energy demands
     _SPE_dem = _hgt_dem_adj * GRAVITY_MSS;
     _SKE_dem = 0.5f * _TAS_dem_adj * _TAS_dem_adj;
@@ -574,6 +580,7 @@ void AP_TECS::_update_energies(void)
     _SPEdot = _climb_rate * GRAVITY_MSS;
     _SKEdot = _TAS_state * _vel_dot;
 
+    printf("TECS hCmd %.2f h %.2f pitchDem %.2f; tasCmd %.2f tas %.2f thrDem %.2f\n", _hgt_dem_adj, _height, _pitch_dem, _TAS_dem_adj, _TAS_state, _throttle_dem);
 }
 
 /*
@@ -590,7 +597,7 @@ float AP_TECS::timeConstant(void) const
     if (_timeConst < 0.1f) {
         return 0.1f;
     }
-    return _timeConst;
+    return 1 / ZenithGains::tecs.TcInv;
 }
 
 /*
@@ -649,6 +656,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         if (_flags.is_doing_auto_land && !is_zero(_land_throttle_damp)) {
             throttle_damp = _land_throttle_damp;
         }
+        throttle_damp = ZenithGains::tecs.totKd;
         _throttle_dem = (_STE_error + STEdot_error * throttle_damp) * K_STE2Thr + ff_throttle;
 
         // Constrain throttle demand
@@ -696,6 +704,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
 
     // Constrain throttle demand
     _throttle_dem = constrain_float(_throttle_dem, _THRminf, _THRmaxf);
+    // _throttle_dem = 0.11;
 }
 
 float AP_TECS::_get_i_gain(void)
@@ -710,7 +719,7 @@ float AP_TECS::_get_i_gain(void)
             i_gain = _integGain_land;
         }
     }
-    return i_gain;
+    return ZenithGains::tecs.Ki;
 }
 
 /*
@@ -855,6 +864,7 @@ void AP_TECS::_update_pitch(void)
     } else if (!is_zero(_land_pitch_damp) && _flags.is_doing_auto_land) {
         pitch_damp = _land_pitch_damp;
     }
+    pitch_damp = ZenithGains::tecs.balKd;
     temp += SEBdot_error * pitch_damp;
 
     if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
@@ -950,6 +960,8 @@ void AP_TECS::_update_STE_rate_lim(void)
 {
     // Calculate Specific Total Energy Rate Limits
     // This is a trivial calculation at the moment but will get bigger once we start adding altitude effects
+    _maxClimbRate = ZenithGains::tecs.hDotMax;
+    _minSinkRate =  ZenithGains::tecs.hDotMin;
     _STEdot_max = _maxClimbRate * GRAVITY_MSS;
     _STEdot_min = - _minSinkRate * GRAVITY_MSS;
 }
@@ -988,6 +1000,8 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         _THRmaxf  = aparm.throttle_max * 0.01f;
     }
     _THRminf  = aparm.throttle_min * 0.01f;
+    _THRminf = ZenithGains::tecs.thrMin;
+    _THRmaxf = ZenithGains::tecs.thrMax;
 
     // min of 1% throttle range to prevent a numerical error
     _THRmaxf = MAX(_THRmaxf, _THRminf+0.01);
