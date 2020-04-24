@@ -18,6 +18,7 @@
 */
 
 #include "SIM_Plane.h"
+#include <AP_BattMonitor/AP_BattMonitor.h>
 
 #include <stdio.h>
 
@@ -386,6 +387,14 @@ void Plane::update(const struct sitl_input &input)
 
     float r, p, y;
     dcm.to_euler(&r, &p, &y);
+
+    // Reset precentage if needed
+    
+    uint8_t remaining = AP::battery().capacity_remaining_pct(AP_BATT_PRIMARY_INSTANCE);
+    if (remaining < 80) {
+        AP::battery().reset_remaining(1 << AP_BATT_PRIMARY_INSTANCE, 81.0f);
+    }
+
     // printf("Pos %f %f %f; vel %f %f %f; accel_body %f %f %f; euler %f %f %f\n", position.x, position.y, position.z, velocity_ef.x, velocity_ef.y, velocity_ef.z, accel_body.x, accel_body.y, accel_body.z, r, p, y);
     // Pos 0.000000 0.000000 -0.099976; vel 0.000000 0.000000 0.000000; accel_body 0.000000 0.000000 -9.806650; euler 0.000000 0.000000 -0.122173
 }

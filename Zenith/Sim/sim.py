@@ -16,7 +16,8 @@ LOCAL_DIR = os.path.dirname(os.path.realpath(__file__))
 ROOT_DIR = os.path.join(LOCAL_DIR, "../..")
 SIM_PATH = os.path.join(ROOT_DIR, "Tools/autotest/sim_vehicle.py")
 PARSER_PATH = os.path.join(LOCAL_DIR, "log_parser.py")
-FP_PATH = os.path.join(LOCAL_DIR, "../flightplans/takeoff.txt")
+FP_PATH = os.path.join(LOCAL_DIR, "../FlightPlans/loiter.txt")
+MAVPROXY_PATH = os.path.join(ROOT_DIR, "../MAVProxy/MAVProxy/mavproxy.py")
 
 
 def parse_logs():
@@ -48,6 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument("--matlab", action="store_true", help="matlab socket communication")
     parser.add_argument("--plane", action="store_true", help="fly regular plane")
+    parser.add_argument("--no-logs", action="store_true", help="don't parse logs")
     args = parser.parse_args()
 
     # Clear data if needed
@@ -78,9 +80,12 @@ if __name__ == "__main__":
         )  # TODO: create special parm for test cases
     if args.debug:
         sim_args += ["--lldb"]
+    # Point to the right mavproxy
+    sim_args += ["--mavproxy-path", MAVPROXY_PATH]
     # Create mav args
     mav_arg_list = ["--logfile logs/flight.tlog"]
-    if args.fp or args.plane:
+    # mav_arg_list += ["--logfile logs/flight.tlog"]
+    if args.fp:
         mav_arg_list += [
             '--cmd-imu-ready "wp load {}"'.format(FP_PATH),
             '--cmd-fp-ready "mode auto; arm throttle"',
@@ -88,11 +93,34 @@ if __name__ == "__main__":
     else:
         mav_arg_list += ['--cmd "arm throttle"']
     mav_args = ["--mavproxy-args", json.dumps(" ".join(mav_arg_list))]
+    # Register exit hook
+    if not args.no_logs:
+        atexit.register(parse_logs)
     # Run command
     cmd = script + sim_args + mav_args
-    atexit.register(parse_logs)
     os.system(" ".join(cmd))
 
+    # p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+    # grep_stdout = p.communicate(input=b'one\ntwo\nthree\nfour\nfive\nsix\n')[0]
     # Execute sim command. TODO: run in subprocess
     # p = subprocess.Popen(cmd, cwd=working_directory)
     # p.wait()
+
+    # if True:
+    #     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    #     while True:
+    #         output = proc.stdout.readline()
+    #         if output == "" and proc.poll() is not None:
+    #             # Terminate
+    #             print("PROCESS TERMINATED")
+    #             break
+    #         # Handle output
+    #         elif output:
+    #             output_str = str(output.decode("ascii")).replace("\n", "")
+    #             print("> {}".format(output_str))
+    #             # Handle
+    #             if "online system 1" in output_str:
+    #                 print("### SENDING CMD")
+    #                 fp_cmd = "wp load {}".format(FP_PATH).encode()
+    #                 proc.stdin.writelines([fp_cmd])
+    #                 print("### CMD SENT!")

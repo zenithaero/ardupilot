@@ -6,7 +6,7 @@
 
 namespace ZenithGains {
 	static struct {
-		float enable = 1;
+		float enable = 0;
 		float FF = -3.612;
 		float Omega = 1.9734;
 		float Kp = 0.11102;
@@ -18,18 +18,18 @@ namespace ZenithGains {
 		float enable = 1;
 		float FF = -0.000107;
 		float Omega = 1;
-		float Kp = 0.038456;
-		float Kd = 0.058384;
-		float Ki = 0;
+		float Kp = 0.21941;
+		float Kd = 0.065625;
+		float Ki = 5.7e-05;
 	} roll;
 
 	static struct {
 		float enable = 1;
-		float FF = 4.9989;
-		float Kd = 0.48871;
+		float FF = -0.00107;
+		float Kd = 0;
 		float Kcoord = 0;
-		float Kslip = 0;
 		float Ki = 0;
+		float Kslip = 0;
 	} yaw;
 
 	static struct {
@@ -46,16 +46,17 @@ namespace ZenithGains {
 		float Wspe = 1;
 		float Wske = 1;
 		float skeFF = 0;
-		float TcInv = 0.41423;
-		float Ki = 0.001989;
-		float totKd = 1;
-		float balKd = 1;
+		float TcInv = 0.5;
+		float Ki = 0.199;
+		float totKd = 0.009;
+		float balKd = 2.3054;
 	} tecs;
 
 	static struct {
-		float enable = 0;
-		float damping = 0.6;
-		float periodInv = 0.045515;
+		float enable = 1;
+		float distOverPeriodMin = 1;
+		float damping = 0.9;
+		float periodInv = 0.047728;
 		float xTrackI = 0;
 	} L1;
 

@@ -1,5 +1,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include "AP_L1_Control.h"
+#include <Zenith/ZenithGains.h>
+#include <stdio.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -81,6 +83,8 @@ int32_t AP_L1_Control::nav_roll_cd(void) const
     float ret;
     ret = cosf(_ahrs.pitch)*degrees(atanf(_latAccDem * 0.101972f) * 100.0f); // 0.101972 = 1/9.81
     ret = constrain_float(ret, -9000, 9000);
+    
+    printf("L1_dist %.2f, ground speed %.2f, latAccDem %.2f rollCmdDeg %.2f\n", _L1_dist, _ahrs.groundspeed_vector().length(), _latAccDem, ret/100);
     return ret;
 }
 
@@ -212,7 +216,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     _last_update_waypoint_us = now;
 
     // Calculate L1 gain required for specified damping
-    float K_L1 = 4.0f * _L1_damping * _L1_damping;
+    float K_L1 = 4.0f * ZenithGains::L1.damping;
 
     // Get current position and velocity
     if (_ahrs.get_position(_current_loc) == false) {
@@ -238,7 +242,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     // Calculate time varying control parameters
     // Calculate the L1 length required for specified period
     // 0.3183099 = 1/1/pipi
-    _L1_dist = MAX(0.3183099f * _L1_damping * _L1_period * groundSpeed, dist_min);
+    _L1_dist = MAX(0.3183099f * ZenithGains::L1.damping / ZenithGains::L1.periodInv * groundSpeed, dist_min);
 
     // Calculate the NE position of WP B relative to WP A
     Vector2f AB = prev_WP.get_distance_NE(next_WP);
@@ -259,6 +263,8 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 
     // calculate distance to target track, for reporting
     _crosstrack_error = A_air % AB;
+
+    printf("ab %.2f, %.2f a_air %.2f, %.2f cross err %.2f\n", AB.x, AB.y, A_air.x, A_air.y, _crosstrack_error);
 
     //Determine if the aircraft is behind a +-135 degree degree arc centred on WP A
     //and further than L1 distance from WP A. Then use WP A as the L1 reference point
@@ -297,6 +303,8 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
         // compute integral error component to converge to a crosstrack of zero when traveling
         // straight but reset it when disabled or if it changes. That allows for much easier
         // tuning by having it re-converge each time it changes.
+        _L1_xtrack_i_gain = ZenithGains::L1.xTrackI;
+        _L1_xtrack_i_gain_prev = ZenithGains::L1.xTrackI;
         if (_L1_xtrack_i_gain <= 0 || !is_equal(_L1_xtrack_i_gain.get(), _L1_xtrack_i_gain_prev)) {
             _L1_xtrack_i = 0;
             _L1_xtrack_i_gain_prev = _L1_xtrack_i_gain;

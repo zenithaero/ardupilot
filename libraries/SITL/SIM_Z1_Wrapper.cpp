@@ -87,8 +87,16 @@ void Z1_Wrapper::recv_fdm()
                         acBus.Xe[2]);
 
     // Simulate airspeed
-    airspeed = velocity_ef.length();
-    airspeed_pitot = constrain_float(velocity_ef * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+    velocity_air_ef = velocity_ef + wind_ef;
+
+    // velocity relative to airmass in body frame
+    velocity_air_bf = dcm.transposed() * velocity_air_ef;
+
+    // airspeed
+    airspeed = velocity_air_bf.length();
+
+    // airspeed as seen by a fwd pitot tube (limited to 120m/s)
+    airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
 
     // auto-adjust to simulation frame rate
     time_now_us += static_cast<uint64_t>(deltat * 1.0e6);
