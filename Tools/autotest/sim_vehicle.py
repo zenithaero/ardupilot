@@ -645,7 +645,6 @@ def start_mavproxy(opts, stuff):
         print("Launch custom mavproxy")
         cmd.append(opts.mavproxy_path)
     elif under_cygwin():
-    if under_cygwin():
         cmd.append("/usr/bin/cygstart")
         cmd.append("-w")
         cmd.append("mavproxy.exe")
