@@ -202,6 +202,7 @@ class Board:
             '-Wfatal-errors',
             '-Wno-trigraphs',
             '-Werror=parentheses',
+            '-Wno-missing-braces'
         ]
 
         if 'clang++' in cfg.env.COMPILER_CXX:

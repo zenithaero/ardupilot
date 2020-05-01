@@ -67,7 +67,8 @@ if __name__ == "__main__":
     elif args.plane:
         frame = "plane"
     else:
-        frame = "Z1_Wrapper"
+        frame = "Z1_Lookup"
+
     sim_args = ["-v", "ArduPlane", "-f", frame, "--no-rebuild", "--wipe-eeprom"]
     if args.joystick:
         sim_args += ["--joystick"]

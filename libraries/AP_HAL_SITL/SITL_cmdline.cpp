@@ -35,6 +35,7 @@
 #include <SITL/SIM_Webots.h>
 #include <SITL/SIM_Z1_Matlab.h>
 #include <SITL/SIM_Z1_Wrapper.h>
+#include <SITL/SIM_Z1_Lookup.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -151,7 +152,8 @@ static const struct {
     { "scrimmage",          Scrimmage::create },
     { "webots",             Webots::create },
     {"Z1_Wrapper",          Z1_Wrapper::create},
-    {"Z1_Matlab",           Z1_Matlab::create}
+    {"Z1_Matlab",           Z1_Matlab::create},
+    {"Z1_Lookup",           Z1_Lookup::create},
 };
 
 void SITL_State::_set_signal_handlers(void) const
