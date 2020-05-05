@@ -7,220 +7,151 @@
 #include "SIM_Z1_Lookup.h"
 #include <Zenith/ZenithAeroData.h>
 #include <AP_BattMonitor/AP_BattMonitor.h>
-
+#include <vector>
 #include <stdio.h>
 
 using namespace SITL;
 
 Startup startup;
+#define INTERP(name, lookup) ({                                     \
+    FM _fm;                                                         \
+    _fm.force.x = aeroData->get(ZenithAeroData::CX##name, lookup);  \
+    _fm.force.y = aeroData->get(ZenithAeroData::CY##name, lookup);  \
+    _fm.force.z = -aeroData->get(ZenithAeroData::CL##name, lookup); \
+    _fm.moment.x = aeroData->get(ZenithAeroData::Cl##name, lookup); \
+    _fm.moment.y = aeroData->get(ZenithAeroData::Cm##name, lookup); \
+    _fm.moment.z = aeroData->get(ZenithAeroData::Cn##name, lookup); \
+    _fm;                                                            \
+})
+
 
 Z1_Lookup::Z1_Lookup(const char *frame_str) :
     Aircraft(frame_str)
 {
-    mass = 2.0f;
-
-    /*
-       scaling from motor power to Newtons. Allows the plane to hold
-       vertically against gravity when the motor is at hover_throttle
-    */
-    thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
+    mass = coefficient.mass;
     frame_height = 0.1f;
     num_motors = 1;
+    ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
 
-    ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;    
+    // Compute inverse intertia
+    bool success = coefficient.I.inverse(coefficient.I_inv);
+    if (!success)
+        printf("Warning: Inertia matrice inversion failure\n");
+
+    // Create interp struct
+    size_t dim;
+    dim = sizeof(ZenithAeroData::As) / sizeof(double);
+    std::vector<double> as(ZenithAeroData::As, ZenithAeroData::As + dim);
+    dim = sizeof(ZenithAeroData::Bs) / sizeof(double);
+    std::vector<double> bs(ZenithAeroData::Bs, ZenithAeroData::Bs + dim);
+    dim = sizeof(ZenithAeroData::Vs) / sizeof(double);
+    std::vector<double> vs(ZenithAeroData::Vs, ZenithAeroData::Vs + dim);
+    std::vector<const std::vector<double>> interp = {as, bs, vs};
+    aeroData = new Interp(interp);
 }
 
-/*
-  the following functions are from last_letter
-  https://github.com/Georacer/last_letter/blob/master/last_letter/src/aerodynamicsLib.cpp
-  many thanks to Georacer!
- */
-float Z1_Lookup::liftCoeff(float alpha) const
-{
-    const float alpha0 = coefficient.alpha_stall;
-    const float M = coefficient.mcoeff;
-    const float c_lift_0 = coefficient.c_lift_0;
-    const float c_lift_a0 = coefficient.c_lift_a;
+Z1_Lookup::~Z1_Lookup() {
+    delete(aeroData);
+}
 
-    // clamp the value of alpha to avoid exp(90) in calculation of sigmoid
-    const float max_alpha_delta = 0.8f;
-    if (alpha-alpha0 > max_alpha_delta) {
-        alpha = alpha0 + max_alpha_delta;
-    } else if (alpha0-alpha > max_alpha_delta) {
-        alpha = alpha0 - max_alpha_delta;
+FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
+    return INTERP(0, lookup);
+}
+
+FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud, float thr) {
+    FM fm;
+    // Actuators
+    fm += INTERP(dF_1, lookup) * ail;
+    fm += INTERP(dF_2, lookup) * elev;
+    fm += INTERP(dF_3, lookup) * rud;
+    // Motors
+    fm += INTERP(dP_1, lookup) * thr;
+    return fm;
+}
+
+FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
+    FM fm;
+    float denom = 2 * airspeed;
+    if (!is_zero(denom)) {
+        fm += INTERP(p, lookup) * pqr.x * coefficient.b * denom;
+        fm += INTERP(q, lookup) * pqr.y * coefficient.c * denom;
+        fm += INTERP(r, lookup) * pqr.z * coefficient.b * denom;
     }
-	double sigmoid = ( 1+exp(-M*(alpha-alpha0))+exp(M*(alpha+alpha0)) ) / (1+exp(-M*(alpha-alpha0))) / (1+exp(M*(alpha+alpha0)));
-	double linear = (1.0-sigmoid) * (c_lift_0 + c_lift_a0*alpha); //Lift at small AoA
-	double flatPlate = sigmoid*(2*copysign(1,alpha)*pow(sin(alpha),2)*cos(alpha)); //Lift beyond stall
-
-	float result  = linear+flatPlate;
-	return result;
+    return fm;
 }
 
-float Z1_Lookup::dragCoeff(float alpha) const
-{
-    const float b = coefficient.b;
-    const float s = coefficient.s;
-    const float c_drag_p = coefficient.c_drag_p;
-    const float c_lift_0 = coefficient.c_lift_0;
-    const float c_lift_a0 = coefficient.c_lift_a;
-    const float oswald = coefficient.oswald;
-    
-	double AR = pow(b,2)/s;
-	double c_drag_a = c_drag_p + pow(c_lift_0+c_lift_a0*alpha,2)/(M_PI*oswald*AR);
-
-	return c_drag_a;
-}
-
-// Torque calculation function
-Vector3f Z1_Lookup::getTorque(float inputAileron, float inputElevator, float inputRudder, float inputThrust, const Vector3f &force) const
-{
-    float alpha = angle_of_attack;
-
-	//calculate aerodynamic torque
-    float effective_airspeed = airspeed;
-
-
-    const float s = coefficient.s;
-    const float c = coefficient.c;
-    const float b = coefficient.b;
-    const float c_l_0 = coefficient.c_l_0;
-    const float c_l_b = coefficient.c_l_b;
-    const float c_l_p = coefficient.c_l_p;
-    const float c_l_r = coefficient.c_l_r;
-    const float c_l_deltaa = coefficient.c_l_deltaa;
-    const float c_l_deltar = coefficient.c_l_deltar;
-    const float c_m_0 = coefficient.c_m_0;
-    const float c_m_a = coefficient.c_m_a;
-    const float c_m_q = coefficient.c_m_q;
-    const float c_m_deltae = coefficient.c_m_deltae;
-    const float c_n_0 = coefficient.c_n_0;
-    const float c_n_b = coefficient.c_n_b;
-    const float c_n_p = coefficient.c_n_p;
-    const float c_n_r = coefficient.c_n_r;
-    const float c_n_deltaa = coefficient.c_n_deltaa;
-    const float c_n_deltar = coefficient.c_n_deltar;
-    const Vector3f &CGOffset = coefficient.CGOffset;
-    
-    float rho = air_density;
-
-	//read angular rates
-	double p = gyro.x;
-	double q = gyro.y;
-	double r = gyro.z;
-
-	double qbar = 1.0/2.0*rho*pow(effective_airspeed,2)*s; //Calculate dynamic pressure
-	double la, na, ma;
-	if (is_zero(effective_airspeed))
-	{
-		la = 0;
-		ma = 0;
-		na = 0;
-	}
-	else
-	{
-		la = qbar*b*(c_l_0 + c_l_b*beta + c_l_p*b*p/(2*effective_airspeed) + c_l_r*b*r/(2*effective_airspeed) + c_l_deltaa*inputAileron + c_l_deltar*inputRudder);
-		ma = qbar*c*(c_m_0 + c_m_a*alpha + c_m_q*c*q/(2*effective_airspeed) + c_m_deltae*inputElevator);
-		na = qbar*b*(c_n_0 + c_n_b*beta + c_n_p*b*p/(2*effective_airspeed) + c_n_r*b*r/(2*effective_airspeed) + c_n_deltaa*inputAileron + c_n_deltar*inputRudder);
-	}
-
-
-	// Add torque to to force misalignment with CG
-	// r x F, where r is the distance from CoG to CoL
-	la +=  CGOffset.y * force.z - CGOffset.z * force.y;
-	ma += -CGOffset.x * force.z + CGOffset.z * force.x;
-	na += -CGOffset.y * force.x + CGOffset.x * force.y;
-
-	return Vector3f(la, ma, na);
-}
-
-// Force calculation function from last_letter
-Vector3f Z1_Lookup::getForce(float inputAileron, float inputElevator, float inputRudder) const
-{
-    const float alpha = angle_of_attack;
-    const float c_drag_q = coefficient.c_drag_q;
-    const float c_lift_q = coefficient.c_lift_q;
-    const float s = coefficient.s;
-    const float c = coefficient.c;
-    const float b = coefficient.b;
-    const float c_drag_deltae = coefficient.c_drag_deltae;
-    const float c_lift_deltae = coefficient.c_lift_deltae;
-    const float c_y_0 = coefficient.c_y_0;
-    const float c_y_b = coefficient.c_y_b;
-    const float c_y_p = coefficient.c_y_p;
-    const float c_y_r = coefficient.c_y_r;
-    const float c_y_deltaa = coefficient.c_y_deltaa;
-    const float c_y_deltar = coefficient.c_y_deltar;
-    
-    float rho = air_density;
-
-	//request lift and drag alpha-coefficients from the corresponding functions
-	double c_lift_a = liftCoeff(alpha);
-	double c_drag_a = dragCoeff(alpha);
-
-	//convert coefficients to the body frame
-	double c_x_a = -c_drag_a*cos(alpha)+c_lift_a*sin(alpha);
-	double c_x_q = -c_drag_q*cos(alpha)+c_lift_q*sin(alpha);
-	double c_z_a = -c_drag_a*sin(alpha)-c_lift_a*cos(alpha);
-	double c_z_q = -c_drag_q*sin(alpha)-c_lift_q*cos(alpha);
-
-	//read angular rates
-	double p = gyro.x;
-	double q = gyro.y;
-	double r = gyro.z;
-
-	//calculate aerodynamic force
-	double qbar = 1.0/2.0*rho*pow(airspeed,2)*s; //Calculate dynamic pressure
-	double ax, ay, az;
-	if (is_zero(airspeed))
-	{
-		ax = 0;
-		ay = 0;
-		az = 0;
-	}
-	else
-	{
-		ax = qbar*(c_x_a + c_x_q*c*q/(2*airspeed) - c_drag_deltae*cos(alpha)*fabs(inputElevator) + c_lift_deltae*sin(alpha)*inputElevator);
-		// split c_x_deltae to include "abs" term
-		ay = qbar*(c_y_0 + c_y_b*beta + c_y_p*b*p/(2*airspeed) + c_y_r*b*r/(2*airspeed) + c_y_deltaa*inputAileron + c_y_deltar*inputRudder);
-		az = qbar*(c_z_a + c_z_q*c*q/(2*airspeed) - c_drag_deltae*sin(alpha)*fabs(inputElevator) - c_lift_deltae*cos(alpha)*inputElevator);
-		// split c_z_deltae to include "abs" term
-	}
-    return Vector3f(ax, ay, az);
-}
 
 void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, Vector3f &body_accel)
 {
-    float aileron  = filtered_servo_angle(input, 0);
-    float elevator = filtered_servo_angle(input, 1);
-    float rudder   = filtered_servo_angle(input, 3);
-    float throttle = filtered_servo_range(input, 2);
+    float ail  = filtered_servo_angle(input, 0);
+    float elev = filtered_servo_angle(input, 1);
+    float rud   = filtered_servo_angle(input, 3);
+    float thr = filtered_servo_range(input, 2);
 
-    float thrust = throttle;
+    // simulate engine RPM
+    rpm[0] = thr * 7000;
 
     // calculate angle of attack
     angle_of_attack = atan2f(velocity_air_bf.z, velocity_air_bf.x);
     beta = atan2f(velocity_air_bf.y,velocity_air_bf.x);
     
-    Vector3f force = getForce(aileron, elevator, rudder);
-    rot_accel = getTorque(aileron, elevator, rudder, thrust, force);
-    
-    // simulate engine RPM
-    rpm[0] = thrust * 7000;
-    
-    // scale thrust to newtons
-    thrust *= thrust_scale;
+    // Build lookup vector
+    std::vector<double> lookup = {angle_of_attack, beta, airspeed};
 
-    accel_body = Vector3f(thrust, 0, 0) + force;
+    // Create rotation transformation (clamped to lookup limits)
+    std::vector<double> lookupClamped = aeroData->clamp(lookup);
+    Matrix3<float> S2B, B2S;
+    S2B.from_euler(0.f, lookupClamped[0], 0.f);
+    B2S = S2B.transposed();
+
+    // Extract normalization coefficients
+    const float s = coefficient.s;
+    const float c = coefficient.c;
+    const float b = coefficient.b;
+
+    // Rotate gyro vector in stability frame
+    Vector3f gyro_sf = B2S * gyro;
+
+    // Calculate dynamic pressure
+    float rho = air_density;
+    double qbar = 1.0 / 2.0 * rho * pow(airspeed, 2) * s;
+
+    // Get aero FM
+    FM aeroFM = getAeroFM(lookup);
+    FM actuatorFM = getActuatorFM(lookup, ail, elev, rud, thr);
+    FM dampingFM = getDampingFM(lookup, gyro_sf);
+    FM fm = aeroFM + actuatorFM + dampingFM;
+
+    // Move the FMs back to body frame
+    fm.force = S2B * fm.force;
+    fm.moment = S2B * fm.moment;
+
+    // Denormalize forces & moments
+    fm.force *= s * qbar;
+    fm.moment.x *= b * s * qbar;
+    fm.moment.y *= c * s * qbar;
+    fm.moment.z *= b * s * qbar;
+    const Vector3f &CGOffset = coefficient.CGOffset;
+    Vector3f armMoment = fm.force % CGOffset;
+    fm.moment += armMoment;
+    
+    // Add thrust at low speeds to compensate for the lack of model there
+    // Reduce contribution linearly up to minAirspeed
+    std::vector<double> zero = {0, 0, 0};
+    std::vector<double> zeroClamped = aeroData->clamp(zero);
+    double minAirspeed = MAX(1, zeroClamped[2]);
+    double r = CLAMP((minAirspeed - airspeed) / minAirspeed, 0, 1);
+    double thrust = mass * GRAVITY_MSS * r;
+
+    // Determine body acceleration & rotational acceleration
+    accel_body = (Vector3f(thrust, 0, 0) + fm.force) / mass;
     accel_body /= mass;
 
-    // add some noise
-    if (thrust_scale > 0) {
-        add_noise(fabsf(thrust) / thrust_scale);
-    }
+    // Determine rotational accel
+    rot_accel = coefficient.I_inv * fm.moment;
 
+    // add some ground friction
     if (on_ground()) {
-        // add some ground friction
         Vector3f vel_body = dcm.transposed() * velocity_ef;
         accel_body.x -= vel_body.x * 0.3f;
     }
