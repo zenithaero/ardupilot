@@ -59,8 +59,8 @@ void Plane::Log_Write_Fast(void)
         Log_Write_Attitude();
     }
     // Log controls
-    logger.Write_CTRL(rollController.get_log());
-    logger.Write_CTRL(pitchController.get_log());
+    // logger.Write_CTRL(rollController.get_log());
+    // logger.Write_CTRL(pitchController.get_log());
 }
 
 

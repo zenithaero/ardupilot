@@ -38,7 +38,6 @@ public:
     void autotune_restore(void) { autotune.stop(); }
 
     const AP_Logger::PID_Info& get_pid_info(void) const { return _pid_info; }
-    log_PitchCtrl& get_log() { return _log; }
 
 	static const struct AP_Param::GroupInfo var_info[];
 
@@ -57,10 +56,10 @@ private:
 	float _last_out;
 	
     AP_Logger::PID_Info _pid_info;
-    struct log_PitchCtrl _log;
 
 	int32_t _get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed);
     float   _get_coordination_rate_offset(float &aspeed, bool &inverted) const;
 	
 	AP_AHRS &_ahrs;
+	
 };

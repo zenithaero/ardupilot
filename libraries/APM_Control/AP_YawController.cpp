@@ -19,8 +19,6 @@
 //
 #include <AP_HAL/AP_HAL.h>
 #include "AP_YawController.h"
-#include <Zenith/ZenithGains.h>
-#include <stdio.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -77,7 +75,6 @@ const AP_Param::GroupInfo AP_YawController::var_info[] = {
 
 int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 {
-	scaler = 1; // TODO Zenith: handle scaler
 	uint32_t tnow = AP_HAL::millis();
 	uint32_t dt = tnow - _last_t;
 	if (_last_t == 0 || dt > 1000) {
@@ -105,7 +102,7 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	    // If no airspeed available use average of min and max
         aspeed = 0.5f*(float(aspd_min) + float(aparm.airspeed_max));
 	}
-    rate_offset = (GRAVITY_MSS / MAX(aspeed , float(aspd_min))) * sinf(bank_angle) * ZenithGains::yaw.Kcoord;
+    rate_offset = (GRAVITY_MSS / MAX(aspeed , float(aspd_min))) * sinf(bank_angle) * _K_FF;
 
     // Get body rate vector (radians/sec)
 	float omega_z = _ahrs.get_gyro().z;
@@ -126,12 +123,11 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	_last_rate_hp_in = rate_hp_in;
 
 	//Calculate input to integrator
-	float integ_in = - ZenithGains::yaw.Ki * (ZenithGains::yaw.Kslip * accel_y + rate_hp_out);
+	float integ_in = - _K_I * (_K_A * accel_y + rate_hp_out);
 	
 	// Apply integrator, but clamp input to prevent control saturation and freeze integrator below min FBW speed
 	// Don't integrate if in stabilise mode as the integrator will wind up against the pilots inputs
 	// Don't integrate if _K_D is zero as integrator will keep winding up
-	_K_D = ZenithGains::yaw.Kd;
 	if (!disable_integrator && _K_D > 0) {
 		//only integrate if airspeed above min value
 		if (aspeed > float(aspd_min))

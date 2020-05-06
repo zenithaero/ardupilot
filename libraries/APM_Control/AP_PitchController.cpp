@@ -18,7 +18,6 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include "AP_PitchController.h"
-#include <Zenith/ZenithGains.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -114,7 +113,6 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 */
 int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed)
 {
-	scaler = 1; // TODO Zenith: handle scaler
 	uint32_t tnow = AP_HAL::millis();
 	uint32_t dt = tnow - _last_t;
 	
@@ -130,17 +128,28 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	
 	// Calculate the pitch rate error (deg/sec) and scale
     float achieved_rate = ToDeg(omega_y);
-	_log.qMeas = achieved_rate;
 	float rate_error = (desired_rate - achieved_rate) * scaler;
-	_log.sc = scaler;
-	_log.qErrSc = rate_error;
-
+	
 	// Multiply pitch rate error by _ki_rate and integrate
 	// Scaler is applied before integrator so that integrator state relates directly to elevator deflection
 	// This means elevator trim offset doesn't change as the value of scaler changes with airspeed
 	// Don't integrate if in stabilise mode as the integrator will wind up against the pilots inputs
 	if (!disable_integrator && gains.I > 0) {
-		float ki_rate = ZenithGains::pitch.Ki;
+        float k_I = gains.I;
+        if (is_zero(gains.FF)) {
+            /*
+              if the user hasn't set a direct FF then assume they are
+              not doing sophisticated tuning. Set a minimum I value of
+              0.15 to ensure that the time constant for trimming in
+              pitch is not too long. We have had a lot of user issues
+              with very small I value leading to very slow pitch
+              trimming, which causes a lot of problems for TECS. A
+              value of 0.15 is still quite small, but a lot better
+              than what many users are running.
+             */
+            k_I = MAX(k_I, 0.15f);
+        }
+        float ki_rate = k_I * gains.tau;
 		//only integrate if gain and time step are positive and airspeed above min value.
 		if (dt > 0 && aspeed > 0.5f*float(aparm.airspeed_min)) {
 		    float integrator_delta = rate_error * ki_rate * delta_time * scaler;
@@ -163,17 +172,19 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
     // Constrain the integrator state
     _pid_info.I = constrain_float(_pid_info.I, -intLimScaled, intLimScaled);
 
-	float k_ff = 0;
-	float kp_ff = ZenithGains::pitch.Kp;
-	float kd = ZenithGains::pitch.Kd;
-
+	// Calculate equivalent gains so that values for K_P and K_I can be taken across from the old PID law
+    // No conversion is required for K_D
+    float eas2tas = _ahrs.get_EAS2TAS();
+	float kp_ff = MAX((gains.P - gains.I * gains.tau) * gains.tau  - gains.D , 0) / eas2tas;
+    float k_ff = gains.FF / eas2tas;
+	
 	// Calculate the demanded control surface deflection
 	// Note the scaler is applied again. We want a 1/speed scaler applied to the feed-forward
 	// path, but want a 1/speed^2 scaler applied to the rate error path. 
 	// This is because acceleration scales with speed^2, but rate scales with speed.
     _pid_info.P = desired_rate * kp_ff * scaler;
     _pid_info.FF = desired_rate * k_ff * scaler;
-    _pid_info.D = rate_error * kd * scaler;
+    _pid_info.D = rate_error * gains.D * scaler;
 	_last_out = _pid_info.D + _pid_info.FF + _pid_info.P;
     _pid_info.target = desired_rate;
     _pid_info.actual = achieved_rate;
@@ -210,13 +221,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
         float roll_prop = (roll_wrapped - (aparm.roll_limit_cd+500)) / (float)(9000 - aparm.roll_limit_cd);
         _last_out *= (1 - roll_prop);
     }
-	// Log output
-	_log.p = _pid_info.P;
-	_log.i = _pid_info.I;
-	_log.d = _pid_info.D;
-	_log.ff = _pid_info.FF;
-	_log.out = _last_out;
-
+    
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);
 }
@@ -306,9 +311,7 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
     rate_offset = _get_coordination_rate_offset(aspeed, inverted);
 	
 	// Calculate the desired pitch rate (deg/sec) from the angle error
-	float Omega = ZenithGains::pitch.Omega;
-	float desired_rate = angle_err * 0.01f * Omega;
-	_log.qCmd = desired_rate;
+	float desired_rate = angle_err * 0.01f / gains.tau;
 	
 	// limit the maximum pitch rate demand. Don't apply when inverted
 	// as the rates will be tuned when upright, and it is common that
@@ -327,7 +330,6 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
 
 	// Apply the turn correction offset
 	desired_rate = desired_rate + rate_offset;
-	_log.qCmdCl = desired_rate;
 
     return _get_rate_out(desired_rate, scaler, disable_integrator, aspeed);
 }

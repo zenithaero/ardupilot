@@ -19,7 +19,6 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include "AP_RollController.h"
-#include <Zenith/ZenithGains.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -92,7 +91,6 @@ const AP_Param::GroupInfo AP_RollController::var_info[] = {
 */
 int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool disable_integrator)
 {
-	scaler = 1; // TODO Zenith: handle scaler
 	uint32_t tnow = AP_HAL::millis();
 	uint32_t dt = tnow - _last_t;
 	if (_last_t == 0 || dt > 1000) {
@@ -100,19 +98,19 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 	}
 	_last_t = tnow;
 	
-	float ki_rate = ZenithGains::roll.Ki;
-	float kp_ff = ZenithGains::roll.Kp;
-    float k_ff = 0;
+	// Calculate equivalent gains so that values for K_P and K_I can be taken across from the old PID law
+    // No conversion is required for K_D
+	float ki_rate = gains.I * gains.tau;
+    float eas2tas = _ahrs.get_EAS2TAS();
+	float kp_ff = MAX((gains.P - gains.I * gains.tau) * gains.tau  - gains.D , 0) / eas2tas;
+    float k_ff = gains.FF / eas2tas;
 	float delta_time    = (float)dt * 0.001f;
     // Get body rate vector (radians/sec)
 	float omega_x = _ahrs.get_gyro().x;
 	
 	// Calculate the roll rate error (deg/sec) and apply gain scaler
     float achieved_rate = ToDeg(omega_x);
-	_log.pMeas = achieved_rate;
 	float rate_error = (desired_rate - achieved_rate) * scaler;
-	_log.sc = scaler;
-	_log.pErrSc = rate_error;
 	
 	// Get an airspeed estimate - default to zero if none available
 	float aspeed;
@@ -151,7 +149,7 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 	// Note the scaler is applied again. We want a 1/speed scaler applied to the feed-forward
 	// path, but want a 1/speed^2 scaler applied to the rate error path. 
 	// This is because acceleration scales with speed^2, but rate scales with speed.
-    _pid_info.D = rate_error * ZenithGains::roll.Kd * scaler;
+    _pid_info.D = rate_error * gains.D * scaler;
     _pid_info.P = desired_rate * kp_ff * scaler;
     _pid_info.FF = desired_rate * k_ff * scaler;
     _pid_info.target = desired_rate;
@@ -168,12 +166,6 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
     }
 
 	_last_out += _pid_info.I;
-	// Log output
-	_log.p = _pid_info.P;
-	_log.i = _pid_info.I;
-	_log.d = _pid_info.D;
-	_log.ff = _pid_info.FF;
-	_log.out = _last_out;
 	
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);
@@ -208,8 +200,7 @@ int32_t AP_RollController::get_servo_out(int32_t angle_err, float scaler, bool d
     }
 	
 	// Calculate the desired roll rate (deg/sec) from the angle error
-	float desired_rate = angle_err * 0.01f * ZenithGains::roll.Omega;
-	_log.pCmd = desired_rate;
+	float desired_rate = angle_err * 0.01f / gains.tau;
 
     // Limit the demanded roll rate
     if (gains.rmax && desired_rate < -gains.rmax) {
@@ -217,7 +208,7 @@ int32_t AP_RollController::get_servo_out(int32_t angle_err, float scaler, bool d
     } else if (gains.rmax && desired_rate > gains.rmax) {
         desired_rate = gains.rmax;
     }
-	_log.pCmdCl = desired_rate;
+
     return _get_rate_out(desired_rate, scaler, disable_integrator);
 }
 
