@@ -53,7 +53,7 @@ private:
     }
 
 public:
-    Interp(const std::vector<const std::vector<double>> &lookups, oorBehavior_e oorBehavior = INTERPOLATE) 
+    Interp(const std::vector<const std::vector<double>> &lookups, oorBehavior_e oorBehavior = CLIP) 
         : lookups(lookups), oorBehavior(oorBehavior) {
             assert(lookups.size() > 0 && lookups.size() < 32);
             for (auto lookup : lookups) {

@@ -117,10 +117,13 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     double qbar = 1.0 / 2.0 * rho * pow(airspeed, 2) * s;
 
     // Get aero FM
+    printf("lookup (alpha %.2f, beta %.2f, airspeed %.2f)\n", angle_of_attack, beta, airspeed);
     FM aeroFM = getAeroFM(lookup);
     FM actuatorFM = getActuatorFM(lookup, ail, elev, rud, thr);
     FM dampingFM = getDampingFM(lookup, gyro_sf);
     FM fm = aeroFM + actuatorFM + dampingFM;
+
+    printf("values F(%.2f %.2f %.2f) M(%.2f %.2f %.2f)\n", fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
 
     // Move the FMs back to body frame
     fm.force = S2B * fm.force;
@@ -141,11 +144,14 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     std::vector<double> zeroClamped = aeroData->clamp(zero);
     double minAirspeed = MAX(1, zeroClamped[2]);
     double r = CLAMP((minAirspeed - airspeed) / minAirspeed, 0, 1);
-    double thrust = mass * GRAVITY_MSS * r;
+    (void)r;
+    double thrust = 2 * mass * GRAVITY_MSS * thr;
 
     // Determine body acceleration & rotational acceleration
     accel_body = (Vector3f(thrust, 0, 0) + fm.force) / mass;
     accel_body /= mass;
+    printf("thr %.2f accel_x %.2f airspeed %.2f\n", thr, accel_body.x, airspeed);
+    // printf("thr %f, thrust: %f accel_body: %f, %f, %f\n", thr, thrust, accel_body.x, accel_body.y, accel_body.z);
 
     // Determine rotational accel
     rot_accel = coefficient.I_inv * fm.moment;
@@ -153,7 +159,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // add some ground friction
     if (on_ground()) {
         Vector3f vel_body = dcm.transposed() * velocity_ef;
-        accel_body.x -= vel_body.x * 0.3f;
+        accel_body.x -= vel_body.x * 0.05f;
     }
 }
     

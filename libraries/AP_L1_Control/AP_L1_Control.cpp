@@ -84,7 +84,7 @@ int32_t AP_L1_Control::nav_roll_cd(void) const
     ret = cosf(_ahrs.pitch)*degrees(atanf(_latAccDem * 0.101972f) * 100.0f); // 0.101972 = 1/9.81
     ret = constrain_float(ret, -9000, 9000);
     
-    printf("L1_dist %.2f, ground speed %.2f, latAccDem %.2f rollCmdDeg %.2f\n", _L1_dist, _ahrs.groundspeed_vector().length(), _latAccDem, ret/100);
+    // printf("L1_dist %.2f, ground speed %.2f, latAccDem %.2f rollCmdDeg %.2f\n", _L1_dist, _ahrs.groundspeed_vector().length(), _latAccDem, ret/100);
     return ret;
 }
 
@@ -264,7 +264,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     // calculate distance to target track, for reporting
     _crosstrack_error = A_air % AB;
 
-    printf("ab %.2f, %.2f a_air %.2f, %.2f cross err %.2f\n", AB.x, AB.y, A_air.x, A_air.y, _crosstrack_error);
+    // printf("ab %.2f, %.2f a_air %.2f, %.2f cross err %.2f\n", AB.x, AB.y, A_air.x, A_air.y, _crosstrack_error);
 
     //Determine if the aircraft is behind a +-135 degree degree arc centred on WP A
     //and further than L1 distance from WP A. Then use WP A as the L1 reference point

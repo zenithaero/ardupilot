@@ -580,7 +580,7 @@ void AP_TECS::_update_energies(void)
     _SPEdot = _climb_rate * GRAVITY_MSS;
     _SKEdot = _TAS_state * _vel_dot;
 
-    printf("TECS hCmd %.2f h %.2f pitchDem %.2f; tasCmd %.2f tas %.2f thrDem %.2f\n", _hgt_dem_adj, _height, _pitch_dem, _TAS_dem_adj, _TAS_state, _throttle_dem);
+    // printf("TECS hCmd %.2f h %.2f pitchDem %.2f; tasCmd %.2f tas %.2f thrDem %.2f\n", _hgt_dem_adj, _height, _pitch_dem, _TAS_dem_adj, _TAS_state, _throttle_dem);
 }
 
 /*
