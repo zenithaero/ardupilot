@@ -477,7 +477,7 @@ def run_cmd_blocking(what, cmd, quiet=False, check=False, **kw):
     return ret
 
 
-def run_in_terminal_window(autotest, name, cmd):
+def run_in_terminal_window(autotest, name, cmd, headless=False):
 
     """Execute the run_in_terminal_window.sh command for cmd"""
     global windowID
@@ -486,7 +486,7 @@ def run_in_terminal_window(autotest, name, cmd):
     runme.extend(cmd)
     progress_cmd("Run " + name, runme)
 
-    if under_macos() and os.environ.get("DISPLAY") and False:
+    if not headless and under_macos() and os.environ.get("DISPLAY"):
         # on MacOS record the window IDs so we can close them later
         out = subprocess.Popen(runme, stdout=subprocess.PIPE).communicate()[0]
         out = out.decode('utf-8')
@@ -508,7 +508,7 @@ def run_in_terminal_window(autotest, name, cmd):
             progress("Cannot find %s process terminal" % name)
     else:
         FNULL = open(os.devnull, 'w')
-        proc = subprocess.Popen(cmd, stdout=FNULL, stderr=subprocess.STDOUT)
+        subprocess.Popen(cmd, stdout=FNULL, stderr=subprocess.STDOUT)
         print("opened sim!")
 
 
@@ -633,7 +633,7 @@ def start_vehicle(binary, autotest, opts, stuff, loc=None, test_case=None):
     # Enable logs
     cmd.extend(['--param', 'LOG_DISARMED=1'])
 
-    run_in_terminal_window(autotest, cmd_name, cmd)
+    run_in_terminal_window(autotest, cmd_name, cmd, opts.headless)
 
 
 def start_mavproxy(opts, stuff):
@@ -957,6 +957,9 @@ group_sim.add_option("-Z", "--swarm",
                      default=None,
                      help="Specify path of swarminit.txt for shifting spawn location")
 group_sim.add_option("--flash-storage",
+                     action='store_true',
+                     help="enable use of flash storage emulation")
+group_sim.add_option("--headless",
                      action='store_true',
                      help="enable use of flash storage emulation")
 parser.add_option_group(group_sim)

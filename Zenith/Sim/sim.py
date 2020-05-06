@@ -50,6 +50,7 @@ if __name__ == "__main__":
     parser.add_argument("--matlab", action="store_true", help="matlab socket communication")
     parser.add_argument("--plane", action="store_true", help="fly regular plane")
     parser.add_argument("--no-logs", action="store_true", help="don't parse logs")
+    parser.add_argument("--headless", action="store_true", help="headless sim")
     args = parser.parse_args()
 
     # Clear data if needed
@@ -81,6 +82,8 @@ if __name__ == "__main__":
         )  # TODO: create special parm for test cases
     if args.debug:
         sim_args += ["--lldb"]
+    if args.headless:
+        sim_args += ["--headless"]
     # Point to the right mavproxy
     sim_args += ["--mavproxy-path", MAVPROXY_PATH]
     # Create mav args
