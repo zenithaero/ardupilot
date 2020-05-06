@@ -143,7 +143,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     std::vector<double> zero = {0, 0, 0};
     std::vector<double> zeroClamped = aeroData->clamp(zero);
     double minAirspeed = MAX(1, zeroClamped[2]);
-    double r = CLAMP((minAirspeed - airspeed) / minAirspeed, 0, 1);
+    double r = MAX(0, MIN(1, (minAirspeed - airspeed) / minAirspeed));
     (void)r;
     double thrust = 2 * mass * GRAVITY_MSS * thr;
 

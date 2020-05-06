@@ -500,7 +500,7 @@ def run_cmd_blocking(what, cmd, quiet=False, check=False, **kw):
     return ret
 
 
-def run_in_terminal_window(name, cmd, **kw):
+def run_in_terminal_window(name, cmd, headless=False, **kw):
 
     """Execute the run_in_terminal_window.sh command for cmd"""
     global windowID
@@ -509,8 +509,7 @@ def run_in_terminal_window(name, cmd, **kw):
     runme.extend(cmd)
     progress_cmd("Run " + name, runme)
 
-    headless = kw.get("headless", False)
-    if headless and under_macos() and os.environ.get("DISPLAY"):
+    if not headless and under_macos() and os.environ.get("DISPLAY"):
         # on MacOS record the window IDs so we can close them later
         out = subprocess.Popen(runme, stdout=subprocess.PIPE, **kw).communicate()[0]
         out = out.decode('utf-8')
@@ -532,6 +531,7 @@ def run_in_terminal_window(name, cmd, **kw):
             progress("Cannot find %s process terminal" % name)
     else:
         FNULL = open(os.devnull, 'w')
+
         subprocess.Popen(cmd, **kw, stdout=FNULL, stderr=subprocess.STDOUT)
         print("Headless sim running")
 
@@ -615,8 +615,8 @@ def start_vehicle(binary, opts, stuff, spawns=None, test_case=None):
     cmd.append(binary)
     cmd.append("-S")
     cmd.append("-I" + str(opts.instance))
-    if loc is not None:
-        cmd.extend(["--home", loc])
+    # if loc is not None:
+    #     cmd.extend(["--home", loc])
     if opts.test_case:
         cmd.extend(["--test-case", opts.test_case])
     if opts.wipe_eeprom:

@@ -900,7 +900,7 @@ double lerp(const std::vector<double> time, const std::vector<double> value, dou
     k = MIN(k, time.size() - 1);
     size_t kprev = k == 0 ? 0 : k - 1;
     double deltaTime = MAX(time[k] - time[kprev], DBL_EPSILON);
-    double alpha = CLAMP((t - time[kprev]) / deltaTime, 0, 1); 
+    double alpha = MAX(0, MIN(1, (t - time[kprev]) / deltaTime)); 
     return value[kprev] + (value[k] - value[kprev]) * alpha;
 }
 
