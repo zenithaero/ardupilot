@@ -132,7 +132,7 @@ void Z1_Matlab::recv_fdm(const struct sitl_input &input)
         adjust_frame_time(static_cast<float>(1.0 / deltat));
     }
 
-    printf("got frame after: %llums; deltaTime: %f; time %f \n", (get_wall_time_us() - last_wall_us) / 1000, deltat, (float)time_now_us / 1e6);
+    // printf("got frame after: %llums; deltaTime: %f; time %f \n", (get_wall_time_us() - last_wall_us) / 1000, deltat, (float)time_now_us / 1e6);
 
     last_wall_us = get_wall_time_us();
     last_timestamp = pkt.time;

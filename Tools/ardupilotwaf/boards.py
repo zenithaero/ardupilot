@@ -116,7 +116,7 @@ class Board:
             '-Werror=shadow',
             '-Werror=return-type',
             '-Werror=unused-result',
-            '-Werror=unused-variable',
+            # '-Werror=unused-variable',
             '-Werror=narrowing',
             '-Werror=attributes',
             '-Werror=overflow',
@@ -187,7 +187,7 @@ class Board:
             '-Werror=enum-compare',
             '-Werror=format',
             '-Werror=array-bounds',
-            '-Werror=uninitialized',
+            # '-Werror=uninitialized',
             '-Werror=init-self',
             '-Werror=narrowing',
             '-Werror=return-type',
@@ -197,7 +197,7 @@ class Board:
             '-Werror=unused-result',
             '-Werror=shadow',
             '-Werror=unused-value',
-            '-Werror=unused-variable',
+            # '-Werror=unused-variable',
             '-Werror=delete-non-virtual-dtor',
             '-Wfatal-errors',
             '-Wno-trigraphs',
@@ -236,7 +236,7 @@ class Board:
         else:
             env.CXXFLAGS += [
                 '-Wno-format-contains-nul',
-                '-Werror=unused-but-set-variable'
+                # '-Werror=unused-but-set-variable'
             ]
             if self.cc_version_gte(cfg, 5, 2):
                 env.CXXFLAGS += [
@@ -470,10 +470,10 @@ class chibios(Board):
             '-Wno-unused-parameter',
             '-Werror=array-bounds',
             '-Wfatal-errors',
-            '-Werror=uninitialized',
+            # '-Werror=uninitialized',
             '-Werror=init-self',
             '-Wframe-larger-than=1024',
-            '-Werror=unused-but-set-variable',
+            # '-Werror=unused-but-set-variable',
             '-Wno-missing-field-initializers',
             '-Wno-trigraphs',
             '-fno-strict-aliasing',
