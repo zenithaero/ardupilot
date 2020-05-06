@@ -38,6 +38,8 @@
 #include <AP_Camera/AP_RunCam.h>
 #include <AP_Hott_Telem/AP_Hott_Telem.h>
 #include <AP_ESC_Telem/AP_ESC_Telem.h>
+#include <AP_GyroFFT/AP_GyroFFT.h>
+#include <AP_VisualOdom/AP_VisualOdom.h>
 
 class AP_Vehicle : public AP_HAL::HAL::Callbacks {
 
@@ -126,10 +128,8 @@ public:
     };
 
     void get_common_scheduler_tasks(const AP_Scheduler::Task*& tasks, uint8_t& num_tasks);
-
-    // initialize the vehicle. Called from AP_BoardConfig
-    void init_vehicle();
-
+    // implementations *MUST* fill in all passed-in fields or we get
+    // Valgrind errors
     virtual void get_scheduler_tasks(const AP_Scheduler::Task *&tasks, uint8_t &task_count, uint32_t &log_bit) = 0;
 
     /*
@@ -164,10 +164,21 @@ public:
         return AP_HAL::millis() - _last_flying_ms;
     }
 
+    /*
+      methods to control vehicle for use by scripting
+    */
+    virtual bool start_takeoff(float alt) { return false; }
+    virtual bool set_target_location(const Location& target_loc) { return false; }
+    virtual bool set_target_velocity_NED(const Vector3f& vel_ned) { return false; }
+
+    // get target location (for use by scripting)
+    virtual bool get_target_location(Location& target_loc) { return false; }
+    
 protected:
 
     virtual void init_ardupilot() = 0;
     virtual void load_parameters() = 0;
+    virtual void set_control_channels() {}
 
     // board specific config
     AP_BoardConfig BoardConfig;
@@ -197,6 +208,9 @@ protected:
 #if HAL_RUNCAM_ENABLED
     AP_RunCam runcam;
 #endif
+#if HAL_GYROFFT_ENABLED
+    AP_GyroFFT gyro_fft;
+#endif
     AP_SerialManager serial_manager;
 
     AP_Relay relay;
@@ -218,24 +232,28 @@ protected:
     AP_Hott_Telem hott_telem;
 #endif
 
+#if HAL_VISUALODOM_ENABLED
+    AP_VisualOdom visual_odom;
+#endif
+
     AP_ESC_Telem esc_telem;
 
     static const struct AP_Param::GroupInfo var_info[];
     static const struct AP_Scheduler::Task scheduler_tasks[];
 
-    void register_scheduler_delay_callback();
-
 private:
 
-    static AP_Vehicle *_singleton;
-    bool init_done;
-
+    // delay() callback that processing MAVLink packets
     static void scheduler_delay_callback();
 
-    // true if vehicle is probably flying
-    bool likely_flying;
-    // time when likely_flying last went true
-    uint32_t _last_flying_ms;
+    // if there's been a watchdog reset, notify the world via a
+    // statustext:
+    void send_watchdog_reset_statustext();
+
+    bool likely_flying;         // true if vehicle is probably flying
+    uint32_t _last_flying_ms;   // time when likely_flying last went true
+
+    static AP_Vehicle *_singleton;
 };
 
 namespace AP {

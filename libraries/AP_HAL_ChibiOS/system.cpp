@@ -56,17 +56,28 @@ void NMI_Handler(void) { while (1); }
 /*
   save watchdog data for a hard fault
  */
-static void save_fault_watchdog(uint16_t line, FaultType fault_type, uint32_t fault_addr)
+static void save_fault_watchdog(uint16_t line, FaultType fault_type, uint32_t fault_addr, uint32_t lr)
 {
 #ifndef HAL_BOOTLOADER_BUILD
     bool using_watchdog = AP_BoardConfig::watchdog_enabled();
     if (using_watchdog) {
         AP_HAL::Util::PersistentData &pd = hal.util->persistent_data;
         pd.fault_line = line;
-        pd.fault_type = fault_type;
+        if (pd.fault_type == 0) {
+            // don't overwrite earlier fault
+            pd.fault_type = fault_type;
+        }
         pd.fault_addr = fault_addr;
-        pd.fault_thd_prio = chThdGetPriorityX();
+        thread_t *tp = chThdGetSelfX();
+        if (tp) {
+            pd.fault_thd_prio = tp->prio;
+            // get first 4 bytes of the name, but only of first fault
+            if (tp->name && pd.thread_name4[0] == 0) {
+                strncpy(pd.thread_name4, tp->name, 4);
+            }
+        }
         pd.fault_icsr = SCB->ICSR;
+        pd.fault_lr = lr;
         stm32_watchdog_save((uint32_t *)&hal.util->persistent_data, (sizeof(hal.util->persistent_data)+3)/4);
     }
 #endif
@@ -98,7 +109,7 @@ void HardFault_Handler(void) {
     (void)isFaultOnStacking;
     (void)isFaultAddressValid;
 
-    save_fault_watchdog(__LINE__, faultType, faultAddress);
+    save_fault_watchdog(__LINE__, faultType, faultAddress, (uint32_t)ctx.lr_thd);
 
 #ifdef HAL_GPIO_PIN_FAULT
     while (true) {
@@ -151,7 +162,7 @@ void UsageFault_Handler(void) {
     (void)isUnalignedAccessFault;
     (void)isDivideByZeroFault;
 
-    save_fault_watchdog(__LINE__, faultType, faultAddress);
+    save_fault_watchdog(__LINE__, faultType, faultAddress, (uint32_t)ctx.lr_thd);
 
     //Cause debugger to stop. Ignored if no debugger is attached
     while(1) {}
@@ -183,7 +194,7 @@ void MemManage_Handler(void) {
     (void)isExceptionStackingFault;
     (void)isFaultAddressValid;
 
-    save_fault_watchdog(__LINE__, faultType, faultAddress);
+    save_fault_watchdog(__LINE__, faultType, faultAddress, (uint32_t)ctx.lr_thd);
 
     while(1) {}
 }

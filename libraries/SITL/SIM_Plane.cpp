@@ -84,6 +84,11 @@ Plane::Plane(const char *frame_str) :
     if (strstr(frame_str, "-ice")) {
         ice_engine = true;
     }
+
+    if (strstr(frame_str, "-soaring")) {
+        mass = 2.0;
+        coefficient.c_drag_p = 0.05;
+    }
 }
 
 /*

@@ -66,9 +66,11 @@ MAV_MODE GCS_MAVLINK_Plane::base_mode() const
     }
 
     if (plane.g.stick_mixing != STICK_MIXING_DISABLED && plane.control_mode != &plane.mode_initializing) {
-        // all modes except INITIALISING have some form of manual
-        // override if stick mixing is enabled
-        _base_mode |= MAV_MODE_FLAG_MANUAL_INPUT_ENABLED;
+        if ((plane.g.stick_mixing != STICK_MIXING_VTOL_YAW) || (plane.control_mode == &plane.mode_auto)) {
+            // all modes except INITIALISING have some form of manual
+            // override if stick mixing is enabled
+            _base_mode |= MAV_MODE_FLAG_MANUAL_INPUT_ENABLED;
+        }
     }
 
 #if HIL_SUPPORT
@@ -138,8 +140,10 @@ void GCS_MAVLINK_Plane::send_attitude() const
         omega.z);
 }
 
-void Plane::send_aoa_ssa(mavlink_channel_t chan)
+void GCS_MAVLINK_Plane::send_aoa_ssa()
 {
+    AP_AHRS &ahrs = AP::ahrs();
+
     mavlink_msg_aoa_ssa_send(
         chan,
         micros(),
@@ -300,9 +304,9 @@ void GCS_MAVLINK_Plane::send_simstate() const
 #endif
 }
 
-void Plane::send_wind(mavlink_channel_t chan)
+void GCS_MAVLINK_Plane::send_wind() const
 {
-    Vector3f wind = ahrs.wind_estimate();
+    const Vector3f wind = AP::ahrs().wind_estimate();
     mavlink_msg_wind_send(
         chan,
         degrees(atan2f(-wind.y, -wind.x)), // use negative, to give
@@ -426,7 +430,7 @@ bool GCS_MAVLINK_Plane::try_send_message(enum ap_message id)
 
     case MSG_WIND:
         CHECK_PAYLOAD_SIZE(WIND);
-        plane.send_wind(chan);
+        send_wind();
         break;
 
     case MSG_ADSB_VEHICLE:
@@ -436,7 +440,7 @@ bool GCS_MAVLINK_Plane::try_send_message(enum ap_message id)
 
     case MSG_AOA_SSA:
         CHECK_PAYLOAD_SIZE(AOA_SSA);
-        plane.send_aoa_ssa(chan);
+        send_aoa_ssa();
         break;
     case MSG_LANDING:
         plane.landing.send_landing_message(chan);
@@ -582,7 +586,6 @@ static const ap_message STREAM_EXTRA1_msgs[] = {
     MSG_ATTITUDE,
     MSG_SIMSTATE,
     MSG_AHRS2,
-    MSG_AHRS3,
     MSG_RPM,
     MSG_AOA_SSA,
     MSG_PID_TUNING,
@@ -1165,8 +1168,7 @@ void GCS_MAVLINK_Plane::handleMessage(const mavlink_message_t &msg)
         // in e.g., RTL, CICLE. Specifying a single mode for companion
         // computer control is more safe (even more so when using
         // FENCE_ACTION = 4 for geofence failures).
-        if ((plane.control_mode != &plane.mode_guided) &&
-            (plane.control_mode != &plane.mode_avoidADSB)) { // don't screw up failsafes
+        if (plane.control_mode != &plane.mode_guided) { // don't screw up failsafes
             break; 
         }
 
@@ -1276,7 +1278,7 @@ void GCS_MAVLINK_Plane::handleMessage(const mavlink_message_t &msg)
         // in modes such as RTL, CIRCLE, etc.  Specifying ONLY one mode
         // for companion computer control is more safe (provided
         // one uses the FENCE_ACTION = 4 (RTL) for geofence failures).
-        if (plane.control_mode != &plane.mode_guided && plane.control_mode != &plane.mode_avoidADSB) {
+        if (plane.control_mode != &plane.mode_guided) {
             //don't screw up failsafes
             break;
         }
@@ -1342,12 +1344,6 @@ void GCS_MAVLINK_Plane::handle_rc_channels_override(const mavlink_message_t &msg
     GCS_MAVLINK::handle_rc_channels_override(msg);
 }
 
-/*
- *  a delay() callback that processes MAVLink packets. We set this as the
- *  callback in long running library initialisation routines to allow
- *  MAVLink to process packets while waiting for the initialisation to
- *  complete
- */
 void GCS_MAVLINK_Plane::handle_mission_set_current(AP_Mission &mission, const mavlink_message_t &msg)
 {
     plane.auto_state.next_wp_crosstrack = false;

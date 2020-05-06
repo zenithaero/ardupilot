@@ -225,7 +225,7 @@ uint16_t AP_Logger_File::find_oldest_log()
     // relying on the min_avail_space_percent feature we could end up
     // doing a *lot* of asprintf()s and stat()s
     EXPECT_DELAY_MS(3000);
-    DIR *d = AP::FS().opendir(_log_directory);
+    auto *d = AP::FS().opendir(_log_directory);
     if (d == nullptr) {
         // SD card may have died?  On linux someone may have rm-rf-d
         return 0;
@@ -301,12 +301,12 @@ void AP_Logger_File::Prep_MinSpace()
         }
         if (count++ > MAX_LOG_FILES+10) {
             // *way* too many deletions going on here.  Possible internal error.
-            AP::internalerror().error(AP_InternalError::error_t::logger_too_many_deletions);
+            INTERNAL_ERROR(AP_InternalError::error_t::logger_too_many_deletions);
             break;
         }
         char *filename_to_remove = _log_file_name(log_to_remove);
         if (filename_to_remove == nullptr) {
-            AP::internalerror().error(AP_InternalError::error_t::logger_bad_getfilename);
+            INTERNAL_ERROR(AP_InternalError::error_t::logger_bad_getfilename);
             break;
         }
         if (file_exists(filename_to_remove)) {
@@ -895,7 +895,7 @@ void AP_Logger_File::flush(void)
         }
         write_fd_semaphore.give();
     } else {
-        AP::internalerror().error(AP_InternalError::error_t::logger_flushing_without_sem);
+        INTERNAL_ERROR(AP_InternalError::error_t::logger_flushing_without_sem);
     }
 }
 #else

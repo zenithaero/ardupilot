@@ -41,6 +41,17 @@ bool ModeZigZag::init(bool ignore_checks)
     return true;
 }
 
+// perform cleanup required when leaving zigzag mode
+void ModeZigZag::exit()
+{
+#if SPRAYER_ENABLED == ENABLED
+    // The pump will stop if the flight mode is changed from ZigZag to other
+    if (g2.zigzag_auto_pump_enabled) {
+        copter.sprayer.run(false);
+    }
+#endif
+}
+
 // run the zigzag controller
 // should be called at 100hz or more
 void ModeZigZag::run()
@@ -113,6 +124,12 @@ void ModeZigZag::save_or_move_to_destination(uint8_t dest_num)
                 wp_nav->wp_and_spline_init();
                 if (wp_nav->set_wp_destination(next_dest, terr_alt)) {
                     stage = AUTO;
+#if SPRAYER_ENABLED == ENABLED
+                    // spray on while moving to A or B
+                    if (g2.zigzag_auto_pump_enabled) {
+                        copter.sprayer.run(true);
+                    }
+#endif
                     reach_wp_time_ms = 0;
                     if (dest_num == 0) {
                         gcs().send_text(MAV_SEVERITY_INFO, "ZigZag: moving to A");
@@ -130,6 +147,12 @@ void ModeZigZag::return_to_manual_control(bool maintain_target)
 {
     if (stage == AUTO) {
         stage = MANUAL_REGAIN;
+#if SPRAYER_ENABLED == ENABLED
+        // spray off
+        if (g2.zigzag_auto_pump_enabled) {
+            copter.sprayer.run(false);
+        }
+#endif
         loiter_nav->clear_pilot_desired_acceleration();
         if (maintain_target) {
             const Vector3f& wp_dest = wp_nav->get_wp_destination();

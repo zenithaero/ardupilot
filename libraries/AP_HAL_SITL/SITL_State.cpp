@@ -214,6 +214,20 @@ void SITL_State::wait_clock(uint64_t wait_time_usec)
             usleep(1000);
         }
     }
+    // check the outbound TCP queue size.  If it is too long then
+    // MAVProxy/pymavlink take too long to process packets and it ends
+    // up seeing traffic well into our past and hits time-out
+    // conditions.
+    if (sitl_model->get_speedup() > 1) {
+        while (true) {
+            const int queue_length = ((HALSITL::UARTDriver*)hal.uartA)->get_system_outqueue_length();
+            // ::fprintf(stderr, "queue_length=%d\n", (signed)queue_length);
+            if (queue_length < 1024) {
+                break;
+            }
+            usleep(1000);
+        }
+    }
 }
 
 #define streq(a, b) (!strcmp(a, b))
@@ -297,6 +311,13 @@ int SITL_State::sim_fd(const char *name, const char *arg)
         }
         nmea = new SITL::RF_NMEA();
         return nmea->fd();
+
+    } else if (streq(name, "rf_mavlink")) {
+        if (wasp != nullptr) {
+            AP_HAL::panic("Only one rf_mavlink at a time");
+        }
+        rf_mavlink = new SITL::RF_MAVLink();
+        return rf_mavlink->fd();
 
     } else if (streq(name, "frsky-d")) {
         if (frsky_d != nullptr) {
@@ -388,6 +409,11 @@ int SITL_State::sim_fd_write(const char *name)
             AP_HAL::panic("No nmea created");
         }
         return nmea->write_fd();
+    } else if (streq(name, "rf_mavlink")) {
+        if (rf_mavlink == nullptr) {
+            AP_HAL::panic("No rf_mavlink created");
+        }
+        return rf_mavlink->write_fd();
     } else if (streq(name, "frsky-d")) {
         if (frsky_d == nullptr) {
             AP_HAL::panic("No frsky-d created");
@@ -637,6 +663,9 @@ void SITL_State::_fdm_input_local(void)
     if (nmea != nullptr) {
         nmea->update(sitl_model->get_range());
     }
+    if (rf_mavlink != nullptr) {
+        rf_mavlink->update(sitl_model->get_range());
+    }
 
     if (frsky_d != nullptr) {
         frsky_d->update();
@@ -694,7 +723,7 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
         if (_vehicle == ArduPlane) {
             pwm_output[0] = pwm_output[1] = pwm_output[3] = 1500;
         }
-        if (_vehicle == APMrover2) {
+        if (_vehicle == Rover) {
             pwm_output[0] = pwm_output[1] = pwm_output[2] = pwm_output[3] = 1500;
         }
     }
@@ -759,22 +788,41 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
         engine_fail = 0;
     }
     // apply engine multiplier to motor defined by the SIM_ENGINE_FAIL parameter
-    if (_vehicle != APMrover2) {
+    if (_vehicle != Rover) {
         input.servos[engine_fail] = ((input.servos[engine_fail]-1000) * engine_mul) + 1000;
     } else {
         input.servos[engine_fail] = static_cast<uint16_t>(((input.servos[engine_fail] - 1500) * engine_mul) + 1500);
     }
 
     if (_vehicle == ArduPlane) {
-        throttle = constrain_float((input.servos[2] - 1000) / 1000.0f, 0.0f, 1.0f);
-    } else if (_vehicle == APMrover2) {
+        float forward_throttle = constrain_float((input.servos[2] - 1000) / 1000.0f, 0.0f, 1.0f);
+        // do a little quadplane dance
+        float hover_throttle = 0.0f;
+        uint8_t running_motors = 0;
+        for (i=0; i < sitl_model->get_num_motors() - 1; i++) {
+            float motor_throttle = constrain_float((input.servos[sitl_model->get_motors_offset() + i] - 1000) / 1000.0f, 0.0f, 1.0f);
+            // update motor_on flag
+            if (!is_zero(motor_throttle)) {
+                hover_throttle += motor_throttle;
+                running_motors++;
+            }
+        }
+        if (running_motors > 0) {
+            hover_throttle /= running_motors;
+        }
+        if (!is_zero(forward_throttle)) {
+            throttle = forward_throttle;
+        } else {
+            throttle = hover_throttle;
+        }
+    } else if (_vehicle == Rover) {
         input.servos[2] = static_cast<uint16_t>(constrain_int16(input.servos[2], 1000, 2000));
         input.servos[0] = static_cast<uint16_t>(constrain_int16(input.servos[0], 1000, 2000));
         throttle = fabsf((input.servos[2] - 1500) / 500.0f);
     } else {
         // run checks on each motor
         uint8_t running_motors = 0;
-        for (i=0; i<SITL_NUM_CHANNELS; i++) {
+        for (i=0; i < sitl_model->get_num_motors(); i++) {
             float motor_throttle = constrain_float((input.servos[i] - 1000) / 1000.0f, 0.0f, 1.0f);
             // update motor_on flag
             if (!is_zero(motor_throttle)) {

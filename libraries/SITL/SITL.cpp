@@ -89,7 +89,7 @@ const AP_Param::GroupInfo SITL::var_info[] = {
     AP_GROUPINFO("ADSB_TX",       51, SITL,  adsb_tx, 0),
     AP_GROUPINFO("SPEEDUP",       52, SITL,  speedup, -1),
     AP_GROUPINFO("IMU_POS",       53, SITL,  imu_pos_offset, 0),
-    AP_GROUPINFO("GPS_POS",       54, SITL,  gps_pos_offset[0], 0),
+    AP_GROUPINFO("GPS_POS1",      54, SITL,  gps_pos_offset[0], 0),
     AP_GROUPINFO("SONAR_POS",     55, SITL,  rngfnd_pos_offset, 0),
     AP_GROUPINFO("FLOW_POS",      56, SITL,  optflow_pos_offset, 0),
     AP_GROUPINFO("ACC2_BIAS",     57, SITL,  accel2_bias, 0),
@@ -172,7 +172,7 @@ const AP_Param::GroupInfo SITL::var_info2[] = {
     AP_GROUPINFO("GND_BEHAV",   41, SITL,  gnd_behav, -1),
     AP_GROUPINFO("BARO_COUNT",  42, SITL,  baro_count,  1),
 
-    AP_GROUPINFO("GPS_HDG",     43, SITL,  gps_hdg_enabled, 0),
+    AP_GROUPINFO("GPS_HDG",     43, SITL,  gps_hdg_enabled[0], 0),
 
     // sailboat wave and tide simulation parameters
     AP_GROUPINFO("WAVE_ENABLE", 44, SITL,  wave.enable, 0.0f),
@@ -208,6 +208,8 @@ const AP_Param::GroupInfo SITL::var_info2[] = {
     AP_GROUPINFO("VIB_MOT_MAX", 61, SITL,  vibe_motor, 0.0f),
     // minimum throttle for simulated ins noise
     AP_GROUPINFO("INS_THR_MIN", 62, SITL,  ins_noise_throttle_min, 0.1f),
+    // amplitude scaling of motor noise relative to gyro/accel noise
+    AP_GROUPINFO("VIB_MOT_MULT", 63, SITL,  vibe_motor_scale, 1.0f),
 
     AP_GROUPEND
 
@@ -216,11 +218,42 @@ const AP_Param::GroupInfo SITL::var_info2[] = {
 // third table of user settable parameters for SITL. 
 const AP_Param::GroupInfo SITL::var_info3[] = {
     AP_GROUPINFO("ODOM_ENABLE",   1, SITL,  odom_enable, 0),
-    AP_GROUPINFO("GPS2_POS",      2, SITL,  gps_pos_offset[1], 0),
+    AP_GROUPINFO("GPS_POS2",      2, SITL,  gps_pos_offset[1], 0),
+    AP_GROUPINFO("MAG1_DEVID",    3, SITL,  mag_devid[0], 97539),
+    AP_GROUPINFO("MAG2_DEVID",    4, SITL,  mag_devid[1], 131874),
+    AP_GROUPINFO("MAG3_DEVID",    5, SITL,  mag_devid[2], 263178),
+    AP_GROUPINFO("MAG4_DEVID",    6, SITL,  mag_devid[3], 97283),    
+    AP_GROUPINFO("MAG5_DEVID",    7, SITL,  mag_devid[4], 97795),
+    AP_GROUPINFO("MAG6_DEVID",    8, SITL,  mag_devid[5], 98051),
+    AP_GROUPINFO("MAG7_DEVID",    9, SITL,  mag_devid[6], 0),
+    AP_GROUPINFO("MAG8_DEVID",    10, SITL, mag_devid[7], 0),
+
+    AP_GROUPINFO("LED_LAYOUT",    11, SITL, led_layout, 0),
+
+    // Scenario for thermalling simulation, for soaring
+    AP_GROUPINFO("THML_SCENARI",  12, SITL,  thermal_scenario, 0),
+
+    AP_GROUPINFO("GPS2_HDG",      13, SITL,  gps_hdg_enabled[1], 0),
+
+    // vicon sensor position (position offsets in body frame)
+    AP_GROUPINFO("VICON_POS",     14, SITL,  vicon_pos_offset, 0),
+
+    // Buyoancy for submarines
+    AP_GROUPINFO_FRAME("BUOYANCY", 15, SITL, buoyancy, 1, AP_PARAM_FRAME_SUB),
+
+    // vicon glitch in NED frame
+    AP_GROUPINFO("VICON_GLIT",    16, SITL,  vicon_glitch, 0),
+
+    // vicon failure
+    AP_GROUPINFO("VICON_FAIL",    17, SITL,  vicon_fail, 0),
+
+    // vicon yaw (in earth frame)
+    AP_GROUPINFO("VICON_YAW",     18, SITL,  vicon_yaw, 0),
+
     AP_GROUPEND
+
 };
     
-
 /* report SITL state via MAVLink */
 void SITL::simstate_send(mavlink_channel_t chan)
 {

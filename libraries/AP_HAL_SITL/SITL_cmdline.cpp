@@ -120,9 +120,12 @@ static const struct {
     { "djix",               MultiCopter::create },
     { "cwx",                MultiCopter::create },
     { "hexa",               MultiCopter::create },
+    { "hexa-cwx",           MultiCopter::create },
     { "hexa-dji",           MultiCopter::create },
     { "octa",               MultiCopter::create },
+    { "octa-cwx",           MultiCopter::create },
     { "octa-dji",           MultiCopter::create },
+    { "octa-quad-cwx",      MultiCopter::create },
     { "dodeca-hexa",        MultiCopter::create },
     { "tri",                MultiCopter::create },
     { "y6",                 MultiCopter::create },
@@ -441,8 +444,8 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         if (_framerate == 0) {
             _framerate = 200;
         }
-    } else if (strcmp(SKETCH, "APMrover2") == 0) {
-        _vehicle = APMrover2;
+    } else if (strcmp(SKETCH, "Rover") == 0) {
+        _vehicle = Rover;
         if (_framerate == 0) {
             _framerate = 50;
         }

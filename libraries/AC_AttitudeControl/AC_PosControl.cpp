@@ -276,8 +276,13 @@ void AC_PosControl::set_max_speed_z(float speed_down, float speed_up)
     // ensure speed_down is always negative
     speed_down = -fabsf(speed_down);
 
-    // only update if there is a minimum of 1cm/s change and is valid
-    if (((fabsf(_speed_down_cms - speed_down) > 1.0f) || (fabsf(_speed_up_cms - speed_up) > 1.0f)) && is_positive(speed_up) && is_negative(speed_down) ) {
+    // exit immediately if no change in speed up or down
+    if (is_equal(_speed_down_cms, speed_down) && is_equal(_speed_up_cms, speed_up)) {
+        return;
+    }
+
+    // sanity check speeds and update
+    if (is_positive(speed_up) && is_negative(speed_down)) {
         _speed_down_cms = speed_down;
         _speed_up_cms = speed_up;
         _flags.recalc_leash_z = true;
@@ -288,11 +293,14 @@ void AC_PosControl::set_max_speed_z(float speed_down, float speed_up)
 /// set_max_accel_z - set the maximum vertical acceleration in cm/s/s
 void AC_PosControl::set_max_accel_z(float accel_cmss)
 {
-    if (fabsf(_accel_z_cms - accel_cmss) > 1.0f) {
-        _accel_z_cms = accel_cmss;
-        _flags.recalc_leash_z = true;
-        calc_leash_length_z();
+    // exit immediately if no change in acceleration
+    if (is_equal(_accel_z_cms, accel_cmss)) {
+        return;
     }
+
+    _accel_z_cms = accel_cmss;
+    _flags.recalc_leash_z = true;
+    calc_leash_length_z();
 }
 
 /// set_alt_target_with_slew - adjusts target towards a final altitude target
@@ -657,21 +665,26 @@ void AC_PosControl::run_z_controller()
 /// set_max_accel_xy - set the maximum horizontal acceleration in cm/s/s
 void AC_PosControl::set_max_accel_xy(float accel_cmss)
 {
-    if (fabsf(_accel_cms - accel_cmss) > 1.0f) {
-        _accel_cms = accel_cmss;
-        _flags.recalc_leash_xy = true;
-        calc_leash_length_xy();
+    // return immediately if no change
+    if (is_equal(_accel_cms, accel_cmss)) {
+        return;
     }
+    _accel_cms = accel_cmss;
+    _flags.recalc_leash_xy = true;
+    calc_leash_length_xy();
 }
 
 /// set_max_speed_xy - set the maximum horizontal speed maximum in cm/s
 void AC_PosControl::set_max_speed_xy(float speed_cms)
 {
-    if (fabsf(_speed_cms - speed_cms) > 1.0f) {
-        _speed_cms = speed_cms;
-        _flags.recalc_leash_xy = true;
-        calc_leash_length_xy();
+    // return immediately if no change in speed
+    if (is_equal(_speed_cms, speed_cms)) {
+        return;
     }
+
+    _speed_cms = speed_cms;
+    _flags.recalc_leash_xy = true;
+    calc_leash_length_xy();
 }
 
 /// set_pos_target in cm from home
@@ -770,6 +783,16 @@ float AC_PosControl::get_distance_to_target() const
 int32_t AC_PosControl::get_bearing_to_target() const
 {
     return get_bearing_cd(_inav.get_position(), _pos_target);
+}
+
+// relax velocity controller by clearing velocity error and setting velocity target to current velocity
+void AC_PosControl::relax_velocity_controller_xy()
+{
+    const Vector3f& curr_vel = _inav.get_velocity();
+    _vel_target.x = curr_vel.x;
+    _vel_target.y = curr_vel.y;
+    _vel_error.x = 0.0f;
+    _vel_error.y = 0.0f;
 }
 
 // is_active_xy - returns true if the xy position controller has been run very recently
@@ -876,6 +899,21 @@ void AC_PosControl::write_log()
     float accel_x, accel_y;
     lean_angles_to_accel(accel_x, accel_y);
 
+// @LoggerMessage: PSC
+// @Description: Position Control data
+// @Field: TimeUS: Time since system startup
+// @Field: TPX: Target position relative to origin, X-axis
+// @Field: TPY: Target position relative to origin, Y-axis
+// @Field: PX: Position relative to origin, X-axis
+// @Field: PY: Position relative to origin, Y-axis
+// @Field: TVX: Target velocity, X-axis
+// @Field: TVY: Target velocity, Y-axis
+// @Field: VX: Velocity, X-axis
+// @Field: VY: Velocity, Y-axis
+// @Field: TAX: Target acceleration, X-axis
+// @Field: TAY: Target acceleration, Y-axis
+// @Field: AX: Acceleration, X-axis
+// @Field: AY: Acceleration, Y-axis
     AP::logger().Write("PSC",
                        "TimeUS,TPX,TPY,PX,PY,TVX,TVY,VX,VY,TAX,TAY,AX,AY",
                        "smmmmnnnnoooo",
@@ -928,45 +966,13 @@ void AC_PosControl::init_vel_controller_xyz()
     init_ekf_z_reset();
 }
 
-/// update_velocity_controller_xy - run the velocity controller - should be called at 100hz or higher
-///     velocity targets should we set using set_desired_velocity_xy() method
-///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
-///     throttle targets will be sent directly to the motors
-void AC_PosControl::update_vel_controller_xy()
-{
-    // capture time since last iteration
-    const uint64_t now_us = AP_HAL::micros64();
-    float dt = (now_us - _last_update_xy_us) * 1.0e-6f;
-
-    // sanity check dt
-    if (dt >= 0.2f) {
-        dt = 0.0f;
-    }
-
-    // check for ekf xy position reset
-    check_for_ekf_xy_reset();
-
-    // check if xy leash needs to be recalculated
-    calc_leash_length_xy();
-
-    // apply desired velocity request to position target
-    // TODO: this will need to be removed and added to the calling function.
-    desired_vel_to_pos(dt);
-
-    // run position controller
-    run_xy_controller(dt);
-
-    // update xy update time
-    _last_update_xy_us = now_us;
-}
-
 /// update_velocity_controller_xyz - run the velocity controller - should be called at 100hz or higher
 ///     velocity targets should we set using set_desired_velocity_xyz() method
 ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
 ///     throttle targets will be sent directly to the motors
 void AC_PosControl::update_vel_controller_xyz()
 {
-    update_vel_controller_xy();
+    update_xy_controller();
 
     // update altitude target
     set_alt_target_from_climb_rate_ff(_vel_desired.z, _dt, false);

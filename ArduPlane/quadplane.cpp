@@ -754,6 +754,9 @@ bool QuadPlane::setup(void)
 
     AP_Param::convert_old_parameters(&q_conversion_table[0], ARRAY_SIZE(q_conversion_table));
 
+    // param count will have changed
+    AP_Param::invalidate_count();
+
     gcs().send_text(MAV_SEVERITY_INFO, "QuadPlane initialised");
     initialised = true;
     return true;
@@ -1125,8 +1128,12 @@ void QuadPlane::init_qland(void)
     init_loiter();
     throttle_wait = false;
     poscontrol.state = QPOS_LAND_DESCEND;
+    last_land_final_agl = plane.relative_ground_altitude(plane.g.rangefinder_landing);
     landing_detect.lower_limit_start_ms = 0;
     landing_detect.land_start_ms = 0;
+#if LANDING_GEAR_ENABLED == ENABLED
+    plane.g2.landing_gear.deploy_for_landing();
+#endif
 }
 
 
@@ -1304,6 +1311,10 @@ float QuadPlane::get_pilot_input_yaw_rate_cds(void) const
     if (plane.get_throttle_input() <= 0 && !plane.auto_throttle_mode &&
         plane.arming.get_rudder_arming_type() != AP_Arming::RudderArming::IS_DISABLED) {
         // the user may be trying to disarm
+        return 0;
+    }
+
+    if (plane.g.stick_mixing == STICK_MIXING_DISABLED) {
         return 0;
     }
 
@@ -1694,13 +1705,17 @@ void QuadPlane::update_transition(void)
         // in half the transition time
         float transition_rate = tailsitter.transition_angle / float(transition_time_ms/2);
         uint32_t dt = now - transition_start_ms;
-        plane.nav_pitch_cd = constrain_float((-transition_rate * dt)*100, -8500, 0);
+        float pitch_cd;
+        pitch_cd = constrain_float((-transition_rate * dt)*100, -8500, 0);
+        // if already pitched forward at start of transition, wait until curve catches up
+        plane.nav_pitch_cd = (pitch_cd > transition_initial_pitch)? transition_initial_pitch : pitch_cd;
         plane.nav_roll_cd = 0;
         check_attitude_relax();
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
                                                                       plane.nav_pitch_cd,
                                                                       0);
-        attitude_control->set_throttle_out(motors->get_throttle_hover(), true, 0);
+        // set throttle at either hover throttle or current throttle, whichever is higher, through the transition
+        attitude_control->set_throttle_out(MAX(motors->get_throttle_hover(),motors->get_throttle()), true, 0);
         break;
     }
 
@@ -1808,6 +1823,7 @@ void QuadPlane::update(void)
                  */
                 transition_state = TRANSITION_ANGLE_WAIT_FW;
                 transition_start_ms = now;
+                transition_initial_pitch= constrain_float(ahrs_view->pitch_sensor,-8500,0);
             } else {
                 /*
                   setup for airspeed wait for later
@@ -2242,7 +2258,7 @@ void QuadPlane::vtol_position_controller(void)
         pos_control->set_desired_accel_xy(0.0f,0.0f);
 
         // run horizontal velocity controller
-        pos_control->update_vel_controller_xy();
+        pos_control->update_xy_controller();
 
         // nav roll and pitch are controller by position controller
         plane.nav_roll_cd = pos_control->get_roll();
@@ -2729,7 +2745,7 @@ void QuadPlane::check_land_complete(void)
         return;
     }
     if (land_detector(4000)) {
-        plane.arming.disarm();
+        plane.arming.disarm(AP_Arming::Method::LANDED);
         poscontrol.state = QPOS_LAND_COMPLETE;
         gcs().send_text(MAV_SEVERITY_INFO,"Land complete");
         // reload target airspeed which could have been modified by the mission
@@ -2744,9 +2760,15 @@ void QuadPlane::check_land_complete(void)
 bool QuadPlane::check_land_final(void)
 {
     float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
-    if (height_above_ground < land_final_alt) {
+    // we require 2 readings at 10Hz to be within 5m of each other to
+    // trigger the switch to land final. This prevents a short term
+    // glitch at high altitude from triggering land final
+    const float max_change = 5;
+    if (height_above_ground < land_final_alt &&
+        fabsf(height_above_ground - last_land_final_agl) < max_change) {
         return true;
     }
+    last_land_final_agl = height_above_ground;
 
     /*
       also apply landing detector, in case we have landed in descent
@@ -2766,6 +2788,10 @@ bool QuadPlane::verify_vtol_land(void)
     if (poscontrol.state == QPOS_POSITION2 &&
         plane.auto_state.wp_distance < 2) {
         poscontrol.state = QPOS_LAND_DESCEND;
+#if LANDING_GEAR_ENABLED == ENABLED
+        plane.g2.landing_gear.deploy_for_landing();
+#endif
+        last_land_final_agl = plane.relative_ground_altitude(plane.g.rangefinder_landing);
         gcs().send_text(MAV_SEVERITY_INFO,"Land descend started");
         if (plane.control_mode == &plane.mode_auto) {
             // set height to mission height, so we can use the mission
@@ -2816,7 +2842,7 @@ void QuadPlane::Log_Write_QControl_Tuning()
         target_climb_rate   : target_climb_rate_cms,
         climb_rate          : int16_t(inertial_nav.get_velocity_z()),
         throttle_mix        : attitude_control->get_throttle_mix(),
-        speed_scaler         : last_spd_scaler,
+        speed_scaler        : last_spd_scaler,
     };
     plane.logger.WriteBlock(&pkt, sizeof(pkt));
 
@@ -3150,7 +3176,7 @@ float QuadPlane::stopping_distance(void)
 #define LAND_CHECK_LARGE_ANGLE_CD   1500.0f     // maximum angle target to be considered landing
 #define LAND_CHECK_ACCEL_MOVING     3.0f        // maximum acceleration after subtracting gravity
 
-void QuadPlane::update_throttle_thr_mix(void)
+void QuadPlane::update_throttle_mix(void)
 {
     // transition will directly manage the mix
     if (in_transition()) {
@@ -3158,7 +3184,7 @@ void QuadPlane::update_throttle_thr_mix(void)
     }
 
     // if disarmed or landed prioritise throttle
-    if(!motors->armed()) {
+    if (!motors->armed()) {
         attitude_control->set_throttle_mix_min();
         return;
     }
@@ -3189,7 +3215,7 @@ void QuadPlane::update_throttle_thr_mix(void)
         // check for requested decent
         bool descent_not_demanded = pos_control->get_desired_velocity().z >= 0.0f;
 
-        if ( large_angle_request || large_angle_error || accel_moving || descent_not_demanded) {
+        if (large_angle_request || large_angle_error || accel_moving || descent_not_demanded) {
             attitude_control->set_throttle_mix_max(1.0);
         } else {
             attitude_control->set_throttle_mix_min();

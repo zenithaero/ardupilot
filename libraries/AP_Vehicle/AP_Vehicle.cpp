@@ -14,6 +14,18 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
     AP_SUBGROUPINFO(runcam, "CAM_RC_", 1, AP_Vehicle, AP_RunCam),
 #endif
 
+#if HAL_GYROFFT_ENABLED
+    // @Group: FFT_
+    // @Path: ../AP_GyroFFT/AP_GyroFFT.cpp
+    AP_SUBGROUPINFO(gyro_fft, "FFT_",  2, AP_Vehicle, AP_GyroFFT),
+#endif
+
+#if HAL_VISUALODOM_ENABLED
+    // @Group: VISO
+    // @Path: ../AP_VisualOdom/AP_VisualOdom.cpp
+    AP_SUBGROUPINFO(visual_odom, "VISO",  3, AP_Vehicle, AP_VisualOdom),
+#endif
+
     AP_GROUPEND
 };
 
@@ -53,8 +65,46 @@ void AP_Vehicle::setup()
     // actual loop rate
     G_Dt = scheduler.get_loop_period_s();
 
+    // this is here for Plane; its failsafe_check method requires the
+    // RC channels to be set as early as possible for maximum
+    // survivability.
+    set_control_channels();
+
+    // initialise serial manager as early as sensible to get
+    // diagnostic output during boot process.  We have to initialise
+    // the GCS singleton first as it sets the global mavlink system ID
+    // which may get used very early on.
+    gcs().init();
+
+    // initialise serial ports
+    serial_manager.init();
+    gcs().setup_console();
+
+    // Register scheduler_delay_cb, which will run anytime you have
+    // more than 5ms remaining in your call to hal.scheduler->delay
+    hal.scheduler->register_delay_callback(scheduler_delay_callback, 5);
+
     // init_ardupilot is where the vehicle does most of its initialisation.
     init_ardupilot();
+
+    // gyro FFT needs to be initialized really late
+#if HAL_GYROFFT_ENABLED
+    gyro_fft.init(AP::scheduler().get_loop_period_us());
+#endif
+#if HAL_RUNCAM_ENABLED
+    runcam.init();
+#endif
+#if HAL_HOTT_TELEM_ENABLED
+    hott_telem.init();
+#endif
+#if HAL_VISUALODOM_ENABLED
+    // init library used for visual position estimation
+    visual_odom.init();
+#endif
+
+#if AP_PARAM_KEY_DUMP
+    AP_Param::show_all(hal.console, true);
+#endif
 }
 
 void AP_Vehicle::loop()
@@ -70,8 +120,13 @@ void AP_Vehicle::loop()
  */
 const AP_Scheduler::Task AP_Vehicle::scheduler_tasks[] = {
 #if HAL_RUNCAM_ENABLED
-    SCHED_TASK_CLASS(AP_RunCam,    &vehicle.runcam,              update,          50,  50),
+    SCHED_TASK_CLASS(AP_RunCam,    &vehicle.runcam,         update,                   50, 50),
 #endif
+#if HAL_GYROFFT_ENABLED
+    SCHED_TASK_CLASS(AP_GyroFFT,   &vehicle.gyro_fft,       sample_gyros,      LOOP_RATE, 50),
+    SCHED_TASK_CLASS(AP_GyroFFT,   &vehicle.gyro_fft,       update_parameters,         1, 50),
+#endif
+    SCHED_TASK(send_watchdog_reset_statustext,         0.1,     20),
 };
 
 void AP_Vehicle::get_common_scheduler_tasks(const AP_Scheduler::Task*& tasks, uint8_t& num_tasks)
@@ -79,22 +134,6 @@ void AP_Vehicle::get_common_scheduler_tasks(const AP_Scheduler::Task*& tasks, ui
     tasks = scheduler_tasks;
     num_tasks = ARRAY_SIZE(scheduler_tasks);
 }
-
-// initialize the vehicle
-void AP_Vehicle::init_vehicle()
-{
-    if (init_done) {
-        return;
-    }
-    init_done = true;
-#if HAL_RUNCAM_ENABLED
-    runcam.init();
-#endif
-#if HAL_HOTT_TELEM_ENABLED
-    hott_telem.init();
-#endif
-}
-
 
 /*
  *  a delay() callback that processes MAVLink packets. We set this as the
@@ -131,11 +170,29 @@ void AP_Vehicle::scheduler_delay_callback()
     logger.EnableWrites(true);
 }
 
-void AP_Vehicle::register_scheduler_delay_callback()
+// if there's been a watchdog reset, notify the world via a statustext:
+void AP_Vehicle::send_watchdog_reset_statustext()
 {
-    // Register scheduler_delay_cb, which will run anytime you have
-    // more than 5ms remaining in your call to hal.scheduler->delay
-    hal.scheduler->register_delay_callback(scheduler_delay_callback, 5);
+    if (!hal.util->was_watchdog_reset()) {
+        return;
+    }
+    const AP_HAL::Util::PersistentData &pd = hal.util->last_persistent_data;
+    gcs().send_text(MAV_SEVERITY_CRITICAL,
+                    "WDG: T%d SL%u FL%u FT%u FA%x FTP%u FLR%x FICSR%u MM%u MC%u IE%u IEC%u TN:%.4s",
+                    pd.scheduler_task,
+                    pd.semaphore_line,
+                    pd.fault_line,
+                    pd.fault_type,
+                    (unsigned)pd.fault_addr,
+                    pd.fault_thd_prio,
+                    (unsigned)pd.fault_lr,
+                    (unsigned)pd.fault_icsr,
+                    pd.last_mavlink_msgid,
+                    pd.last_mavlink_cmd,
+                    (unsigned)pd.internal_errors,
+                    (unsigned)pd.internal_error_count,
+                    pd.thread_name4
+        );
 }
 
 AP_Vehicle *AP_Vehicle::_singleton = nullptr;

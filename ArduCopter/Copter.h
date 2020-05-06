@@ -40,8 +40,6 @@
 #include <AP_AccelCal/AP_AccelCal.h>                // interface and maths for accelerometer calibration
 #include <AP_InertialSensor/AP_InertialSensor.h>  // ArduPilot Mega Inertial Sensor (accel & gyro) Library
 #include <AP_AHRS/AP_AHRS.h>
-#include <AP_NavEKF2/AP_NavEKF2.h>
-#include <AP_NavEKF3/AP_NavEKF3.h>
 #include <AP_Mission/AP_Mission.h>     // Mission command library
 #include <AC_AttitudeControl/AC_AttitudeControl_Multi.h> // Attitude control library
 #include <AC_AttitudeControl/AC_AttitudeControl_Heli.h> // Attitude control library for traditional helicopter
@@ -128,9 +126,6 @@
 #endif
 #if OPTFLOW == ENABLED
  # include <AP_OpticalFlow/AP_OpticalFlow.h>
-#endif
-#if VISUAL_ODOMETRY_ENABLED == ENABLED
- # include <AP_VisualOdom/AP_VisualOdom.h>
 #endif
 #if RANGEFINDER_ENABLED == ENABLED
  # include <AP_RangeFinder/AP_RangeFinder.h>
@@ -261,12 +256,18 @@ private:
         bool enabled:1;
         bool alt_healthy:1; // true if we can trust the altitude from the rangefinder
         int16_t alt_cm;     // tilt compensated altitude (in cm) from rangefinder
+        float inertial_alt_cm; // inertial alt at time of last rangefinder sample
         uint32_t last_healthy_ms;
         LowPassFilterFloat alt_cm_filt; // altitude filter
         int16_t alt_cm_glitch_protected;    // last glitch protected altitude
         int8_t glitch_count;    // non-zero number indicates rangefinder is glitching
         uint32_t glitch_cleared_ms; // system time glitch cleared
     } rangefinder_state, rangefinder_up_state;
+
+    /*
+      return rangefinder height interpolated using inertial altitude
+     */
+    bool get_rangefinder_height_interpolated_cm(int32_t& ret);
 
     class SurfaceTracking {
     public:
@@ -364,7 +365,7 @@ private:
             uint8_t motor_interlock_switch  : 1; // 22      // true if pilot is requesting motor interlock enable
             uint8_t in_arming_delay         : 1; // 23      // true while we are armed but waiting to spin motors
             uint8_t initialised_params      : 1; // 24      // true when the all parameters have been initialised. we cannot send parameters to the GCS until this is done
-            uint8_t unused3   : 1; // 25      // was compass_init_location; true when the compass's initial location has been set
+            uint8_t unused3                 : 1; // 25      // was compass_init_location; true when the compass's initial location has been set
             uint8_t unused2                 : 1; // 26      // aux switch rc_override is allowed
             uint8_t armed_with_switch       : 1; // 27      // we armed using a arming switch
         };
@@ -630,6 +631,9 @@ private:
                              uint8_t &task_count,
                              uint32_t &log_bit) override;
     void fast_loop() override;
+    bool start_takeoff(float alt) override;
+    bool set_target_location(const Location& target_loc) override;
+    bool set_target_velocity_NED(const Vector3f& vel_ned) override;
     void rc_loop();
     void throttle_loop();
     void update_batt_compass(void);
@@ -744,7 +748,7 @@ private:
     void update_land_detector();
     void set_land_complete(bool b);
     void set_land_complete_maybe(bool b);
-    void update_throttle_thr_mix();
+    void update_throttle_mix();
 
     // landing_gear.cpp
     void landinggear_update();
@@ -838,7 +842,6 @@ private:
     void accel_cal_update(void);
     void init_proximity();
     void update_proximity();
-    void init_visual_odom();
     void winch_init();
     void winch_update();
 

@@ -215,38 +215,32 @@ static inline auto MAX(const A &one, const B &two) -> decltype(one > two ? one :
     return one > two ? one : two;
 }
 
-template<typename V, typename A, typename B>
-static inline V CLAMP(const V &val, const A &min, const B &max)
-{
-    return MIN(max, MAX(min, val));
-}
-
-inline uint32_t hz_to_nsec(uint32_t freq)
+inline constexpr uint32_t hz_to_nsec(uint32_t freq)
 {
     return AP_NSEC_PER_SEC / freq;
 }
 
-inline uint32_t nsec_to_hz(uint32_t nsec)
+inline constexpr uint32_t nsec_to_hz(uint32_t nsec)
 {
     return AP_NSEC_PER_SEC / nsec;
 }
 
-inline uint32_t usec_to_nsec(uint32_t usec)
+inline constexpr uint32_t usec_to_nsec(uint32_t usec)
 {
     return usec * AP_NSEC_PER_USEC;
 }
 
-inline uint32_t nsec_to_usec(uint32_t nsec)
+inline constexpr uint32_t nsec_to_usec(uint32_t nsec)
 {
     return nsec / AP_NSEC_PER_USEC;
 }
 
-inline uint32_t hz_to_usec(uint32_t freq)
+inline constexpr uint32_t hz_to_usec(uint32_t freq)
 {
     return AP_USEC_PER_SEC / freq;
 }
 
-inline uint32_t usec_to_hz(uint32_t usec)
+inline constexpr uint32_t usec_to_hz(uint32_t usec)
 {
     return AP_USEC_PER_SEC / usec;
 }
@@ -262,7 +256,7 @@ float linear_interpolate(float low_output, float high_output,
  * alpha range: [0,1] min to max expo
  * input range: [-1,1]
  */
-float expo_curve(float alpha, float input);
+constexpr float expo_curve(float alpha, float input);
 
 /* throttle curve generator
  * thr_mid: output at mid stick

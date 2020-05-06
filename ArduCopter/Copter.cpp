@@ -22,7 +22,7 @@
  *  Based on code and ideas from the Arducopter team: Leonard Hall, Andrew Tridgell, Robert Lefebvre, Pat Hickey, Michael Oborne, Jani Hirvinen,
                                                       Olivier Adler, Kevin Hester, Arthur Benemann, Jonathan Challinger, John Arne Birkeland,
                                                       Jean-Louis Naudin, Mike Smith, and more
- *  Thanks to:	Chris Anderson, Jordi Munoz, Jason Short, Doug Weibel, Jose Julio
+ *  Thanks to: Chris Anderson, Jordi Munoz, Jason Short, Doug Weibel, Jose Julio
  *
  *  Special Thanks to contributors (in alphabetical order by first name):
  *
@@ -37,7 +37,7 @@
  *  Christof Schmid     :Alpha testing
  *  Craig Elder         :Release Management, Support
  *  Dani Saez           :V Octo Support
- *  Doug Weibel	        :DCM, Libraries, Control law advice
+ *  Doug Weibel         :DCM, Libraries, Control law advice
  *  Emile Castelnuovo   :VRBrain port, bug fixes
  *  Gregory Fletcher    :Camera mount orientation math
  *  Guntars             :Arming safety suggestion
@@ -48,7 +48,7 @@
  *  James Goppert       :Mavlink Support
  *  Jani Hiriven        :Testing feedback
  *  Jean-Louis Naudin   :Auto Landing
- *  John Arne Birkeland	:PPM Encoder
+ *  John Arne Birkeland :PPM Encoder
  *  Jose Julio          :Stabilization Control laws, MPU6k driver
  *  Julien Dubois       :PosHold flight mode
  *  Julian Oes          :Pixhawk
@@ -112,9 +112,6 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if BEACON_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Beacon,            &copter.g2.beacon,           update,         400,  50),
 #endif
-#if VISUAL_ODOMETRY_ENABLED == ENABLED
-    SCHED_TASK_CLASS(AP_VisualOdom,       &copter.g2.visual_odom,        update,         400,  50),
-#endif
     SCHED_TASK(update_altitude,       10,    100),
     SCHED_TASK(run_nav_updates,       50,    100),
     SCHED_TASK(update_throttle_hover,100,     90),
@@ -161,6 +158,7 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_Logger,      &copter.logger,           periodic_tasks, 400, 300),
 #endif
     SCHED_TASK_CLASS(AP_InertialSensor,    &copter.ins,                 periodic,       400,  50),
+
     SCHED_TASK_CLASS(AP_Scheduler,         &copter.scheduler,           update_logging, 0.1,  75),
 #if RPM_ENABLED == ENABLED
     SCHED_TASK(rpm_update,            40,    200),
@@ -270,6 +268,45 @@ void Copter::fast_loop()
     }
 }
 
+// start takeoff to given altitude (for use by scripting)
+bool Copter::start_takeoff(float alt)
+{
+    // exit if vehicle is not in Guided mode or Auto-Guided mode
+    if (!flightmode->in_guided_mode()) {
+        return false;
+    }
+
+    if (mode_guided.do_user_takeoff_start(alt * 100.0f)) {
+        copter.set_auto_armed(true);
+        return true;
+    }
+    return false;
+}
+
+// set target location (for use by scripting)
+bool Copter::set_target_location(const Location& target_loc)
+{
+    // exit if vehicle is not in Guided mode or Auto-Guided mode
+    if (!flightmode->in_guided_mode()) {
+        return false;
+    }
+
+    return mode_guided.set_destination(target_loc);
+}
+
+bool Copter::set_target_velocity_NED(const Vector3f& vel_ned)
+{
+    // exit if vehicle is not in Guided mode or Auto-Guided mode
+    if (!flightmode->in_guided_mode()) {
+        return false;
+    }
+
+    // convert vector to neu in cm
+    const Vector3f vel_neu_cms(vel_ned.x * 100.0f, vel_ned.y * 100.0f, -vel_ned.z * 100.0f);
+    mode_guided.set_velocity(vel_neu_cms);
+    return true;
+}
+
 // rc_loops - reads user input from transmitter/receiver
 // called at 100hz
 void Copter::rc_loop()
@@ -285,7 +322,7 @@ void Copter::rc_loop()
 void Copter::throttle_loop()
 {
     // update throttle_low_comp value (controls priority of throttle vs attitude control)
-    update_throttle_thr_mix();
+    update_throttle_mix();
 
     // check auto_armed status
     update_auto_armed();
@@ -575,6 +612,9 @@ void Copter::update_altitude()
 
     if (should_log(MASK_LOG_CTUN)) {
         Log_Write_Control_Tuning();
+#if HAL_GYROFFT_ENABLED
+        gyro_fft.write_log_messages();
+#endif
     }
 }
 

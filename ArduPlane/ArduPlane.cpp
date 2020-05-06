@@ -177,7 +177,7 @@ void Plane::update_speed_height(void)
 
     if (quadplane.in_vtol_mode() ||
         quadplane.in_assisted_flight()) {
-        quadplane.update_throttle_thr_mix();
+        quadplane.update_throttle_mix();
     }
 }
 
@@ -213,8 +213,12 @@ void Plane::update_logging1(void)
  */
 void Plane::update_logging2(void)
 {
-    if (should_log(MASK_LOG_CTUN))
+    if (should_log(MASK_LOG_CTUN)) {
         Log_Write_Control_Tuning();
+#if HAL_GYROFFT_ENABLED
+        gyro_fft.write_log_messages();
+#endif
+    }
     
     if (should_log(MASK_LOG_NTUN))
         Log_Write_Nav_Tuning();
@@ -256,6 +260,8 @@ void Plane::one_second_loop()
 
     adsb.set_stall_speed_cm(aparm.airspeed_min);
     adsb.set_max_speed(aparm.airspeed_max);
+
+    ahrs.writeDefaultAirSpeed((float)((aparm.airspeed_min + aparm.airspeed_max)/2));
 
     // sync MAVLink system ID
     mavlink_system.sysid = g.sysid_this_mav;
@@ -462,6 +468,7 @@ void Plane::update_navigation()
             // we've reached the RTL point, see if we have a landing sequence
             if (mission.jump_to_landing_sequence()) {
                 // switch from RTL -> AUTO
+                mission.set_force_resume(true);
                 set_mode(mode_auto, ModeReason::UNKNOWN);
             }
 
@@ -474,6 +481,7 @@ void Plane::update_navigation()
             // Go directly to the landing sequence
             if (mission.jump_to_landing_sequence()) {
                 // switch from RTL -> AUTO
+                mission.set_force_resume(true);
                 set_mode(mode_auto, ModeReason::UNKNOWN);
             }
 
@@ -570,13 +578,6 @@ void Plane::update_alt()
         if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && current_loc.past_interval_finish_line(prev_WP_loc, next_WP_loc)) {
             distance_beyond_land_wp = current_loc.get_distance(next_WP_loc);
         }
-
-        bool soaring_active = false;
-#if SOARING_ENABLED == ENABLED
-        if (g2.soaring_controller.is_active() && g2.soaring_controller.get_throttle_suppressed()) {
-            soaring_active = true;
-        }
-#endif
         // printf("alt cmd %d airspeed cmd %d\n", relative_target_altitude_cm(), target_airspeed_cm);
         SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
                                                  target_airspeed_cm,
@@ -585,8 +586,7 @@ void Plane::update_alt()
                                                  get_takeoff_pitch_min_cd(),
                                                  throttle_nudge,
                                                  tecs_hgt_afe(),
-                                                 aerodynamic_load_factor,
-                                                 soaring_active);
+                                                 aerodynamic_load_factor);
     }
 }
 
@@ -648,7 +648,7 @@ void Plane::disarm_if_autoland_complete()
         arming.is_armed()) {
         /* we have auto disarm enabled. See if enough time has passed */
         if (millis() - auto_state.last_flying_ms >= landing.get_disarm_delay()*1000UL) {
-            if (arming.disarm()) {
+            if (arming.disarm(AP_Arming::Method::AUTOLANDED)) {
                 gcs().send_text(MAV_SEVERITY_INFO,"Auto disarmed");
             }
         }
@@ -691,5 +691,43 @@ void Plane::publish_osd_info()
     osd.set_nav_info(nav_info);
 }
 #endif
+
+// set target location (for use by scripting)
+bool Plane::set_target_location(const Location& target_loc)
+{
+    if (plane.control_mode != &plane.mode_guided) {
+        // only accept position updates when in GUIDED mode
+        return false;
+    }
+    plane.guided_WP_loc = target_loc;
+    // add home alt if needed
+    if (plane.guided_WP_loc.relative_alt) {
+        plane.guided_WP_loc.alt += plane.home.alt;
+        plane.guided_WP_loc.relative_alt = 0;
+    }
+    plane.set_guided_WP();
+    return true;
+}
+
+// set target location (for use by scripting)
+bool Plane::get_target_location(Location& target_loc)
+{
+    switch (control_mode->mode_number()) {
+    case Mode::Number::RTL:
+    case Mode::Number::AVOID_ADSB:
+    case Mode::Number::GUIDED:
+    case Mode::Number::AUTO:
+    case Mode::Number::LOITER:
+    case Mode::Number::QLOITER:
+    case Mode::Number::QLAND:
+    case Mode::Number::QRTL:
+        target_loc = next_WP_loc;
+        return true;
+        break;
+    default:
+        break;
+    }
+    return false;
+}
 
 AP_HAL_MAIN_CALLBACKS(&plane);

@@ -111,7 +111,7 @@ bool NavEKF3_core::getRangeBeaconDebug(uint8_t &ID, float &rng, float &innov, fl
 bool NavEKF3_core::getHeightControlLimit(float &height) const
 {
     // only ask for limiting if we are doing optical flow navigation
-    if (frontend->_fusionModeGPS == 3) {
+    if (frontend->_fusionModeGPS == 3 && (PV_AidingMode == AID_RELATIVE) && flowDataValid) {
         // If are doing optical flow nav, ensure the height above ground is within range finder limits after accounting for vehicle tilt and control errors
         const RangeFinder *_rng = AP::rangefinder();
         if (_rng == nullptr) {
@@ -345,6 +345,8 @@ bool NavEKF3_core::getLLH(struct Location &loc) const
                 return true;
             } else {
                 // if no GPS fix, provide last known position before entering the mode
+                loc.lat = EKF_origin.lat;
+                loc.lng = EKF_origin.lng;
                 loc.offset(lastKnownPositionNE.x, lastKnownPositionNE.y);
                 return false;
             }
@@ -585,6 +587,9 @@ void NavEKF3_core::send_status_report(mavlink_channel_t chan) const
     if (filterStatus.flags.pred_horiz_pos_abs) {
         flags |= EKF_PRED_POS_HORIZ_ABS;
     }
+    if (!filterStatus.flags.initalized) {
+        flags |= EKF_UNINITIALIZED;
+    }
     if (filterStatus.flags.gps_glitching) {
         flags |= (1<<15);
     }
@@ -604,10 +609,10 @@ void NavEKF3_core::send_status_report(mavlink_channel_t chan) const
     } else {
         temp = 0.0f;
     }
+    const float mag_max = fmaxf(fmaxf(magVar.x,magVar.y),magVar.z);
 
     // send message
-    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, magVar.length(), temp, tasVar);
-
+    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, mag_max, temp, tasVar);
 }
 
 // report the reason for why the backend is refusing to initialise
@@ -634,3 +639,10 @@ void NavEKF3_core::getOutputTrackingError(Vector3f &error) const
     error = outputTrackError;
 }
 
+bool NavEKF3_core::getDataEKFGSF(float &yaw_composite, float &yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF])
+{
+    if (yawEstimator != nullptr) {
+        return yawEstimator->getLogData(yaw_composite, yaw_composite_variance, yaw, innov_VN, innov_VE, weight);
+    }
+    return false;
+}

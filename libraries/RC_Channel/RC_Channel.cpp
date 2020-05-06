@@ -41,6 +41,8 @@ extern const AP_HAL::HAL& hal;
 #include <AP_Avoidance/AP_Avoidance.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AC_Fence/AC_Fence.h>
+#include <AP_VisualOdom/AP_VisualOdom.h>
+#include <AP_AHRS/AP_AHRS.h>
 
 #define SWITCH_DEBOUNCE_TIME_MS  200
 
@@ -90,9 +92,9 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Param: OPTION
     // @DisplayName: RC input option
     // @Description: Function assigned to this RC channel
-    // @Values{Copter}: 0:Do Nothing, 2:Flip, 3:Simple Mode, 4:RTL, 5:Save Trim, 7:Save WP, 9:Camera Trigger, 10:RangeFinder, 11:Fence, 13:Super Simple Mode, 14:Acro Trainer, 15:Sprayer, 16:Auto, 17:AutoTune, 18:Land, 19:Gripper, 21:Parachute Enable, 22:Parachute Release, 23:Parachute 3pos, 24:Auto Mission Reset, 25:AttCon Feed Forward, 26:AttCon Accel Limits, 27:Retract Mount, 28:Relay On/Off, 29:Landing Gear, 30:Lost Copter Sound, 31:Motor Emergency Stop, 32:Motor Interlock, 33:Brake, 34:Relay2 On/Off, 35:Relay3 On/Off, 36:Relay4 On/Off, 37:Throw, 38:ADSB Avoidance En, 39:PrecLoiter, 40:Proximity Avoidance, 41:ArmDisarm, 42:SmartRTL, 43:InvertedFlight, 46:RC Override Enable, 47:User Function 1, 48:User Function 2, 49:User Function 3, 52:Acro, 55:Guided, 56:Loiter, 57:Follow, 58:Clear Waypoints, 60:ZigZag, 61:ZigZag SaveWP, 62:Compass Learn, 65:GPS Disable, 66:Relay5, 67:Relay6, 68:Stabilize, 69:PosHold, 70:AltHold, 71:FlowHold, 72:Circle, 73:Drift, 76:Standby Mode, 78:RunCam Control, 79:RunCam OSD Control, 100:KillIMU1, 101:KillIMU2, 102:Camera Mode Toggle
-    // @Values{Rover}: 0:Do Nothing, 4:RTL, 5:Save Trim, 7:Save WP, 9:Camera Trigger, 11:Fence, 16:Auto, 19:Gripper, 24:Auto Mission Reset, 28:Relay On/Off, 30:Lost Rover Sound, 31:Motor Emergency Stop, 34:Relay2 On/Off, 35:Relay3 On/Off, 36:Relay4 On/Off, 40:Proximity Avoidance, 41:ArmDisarm, 42:SmartRTL, 46:RC Override Enable, 50:LearnCruise, 51:Manual, 52:Acro, 53:Steering, 54:Hold, 55:Guided, 56:Loiter, 57:Follow, 58:Clear Waypoints, 59:Simple Mode, 62:Compass Learn, 63:Sailboat Tack, 65:GPS Disable, 66:Relay5, 67:Relay6, 74:Sailboat motoring 3pos, 78:RunCam Control, 79:RunCam OSD Control, 100:KillIMU1, 101:KillIMU2, 207:MainSail, 102:Camera Mode Toggle
-    // @Values{Plane}: 0:Do Nothing, 4:ModeRTL, 9:Camera Trigger, 16:ModeAuto, 24:Auto Mission Reset, 28:Relay On/Off, 29:Landing Gear, 34:Relay2 On/Off, 30:Lost Plane Sound, 31:Motor Emergency Stop, 35:Relay3 On/Off, 36:Relay4 On/Off, 38:ADSB Avoidance En, 41:ArmDisarm, 43:InvertedFlight, 46:RC Override Enable, 51:ModeManual, 55:ModeGuided, 56:ModeLoiter, 58:Clear Waypoints, 62:Compass Learn, 64:Reverse Throttle, 65:GPS Disable, 66:Relay5, 67:Relay6, 72:ModeCircle, 77:ModeTakeoff, 78:RunCam Control, 79:RunCam OSD Control, 100:KillIMU1, 101:KillIMU2, 208:Flap, 102:Camera Mode Toggle
+    // @Values{Copter}: 0:Do Nothing, 2:Flip, 3:Simple Mode, 4:RTL, 5:Save Trim, 7:Save WP, 9:Camera Trigger, 10:RangeFinder, 11:Fence, 13:Super Simple Mode, 14:Acro Trainer, 15:Sprayer, 16:Auto, 17:AutoTune, 18:Land, 19:Gripper, 21:Parachute Enable, 22:Parachute Release, 23:Parachute 3pos, 24:Auto Mission Reset, 25:AttCon Feed Forward, 26:AttCon Accel Limits, 27:Retract Mount, 28:Relay On/Off, 29:Landing Gear, 30:Lost Copter Sound, 31:Motor Emergency Stop, 32:Motor Interlock, 33:Brake, 34:Relay2 On/Off, 35:Relay3 On/Off, 36:Relay4 On/Off, 37:Throw, 38:ADSB Avoidance En, 39:PrecLoiter, 40:Proximity Avoidance, 41:ArmDisarm, 42:SmartRTL, 43:InvertedFlight, 46:RC Override Enable, 47:User Function 1, 48:User Function 2, 49:User Function 3, 52:Acro, 55:Guided, 56:Loiter, 57:Follow, 58:Clear Waypoints, 60:ZigZag, 61:ZigZag SaveWP, 62:Compass Learn, 65:GPS Disable, 66:Relay5, 67:Relay6, 68:Stabilize, 69:PosHold, 70:AltHold, 71:FlowHold, 72:Circle, 73:Drift, 76:Standby Mode, 78:RunCam Control, 79:RunCam OSD Control, 80:Viso Align, 81: Disarm, 100:KillIMU1, 101:KillIMU2, 102:Camera Mode Toggle
+    // @Values{Rover}: 0:Do Nothing, 4:RTL, 5:Save Trim, 7:Save WP, 9:Camera Trigger, 11:Fence, 16:Auto, 19:Gripper, 24:Auto Mission Reset, 28:Relay On/Off, 30:Lost Rover Sound, 31:Motor Emergency Stop, 34:Relay2 On/Off, 35:Relay3 On/Off, 36:Relay4 On/Off, 40:Proximity Avoidance, 41:ArmDisarm, 42:SmartRTL, 46:RC Override Enable, 50:LearnCruise, 51:Manual, 52:Acro, 53:Steering, 54:Hold, 55:Guided, 56:Loiter, 57:Follow, 58:Clear Waypoints, 59:Simple Mode, 62:Compass Learn, 63:Sailboat Tack, 65:GPS Disable, 66:Relay5, 67:Relay6, 74:Sailboat motoring 3pos, 78:RunCam Control, 79:RunCam OSD Control, 80:Viso Align, 81: Disarm, 100:KillIMU1, 101:KillIMU2, 207:MainSail, 102:Camera Mode Toggle
+    // @Values{Plane}: 0:Do Nothing, 4:ModeRTL, 9:Camera Trigger, 16:ModeAuto, 24:Auto Mission Reset, 28:Relay On/Off, 29:Landing Gear, 34:Relay2 On/Off, 30:Lost Plane Sound, 31:Motor Emergency Stop, 35:Relay3 On/Off, 36:Relay4 On/Off, 38:ADSB Avoidance En, 41:ArmDisarm, 43:InvertedFlight, 46:RC Override Enable, 51:ModeManual, 55:ModeGuided, 56:ModeLoiter, 58:Clear Waypoints, 62:Compass Learn, 64:Reverse Throttle, 65:GPS Disable, 66:Relay5, 67:Relay6, 72:ModeCircle, 77:ModeTakeoff, 78:RunCam Control, 79:RunCam OSD Control, 81: Disarm, 100:KillIMU1, 101:KillIMU2, 208:Flap, 102:Camera Mode Toggle
     // @User: Standard
     AP_GROUPINFO_FRAME("OPTION",  6, RC_Channel, option, 0, AP_PARAM_FRAME_COPTER|AP_PARAM_FRAME_ROVER|AP_PARAM_FRAME_PLANE),
 
@@ -106,35 +108,30 @@ RC_Channel::RC_Channel(void)
     AP_Param::setup_object_defaults(this, var_info);
 }
 
-void
-RC_Channel::set_range(uint16_t high)
+void RC_Channel::set_range(uint16_t high)
 {
     type_in = RC_CHANNEL_TYPE_RANGE;
     high_in = high;
 }
 
-void
-RC_Channel::set_angle(uint16_t angle)
+void RC_Channel::set_angle(uint16_t angle)
 {
     type_in = RC_CHANNEL_TYPE_ANGLE;
     high_in = angle;
 }
 
-void
-RC_Channel::set_default_dead_zone(int16_t dzone)
+void RC_Channel::set_default_dead_zone(int16_t dzone)
 {
     dead_zone.set_default(abs(dzone));
 }
 
-bool
-RC_Channel::get_reverse(void) const
+bool RC_Channel::get_reverse(void) const
 {
     return bool(reversed.get());
 }
 
 // read input from hal.rcin or overrides
-bool
-RC_Channel::update(void)
+bool RC_Channel::update(void)
 {
     if (has_override() && !rc().ignore_overrides()) {
         radio_in = override_value;
@@ -157,8 +154,7 @@ RC_Channel::update(void)
 // recompute control values with no deadzone
 // When done this way the control_in value can be used as servo_out
 // to give the same output as input
-void
-RC_Channel::recompute_pwm_no_deadzone()
+void RC_Channel::recompute_pwm_no_deadzone()
 {
     if (type_in == RC_CHANNEL_TYPE_RANGE) {
         control_in = pwm_to_range_dz(0);
@@ -193,8 +189,7 @@ int16_t RC_Channel::get_control_mid() const
   return an "angle in centidegrees" (normally -4500 to 4500) from
   the current radio_in value using the specified dead_zone
  */
-int16_t
-RC_Channel::pwm_to_angle_dz_trim(uint16_t _dead_zone, uint16_t _trim) const
+int16_t RC_Channel::pwm_to_angle_dz_trim(uint16_t _dead_zone, uint16_t _trim) const
 {
     int16_t radio_trim_high = _trim + _dead_zone;
     int16_t radio_trim_low  = _trim - _dead_zone;
@@ -213,8 +208,7 @@ RC_Channel::pwm_to_angle_dz_trim(uint16_t _dead_zone, uint16_t _trim) const
   return an "angle in centidegrees" (normally -4500 to 4500) from
   the current radio_in value using the specified dead_zone
  */
-int16_t
-RC_Channel::pwm_to_angle_dz(uint16_t _dead_zone) const
+int16_t RC_Channel::pwm_to_angle_dz(uint16_t _dead_zone) const
 {
     return pwm_to_angle_dz_trim(_dead_zone, radio_trim);
 }
@@ -223,8 +217,7 @@ RC_Channel::pwm_to_angle_dz(uint16_t _dead_zone) const
   return an "angle in centidegrees" (normally -4500 to 4500) from
   the current radio_in value
  */
-int16_t
-RC_Channel::pwm_to_angle() const
+int16_t RC_Channel::pwm_to_angle() const
 {
 	return pwm_to_angle_dz(dead_zone);
 }
@@ -234,8 +227,7 @@ RC_Channel::pwm_to_angle() const
   convert a pulse width modulation value to a value in the configured
   range, using the specified deadzone
  */
-int16_t
-RC_Channel::pwm_to_range_dz(uint16_t _dead_zone) const
+int16_t RC_Channel::pwm_to_range_dz(uint16_t _dead_zone) const
 {
     int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
 
@@ -255,8 +247,7 @@ RC_Channel::pwm_to_range_dz(uint16_t _dead_zone) const
   convert a pulse width modulation value to a value in the configured
   range
  */
-int16_t
-RC_Channel::pwm_to_range() const
+int16_t RC_Channel::pwm_to_range() const
 {
     return pwm_to_range_dz(dead_zone);
 }
@@ -272,8 +263,7 @@ int16_t RC_Channel::get_control_in_zero_dz(void) const
 
 // ------------------------------------------
 
-float
-RC_Channel::norm_input() const
+float RC_Channel::norm_input() const
 {
     float ret;
     int16_t reverse_mul = (reversed?-1:1);
@@ -291,8 +281,7 @@ RC_Channel::norm_input() const
     return constrain_float(ret, -1.0f, 1.0f);
 }
 
-float
-RC_Channel::norm_input_dz() const
+float RC_Channel::norm_input_dz() const
 {
     int16_t dz_min = radio_trim - dead_zone;
     int16_t dz_max = radio_trim + dead_zone;
@@ -308,11 +297,22 @@ RC_Channel::norm_input_dz() const
     return constrain_float(ret, -1.0f, 1.0f);
 }
 
+// return a normalised input for a channel, in range -1 to 1,
+// ignores trim and deadzone
+float RC_Channel::norm_input_ignore_trim() const
+{
+    // sanity check min and max to avoid divide by zero
+    if (radio_max <= radio_min) {
+        return 0.0f;
+    }
+    const float ret = (reversed ? -2.0f : 2.0f) * (((float)(radio_in - radio_min) / (float)(radio_max - radio_min)) - 0.5f);
+    return constrain_float(ret, -1.0f, 1.0f);
+}
+
 /*
   get percentage input from 0 to 100. This ignores the trim value.
  */
-uint8_t
-RC_Channel::percent_input() const
+uint8_t RC_Channel::percent_input() const
 {
     if (radio_in <= radio_min) {
         return reversed?100:0;
@@ -455,6 +455,7 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const aux_switch_
     case AUX_FUNC::CAMERA_TRIGGER:
     case AUX_FUNC::CLEAR_WP:
     case AUX_FUNC::COMPASS_LEARN:
+    case AUX_FUNC::DISARM:
     case AUX_FUNC::DO_NOTHING:
     case AUX_FUNC::LANDING_GEAR:
     case AUX_FUNC::LOST_VEHICLE_SOUND:
@@ -464,6 +465,9 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const aux_switch_
     case AUX_FUNC::RELAY4:
     case AUX_FUNC::RELAY5:
     case AUX_FUNC::RELAY6:
+    case AUX_FUNC::VISODOM_CALIBRATE:
+    case AUX_FUNC::EKF_LANE_SWITCH:
+    case AUX_FUNC::EKF_YAW_RESET:
         break;
     case AUX_FUNC::AVOID_ADSB:
     case AUX_FUNC::AVOID_PROXIMITY:
@@ -528,7 +532,7 @@ void RC_Channel::do_aux_function_armdisarm(const aux_switch_pos_t ch_flag)
         // nothing
         break;
     case LOW:
-        AP::arming().disarm();
+        AP::arming().disarm(AP_Arming::Method::AUXSWITCH);
         break;
     }
 }
@@ -828,6 +832,12 @@ void RC_Channel::do_aux_function(const aux_func_t ch_option, const aux_switch_po
         do_aux_function_armdisarm(ch_flag);
         break;
 
+    case AUX_FUNC::DISARM:
+        if (ch_flag == HIGH) {
+            AP::arming().disarm(AP_Arming::Method::AUXSWITCH);
+        }
+        break;
+
     case AUX_FUNC::COMPASS_LEARN:
         if (ch_flag == HIGH) {
             Compass &compass = AP::compass();
@@ -886,6 +896,17 @@ void RC_Channel::do_aux_function(const aux_func_t ch_option, const aux_switch_po
         }
         break;
 
+    case AUX_FUNC::VISODOM_CALIBRATE:
+#if HAL_VISUALODOM_ENABLED
+        if (ch_flag == HIGH) {
+            AP_VisualOdom *visual_odom = AP::visualodom();
+            if (visual_odom != nullptr) {
+                visual_odom->align_sensor_to_vehicle();
+            }
+        }
+#endif
+        break;
+
 #if !HAL_MINIMIZE_FEATURES
     case AUX_FUNC::KILL_IMU1:
         if (ch_flag == HIGH) {
@@ -924,6 +945,16 @@ void RC_Channel::do_aux_function(const aux_func_t ch_option, const aux_switch_po
         break;
     }
 
+    case AUX_FUNC::EKF_LANE_SWITCH:
+        // used to test emergency lane switch
+        AP::ahrs().check_lane_switch();
+        break;
+
+    case AUX_FUNC::EKF_YAW_RESET:
+        // used to test emergency yaw reset
+        AP::ahrs().request_yaw_reset();
+        break;
+
     default:
         gcs().send_text(MAV_SEVERITY_INFO, "Invalid channel option (%u)", (unsigned int)ch_option);
         break;
@@ -954,6 +985,24 @@ bool RC_Channel::read_3pos_switch(RC_Channel::aux_switch_pos_t &ret) const
         ret = MIDDLE;
     }
     return true;
+}
+
+// return switch position value as LOW, MIDDLE, HIGH
+// if reading the switch fails then it returns LOW
+RC_Channel::aux_switch_pos_t RC_Channel::get_aux_switch_pos() const
+{
+    aux_switch_pos_t position = aux_switch_pos_t::LOW;
+    UNUSED_RESULT(read_3pos_switch(position));
+
+    return position;
+}
+
+// return switch position value as LOW, MIDDLE, HIGH
+// if reading the switch fails then it returns LOW
+RC_Channel::aux_switch_pos_t RC_Channels::get_channel_pos(const uint8_t rcmapchan) const
+{
+    const RC_Channel* chan = rc().channel(rcmapchan-1);
+    return chan != nullptr ? chan->get_aux_switch_pos() : RC_Channel::aux_switch_pos_t::LOW;
 }
 
 RC_Channel *RC_Channels::find_channel_for_option(const RC_Channel::aux_func_t option)

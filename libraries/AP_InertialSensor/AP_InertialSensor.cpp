@@ -23,6 +23,7 @@
 #include "AP_InertialSensor_BMI055.h"
 #include "AP_InertialSensor_BMI088.h"
 #include "AP_InertialSensor_Invensensev2.h"
+#include "AP_InertialSensor_ADIS1647x.h"
 
 /* Define INS_TIMING_DEBUG to track down scheduling issues with the main loop.
  * Output is on the debug console. */
@@ -43,7 +44,7 @@ extern const AP_HAL::HAL& hal;
 #define DEFAULT_GYRO_FILTER  20
 #define DEFAULT_ACCEL_FILTER 20
 #define DEFAULT_STILL_THRESH 2.5f
-#elif APM_BUILD_TYPE(APM_BUILD_APMrover2)
+#elif APM_BUILD_TYPE(APM_BUILD_Rover)
 #define DEFAULT_GYRO_FILTER  4
 #define DEFAULT_ACCEL_FILTER 10
 #define DEFAULT_STILL_THRESH 0.1f
@@ -655,6 +656,32 @@ AP_InertialSensor_Backend *AP_InertialSensor::_find_backend(int16_t backend_id, 
     return nullptr;
 }
 
+bool AP_InertialSensor::set_gyro_window_size(uint16_t size) {
+#if HAL_WITH_DSP
+    _gyro_window_size = size;
+
+    // allocate FFT gyro window
+    for (uint8_t i = 0; i < INS_MAX_INSTANCES; i++) {
+        for (uint8_t j = 0; j < XYZ_AXIS_COUNT; j++) {
+            _gyro_window[i][j] = (float*)hal.util->malloc_type(sizeof(float) * (size), DSP_MEM_REGION);
+            if (_gyro_window[i][j] == nullptr) {
+                gcs().send_text(MAV_SEVERITY_WARNING, "Failed to allocate window for INS");
+                // clean up whatever we have currently allocated
+                for (uint8_t ii = 0; ii <= i; ii++) {
+                    for (uint8_t jj = 0; jj < j; jj++) {
+                        hal.util->free_type(_gyro_window[ii][jj], sizeof(float) * (size), DSP_MEM_REGION);
+                        _gyro_window[ii][jj] = nullptr;
+                        _gyro_window_size = 0;
+                    }
+                }
+                return false;
+            }
+        }
+    }
+#endif
+    return true;
+}
+
 void
 AP_InertialSensor::init(uint16_t sample_rate)
 {
@@ -701,7 +728,8 @@ AP_InertialSensor::init(uint16_t sample_rate)
     _calculated_harmonic_notch_freq_hz = _harmonic_notch_filter.center_freq_hz();
 
     for (uint8_t i=0; i<get_gyro_count(); i++) {
-        _gyro_harmonic_notch_filter[i].allocate_filters(_harmonic_notch_filter.harmonics());
+        _gyro_harmonic_notch_filter[i].allocate_filters(_harmonic_notch_filter.harmonics(),
+            _harmonic_notch_filter.hasOption(HarmonicNotchFilterParams::Options::DoubleNotch));
         // initialise default settings, these will be subsequently changed in AP_InertialSensor_Backend::update_gyro()
         _gyro_harmonic_notch_filter[i].init(_gyro_raw_sample_rates[i], _calculated_harmonic_notch_freq_hz,
              _harmonic_notch_filter.bandwidth_hz(), _harmonic_notch_filter.attenuation_dB());
@@ -772,7 +800,8 @@ AP_InertialSensor::detect_backends(void)
     // IMUs defined by IMU lines in hwdef.dat
     HAL_INS_PROBE_LIST;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    ADD_BACKEND(AP_InertialSensor_SITL::detect(*this));
+    ADD_BACKEND(AP_InertialSensor_SITL::detect(*this, INS_SITL_SENSOR_A));
+    ADD_BACKEND(AP_InertialSensor_SITL::detect(*this, INS_SITL_SENSOR_B));
 #elif HAL_INS_DEFAULT == HAL_INS_HIL
     ADD_BACKEND(AP_InertialSensor_HIL::detect(*this));
 #elif AP_FEATURE_BOARD_DETECT

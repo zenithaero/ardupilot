@@ -57,6 +57,10 @@ bool RC_Channels_Copter::has_valid_input() const
     return true;
 }
 
+RC_Channel * RC_Channels_Copter::get_arming_channel(void) const
+{
+    return copter.channel_yaw;
+}
 
 // init_aux_switch_function - initialize aux functions
 void RC_Channel_Copter::init_aux_function(const aux_func_t ch_option, const aux_switch_pos_t ch_flag)
@@ -509,7 +513,7 @@ void RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const aux_sw
             do_aux_function_change_mode(Mode::Number::ALT_HOLD, ch_flag);
             break;
 
-	case AUX_FUNC::FLOWHOLD:
+        case AUX_FUNC::FLOWHOLD:
 #if OPTFLOW == ENABLED
             do_aux_function_change_mode(Mode::Number::FLOWHOLD, ch_flag);
 #endif
@@ -556,7 +560,7 @@ void RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const aux_sw
                 break;
             }
             break;
-
+            
     default:
         RC_Channel::do_aux_function(ch_option, ch_flag);
         break;
