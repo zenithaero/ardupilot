@@ -48,6 +48,19 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     std::vector<double> vs(ZenithAeroData::Vs, ZenithAeroData::Vs + dim);
     std::vector<const std::vector<double>> interp = {as, bs, vs};
     aeroData = new Interp(interp);
+
+    // TEST Lookup
+    // double _alpha[] = {-2, 3, 5, 6};
+    // double _beta[] = {-2, -4, 3, 4};
+    // double _airspeed[] = {9, 10, 15, 18};
+    // for (size_t k = 0; k < sizeof(_alpha) / sizeof(double); k++) {
+    //     std::vector<double> lookup = {_alpha[k], _beta[k], _airspeed[k]};
+    //     double CX0 = aeroData->get(ZenithAeroData::CX0, lookup);
+    //     double Cmq = aeroData->get(ZenithAeroData::Cmq, lookup);
+    //     double CldF_1 = aeroData->get(ZenithAeroData::CldF_1, lookup);
+    //     printf("CX0 %.4f Cmq %.4f CldF_1 %.4f\n", CX0, Cmq, CldF_1);
+    // }
+    // exit(-1);
 }
 
 Z1_Lookup::~Z1_Lookup() {
@@ -61,11 +74,11 @@ FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
 FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud, float thr) {
     FM fm;
     // Actuators
-    fm += INTERP(dF_1, lookup) * ail;
-    fm += INTERP(dF_2, lookup) * elev;
-    fm += INTERP(dF_3, lookup) * rud;
+    fm += INTERP(dF_1, lookup) * ail; // CldF_1 ~= 7e-3
+    fm += INTERP(dF_2, lookup) * elev; // CmdF_2 ~= -2e-2
+    fm += INTERP(dF_3, lookup) * rud; // CldF_3 ~=  7e-4
     // Motors
-    fm += INTERP(dP_1, lookup) * thr;
+    fm += INTERP(dP_1, lookup) * thr; // CXdP_1 ~= 0.9
     return fm;
 }
 
@@ -73,9 +86,9 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
     FM fm;
     float denom = 2 * airspeed;
     if (!is_zero(denom)) {
-        fm += INTERP(p, lookup) * pqr.x * coefficient.b * denom;
-        fm += INTERP(q, lookup) * pqr.y * coefficient.c * denom;
-        fm += INTERP(r, lookup) * pqr.z * coefficient.b * denom;
+        fm += INTERP(p, lookup) * pqr.x * coefficient.b * (1 / denom);
+        fm += INTERP(q, lookup) * pqr.y * coefficient.c * (1 / denom);
+        fm += INTERP(r, lookup) * pqr.z * coefficient.b * (1 / denom);
     }
     return fm;
 }
@@ -83,51 +96,55 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
 
 void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, Vector3f &body_accel)
 {
-    float ail  = filtered_servo_angle(input, 0);
-    float elev = filtered_servo_angle(input, 1);
-    float rud   = filtered_servo_angle(input, 3);
+    float ail  = filtered_servo_angle(input, 0) * 45;
+    float elev = -filtered_servo_angle(input, 1) * 45;
+    float rud  = filtered_servo_angle(input, 3) * 45;
     float thr = filtered_servo_range(input, 2);
+    // printf("elev %.2f, ail %.2f\n", elev, ail);
+
+    // TEMP HACK
+    // elev = 0.0035;
+    // thr = 0.0;
+    // ail = 0.0;
+    // rud = 0.0;
+    // TEMP HACK DONE
 
     // simulate engine RPM
     rpm[0] = thr * 7000;
 
     // calculate angle of attack
     angle_of_attack = atan2f(velocity_air_bf.z, velocity_air_bf.x);
-    beta = atan2f(velocity_air_bf.y,velocity_air_bf.x);
+    beta = atan2f(velocity_air_bf.y, velocity_air_bf.x);
     
     // Build lookup vector
-    std::vector<double> lookup = {angle_of_attack, beta, airspeed};
+    std::vector<double> lookup = {angle_of_attack * RAD_TO_DEG, beta * RAD_TO_DEG, airspeed};
 
     // Create rotation transformation (clamped to lookup limits)
     std::vector<double> lookupClamped = aeroData->clamp(lookup);
-    Matrix3<float> S2B, B2S;
-    S2B.from_euler(0.f, lookupClamped[0], 0.f);
-    B2S = S2B.transposed();
 
     // Extract normalization coefficients
     const float s = coefficient.s;
     const float c = coefficient.c;
     const float b = coefficient.b;
 
-    // Rotate gyro vector in stability frame
-    Vector3f gyro_sf = B2S * gyro;
-
     // Calculate dynamic pressure
     float rho = air_density;
-    double qbar = 1.0 / 2.0 * rho * pow(airspeed, 2) * s;
+    double qbar = 1.0 / 2.0 * rho * pow(airspeed, 2);
 
     // Get aero FM
-    printf("lookup (alpha %.2f, beta %.2f, airspeed %.2f)\n", angle_of_attack, beta, airspeed);
+    // printf("lookup (alpha %.2f, beta %.2f, airspeed %.2f)\n", angle_of_attack, beta, airspeed);
     FM aeroFM = getAeroFM(lookup);
     FM actuatorFM = getActuatorFM(lookup, ail, elev, rud, thr);
-    FM dampingFM = getDampingFM(lookup, gyro_sf);
+    FM dampingFM = getDampingFM(lookup, gyro);
+    // printf("qbar: %.2f\n", qbar);
+    // printf("aeroFM (%.3f, %.3f, %.3f; %.3f, %.3f, %.3f)\n", aeroFM.force.x, aeroFM.force.y, aeroFM.force.z, aeroFM.moment.x, aeroFM.moment.y, aeroFM.moment.z);
+    // printf("actuatorFM (%.3f, %.3f, %.3f; %.3f, %.3f, %.3f)\n", actuatorFM.force.x, actuatorFM.force.y, actuatorFM.force.z, actuatorFM.moment.x, actuatorFM.moment.y, actuatorFM.moment.z);
+    // printf("dampingFM (%.3f, %.3f, %.3f; %.3f, %.3f, %.3f)\n", dampingFM.force.x, dampingFM.force.y, dampingFM.force.z, dampingFM.moment.x, dampingFM.moment.y, dampingFM.moment.z);
     FM fm = aeroFM + actuatorFM + dampingFM;
 
-    printf("values F(%.2f %.2f %.2f) M(%.2f %.2f %.2f)\n", fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
+    // (0.03, 0.00, -0.54; 0.00, -0.00, -0.54)
 
-    // Move the FMs back to body frame
-    fm.force = S2B * fm.force;
-    fm.moment = S2B * fm.moment;
+    // printf("values F(%.2f %.2f %.2f) M(%.2f %.2f %.2f)\n", fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
 
     // Denormalize forces & moments
     fm.force *= s * qbar;
@@ -143,14 +160,14 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     std::vector<double> zero = {0, 0, 0};
     std::vector<double> zeroClamped = aeroData->clamp(zero);
     double minAirspeed = MAX(1, zeroClamped[2]);
-    double r = CLAMP((minAirspeed - airspeed) / minAirspeed, 0, 1);
+    double r = MAX(0, MIN(1, (minAirspeed - airspeed) / minAirspeed));
     (void)r;
-    double thrust = 2 * mass * GRAVITY_MSS * thr;
+    double thrust = mass * GRAVITY_MSS * thr;
 
     // Determine body acceleration & rotational acceleration
     accel_body = (Vector3f(thrust, 0, 0) + fm.force) / mass;
     accel_body /= mass;
-    printf("thr %.2f accel_x %.2f airspeed %.2f\n", thr, accel_body.x, airspeed);
+    // printf("thr %.2f accel_x %.2f airspeed %.2f\n", thr, accel_body.x, airspeed);
     // printf("thr %f, thrust: %f accel_body: %f, %f, %f\n", thr, thrust, accel_body.x, accel_body.y, accel_body.z);
 
     // Determine rotational accel
@@ -159,7 +176,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // add some ground friction
     if (on_ground()) {
         Vector3f vel_body = dcm.transposed() * velocity_ef;
-        accel_body.x -= vel_body.x * 0.05f;
+        accel_body.x -= vel_body.x * 0.3f;
     }
 }
     
@@ -193,6 +210,26 @@ void Z1_Lookup::update(const struct sitl_input &input)
     if (remaining < 80) {
         AP::battery().reset_remaining(1 << AP_BATT_PRIMARY_INSTANCE, 81.0f);
     }
+
+    // Clip velocity
+    printf("velocity: %.2f\n", velocity_ef.length());
+    float V = velocity_ef.length();
+    if (V > FLT_EPSILON)
+        velocity_ef = velocity_ef.normalized() * MIN(25, V);
+    
+
+
+    // TEMP HACK: place the plane in a known state
+    // gyro = Vector3f();
+    // gyro_prev = gyro;
+    // ang_accel = gyro;
+    // dcm.from_euler(-0.0001, 0.0541, 0.0291);
+    // Vector3f velocity_bf = {12.0000, 0.0000, 0.6500};
+    // velocity_ef = dcm * velocity_bf;
+    // position = {0, 0, -19.1};
+    // update_position();
+    // TEMP HACK DONE
+
 
     // printf("Pos %f %f %f; vel %f %f %f; accel_body %f %f %f; euler %f %f %f\n", position.x, position.y, position.z, velocity_ef.x, velocity_ef.y, velocity_ef.z, accel_body.x, accel_body.y, accel_body.z, r, p, y);
     // Pos 0.000000 0.000000 -0.099976; vel 0.000000 0.000000 0.000000; accel_body 0.000000 0.000000 -9.806650; euler 0.000000 0.000000 -0.122173
