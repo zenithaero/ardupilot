@@ -8,21 +8,21 @@
 import argparse
 import os
 import json
-import subprocess
 import shutil
 import atexit
+import subprocess
 
 LOCAL_DIR = os.path.dirname(os.path.realpath(__file__))
 ROOT_DIR = os.path.join(LOCAL_DIR, "../..")
 SIM_PATH = os.path.join(ROOT_DIR, "Tools/autotest/sim_vehicle.py")
 PARSER_PATH = os.path.join(LOCAL_DIR, "log_parser.py")
-FP_PATH = os.path.join(LOCAL_DIR, "../FlightPlans/loiter.txt")
+FP_PATH = os.path.join(LOCAL_DIR, "../FlightPlans/line.txt")
 MAVPROXY_PATH = os.path.join(ROOT_DIR, "../MAVProxy/MAVProxy/mavproxy.py")
+OUTPUT_DIR = os.path.join(LOCAL_DIR, "out")
+LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
 
 
 def parse_logs():
-    print("Sim exited")
-    LOG_DIR = os.path.join(LOCAL_DIR, "logs")
     # Find last log
     fname = os.path.join(LOG_DIR, "LASTLOG.txt")
     if not os.path.isfile(fname):
@@ -101,8 +101,10 @@ if __name__ == "__main__":
     if not args.no_logs:
         atexit.register(parse_logs)
     # Run command
-    cmd = script + sim_args + mav_args
+    cmd = ["cd", OUTPUT_DIR, ";"] + script + sim_args + mav_args
     os.system(" ".join(cmd))
+    # p = subprocess.Popen(cmd, cwd=LOCAL_DIR)
+    # p.wait()
 
     # p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
     # grep_stdout = p.communicate(input=b'one\ntwo\nthree\nfour\nfive\nsix\n')[0]

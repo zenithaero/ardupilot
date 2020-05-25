@@ -576,8 +576,6 @@ void AP_TECS::_detect_underspeed(void)
 void AP_TECS::_update_energies(void)
 {
 
-    _TAS_dem_adj = 20;
-    _hgt_dem_adj = 25;
     // Calculate specific energy demands
     _SPE_dem = _hgt_dem_adj * GRAVITY_MSS;
     _SKE_dem = 0.5f * _TAS_dem_adj * _TAS_dem_adj;

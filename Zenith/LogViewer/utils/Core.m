@@ -32,7 +32,7 @@ classdef Core < handle
             % Load new logs automatically if needed
             if isempty(obj.logFiles)
                 dir = fileparts(mfilename('fullpath'));
-                logpath = fullfile(dir, '../../Sim/logs/log.mat');
+                logpath = fullfile(dir, '../../Sim/out/logs/log.mat');
                 obj.logFiles = {logpath};
                 obj.cacheLogs = false; % Reload sim logs every time
             elseif length(obj.logFiles) == 1 && isfolder(obj.logFiles{1})

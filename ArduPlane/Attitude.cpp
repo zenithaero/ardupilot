@@ -125,6 +125,15 @@ void Plane::stabilize_pitch(float speed_scaler)
         disable_integrator = true;
     }
     // demanded_pitch = 0;
+    
+    // Test program. Get mode / Waypoint?
+    printf("pitchCtrl: %d\n", demanded_pitch);
+    if (control_mode == &mode_cruise) {
+        // Perform pitch maneuver
+        // demanded_pitch = 1000;
+    }
+    
+    
     int32_t pitch = pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator);
     // printf("pitchCmd %.2f sensed %.2f elev %.2f\n", demanded_pitch / 100.f, ahrs.pitch_sensor / 100.f, pitch / 100.f);
     SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitch);

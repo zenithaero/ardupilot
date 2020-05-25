@@ -36,7 +36,7 @@ core.cacheLogs    = false;  % Keep logs in memory (prevent re-loading)
 % long    - Longitudinal plot
 % lat     - Lateral plot
 % ------------------------
-core.plots = {'2d'};
+core.plots = {'long'};
 
 core.init();
 toDeg = 180/pi;
@@ -95,7 +95,7 @@ for k = core.loopIndices()
     % Body longitudinal ---------------------------------------------------
     if core.isPlot('long')
         core.figureInit();
-        rows = [2, 3]; % [column 1, column 2]...
+        rows = [3, 3]; % [column 1, column 2]...
         
         [N, E, agl, t] = getPosVar(core, log);
         if isfield(log, 'CMD')
