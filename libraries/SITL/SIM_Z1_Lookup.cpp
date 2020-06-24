@@ -68,6 +68,8 @@ Z1_Lookup::~Z1_Lookup() {
 }
 
 FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
+    auto fm = INTERP(0, lookup);
+    printf("lookup: [%.4f, %.4f, %.4f]: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n", lookup[0], lookup[1], lookup[2], fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
     return INTERP(0, lookup);
 }
 
@@ -100,6 +102,12 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     float elev = -filtered_servo_angle(input, 1) * 45;
     float rud  = filtered_servo_angle(input, 3) * 45;
     float thr = filtered_servo_range(input, 2);
+
+    // TEMP
+    actuators[0] = ail;
+    actuators[1] = elev;
+    actuators[2] = rud;
+    actuators[3] = thr;
     // printf("elev %.2f, ail %.2f\n", elev, ail);
 
     // TEMP HACK
@@ -157,16 +165,20 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     
     // Add thrust at low speeds to compensate for the lack of model there
     // Reduce contribution linearly up to minAirspeed
+    // That component is not captured by modelFit
     std::vector<double> zero = {0, 0, 0};
     std::vector<double> zeroClamped = aeroData->clamp(zero);
     double minAirspeed = MAX(1, zeroClamped[2]);
     double r = MAX(0, MIN(1, (minAirspeed - airspeed) / minAirspeed));
-    (void)r;
-    double thrust = mass * GRAVITY_MSS * thr;
+    // (void)r;
+    double thrust = mass * GRAVITY_MSS * thr * r;
+
+    // Store forces & moments
+    force_bf = fm.force;
+    moment_bf = fm.moment;
 
     // Determine body acceleration & rotational acceleration
     accel_body = (Vector3f(thrust, 0, 0) + fm.force) / mass;
-    accel_body /= mass;
     // printf("thr %.2f accel_x %.2f airspeed %.2f\n", thr, accel_body.x, airspeed);
     // printf("thr %f, thrust: %f accel_body: %f, %f, %f\n", thr, thrust, accel_body.x, accel_body.y, accel_body.z);
 
@@ -211,11 +223,11 @@ void Z1_Lookup::update(const struct sitl_input &input)
         AP::battery().reset_remaining(1 << AP_BATT_PRIMARY_INSTANCE, 81.0f);
     }
 
-    // Clip velocity
-    printf("velocity: %.2f\n", velocity_ef.length());
-    float V = velocity_ef.length();
-    if (V > FLT_EPSILON)
-        velocity_ef = velocity_ef.normalized() * MIN(25, V);
+    // Clip velocity TODO: messes with estimation (would require a recomputation of the acceleration)
+    // printf("velocity: %.2f\n", velocity_ef.length());
+    // float V = velocity_ef.length();
+    // if (V > FLT_EPSILON)
+    //     velocity_ef = velocity_ef.normalized() * MIN(25, V);
     
 
 

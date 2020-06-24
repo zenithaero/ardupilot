@@ -185,6 +185,10 @@ protected:
     uint8_t rcin_chan_count = 0;
     float rcin[8];
     float range = -1.0f;                 // rangefinder detection in m
+    // Added for logging
+    Vector3f force_bf;
+    Vector3f moment_bf;
+    float actuators[4];
 
     struct {
         // data from simulated laser scanner, if available

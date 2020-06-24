@@ -195,6 +195,23 @@ void Aircraft::update_position(void)
                                            accel_ef.x, accel_ef.y, accel_ef.z,
                                            position.x, position.y, position.z);
 #endif
+    // Write some body frame values
+    auto velocity_bf = dcm.transposed() * velocity_ef;
+    auto alpha = atan2f(velocity_air_bf.z, velocity_air_bf.x);
+    auto beta = atan2f(velocity_air_bf.y, velocity_air_bf.x);
+    AP::logger().Write("SIM2", "TimeUS,ue,ve,we,u,v,w,ax,ay,az,gx,gy,gz,a,b,as", "Qfffffffffffffff",
+        AP_HAL::micros64(),
+        velocity_ef.x, velocity_ef.y, velocity_ef.z,
+        velocity_bf.x, velocity_bf.y, velocity_bf.z,
+        accel_body.x, accel_body.y, accel_body.z,
+        gyro.x, gyro.y, gyro.z,
+        alpha, beta, airspeed);
+
+    AP::logger().Write("SIM3", "TimeUS,fx,fy,fz,mx,my,mz,ail,elev,rud,thr", "Qffffffffff",
+        AP_HAL::micros64(),
+        force_bf.x, force_bf.y, force_bf.z,
+        moment_bf.x, moment_bf.y, moment_bf.z,
+        actuators[0], actuators[1], actuators[2], actuators[3]);
 }
 
 /*

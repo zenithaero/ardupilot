@@ -216,7 +216,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     _last_update_waypoint_us = now;
 
     // Calculate L1 gain required for specified damping
-    float K_L1 = 4.0f * ZenithGains::L1.damping;
+    float K_L1 = 4.0f * ZenithGains::L1.damping * ZenithGains::L1.damping;
 
     // Get current position and velocity
     if (_ahrs.get_position(_current_loc) == false) {
@@ -347,12 +347,12 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     radius = loiter_radius(fabsf(radius));
 
     // Calculate guidance gains used by PD loop (used during circle tracking)
-    float omega = (6.2832f / _L1_period);
+    float omega = (6.2832f * ZenithGains::L1.periodInv);
     float Kx = omega * omega;
-    float Kv = 2.0f * _L1_damping * omega;
+    float Kv = 2.0f * ZenithGains::L1.damping * omega;
 
     // Calculate L1 gain required for specified damping (used during waypoint capture)
-    float K_L1 = 4.0f * _L1_damping * _L1_damping;
+    float K_L1 = 4.0f * ZenithGains::L1.damping * ZenithGains::L1.damping;
 
     //Get current position and velocity
     if (_ahrs.get_position(_current_loc) == false) {
@@ -374,7 +374,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     // Calculate time varying control parameters
     // Calculate the L1 length required for specified period
     // 0.3183099 = 1/pi
-    _L1_dist = 0.3183099f * _L1_damping * _L1_period * groundSpeed;
+    _L1_dist = 0.3183099f * ZenithGains::L1.damping / ZenithGains::L1.periodInv * groundSpeed;
 
     //Calculate the NE position of the aircraft relative to WP A
     const Vector2f A_air = center_WP.get_distance_NE(_current_loc);
@@ -454,7 +454,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
 void AP_L1_Control::update_heading_hold(int32_t navigation_heading_cd)
 {
     // Calculate normalised frequency for tracking loop
-    const float omegaA = 4.4428f/_L1_period; // sqrt(2)*pi/period
+    const float omegaA = 4.4428f * ZenithGains::L1.periodInv; // sqrt(2)*pi/period
     // Calculate additional damping gain
 
     int32_t Nu_cd;
