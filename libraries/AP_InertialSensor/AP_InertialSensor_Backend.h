@@ -248,7 +248,13 @@ protected:
     bool _gyro_notch_enabled(void) const { return _imu._notch_filter.enabled(); }
 
     // return the harmonic notch filter center in Hz for the sample rate
-    float gyro_harmonic_notch_center_freq_hz() const { return _imu._calculated_harmonic_notch_freq_hz; }
+    float gyro_harmonic_notch_center_freq_hz() const { return _imu.get_gyro_dynamic_notch_center_freq_hz(); }
+
+    // set of harmonic notch current center frequencies
+    const float* gyro_harmonic_notch_center_frequencies_hz(void) const { return _imu.get_gyro_dynamic_notch_center_frequencies_hz(); }
+
+    // number of harmonic notch current center frequencies
+    uint8_t num_gyro_harmonic_notch_center_frequencies(void) const { return _imu.get_num_gyro_dynamic_notch_center_frequencies(); }
 
     // return the harmonic notch filter bandwidth in Hz for the sample rate
     float gyro_harmonic_notch_bandwidth_hz(void) const { return _imu._harmonic_notch_filter.bandwidth_hz(); }
@@ -275,11 +281,6 @@ protected:
     float _last_harmonic_notch_center_freq_hz;
     float _last_harmonic_notch_bandwidth_hz;
     float _last_harmonic_notch_attenuation_dB;
-
-    // local window of gyro values to be copied to the frontend for FFT analysis
-    uint16_t _last_circular_buffer_idx;
-    uint16_t _num_gyro_samples;
-    Vector3f _last_gyro_window[INS_MAX_GYRO_WINDOW_SAMPLES]; // The maximum we need to store is gyro-rate / loop-rate
 
     void set_gyro_orientation(uint8_t instance, enum Rotation rotation) {
         _imu._gyro_orientation[instance] = rotation;

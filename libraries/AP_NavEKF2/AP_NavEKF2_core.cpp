@@ -101,7 +101,7 @@ bool NavEKF2_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
     if(!storedRangeBeacon.init(imu_buffer_length)) {
         return false;
     }
-    if(!storedExtNav.init(OBS_BUFFER_LENGTH)) {
+    if(!storedExtNav.init(EXTNAV_BUFFER_LENGTH)) {
         return false;
     }
     if(!storedIMU.init(imu_buffer_length)) {
@@ -109,6 +109,9 @@ bool NavEKF2_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
     }
     if(!storedOutput.init(imu_buffer_length)) {
         return false;
+    }
+    if(!storedExtNavVel.init(EXTNAV_BUFFER_LENGTH)) {
+       return false;
     }
 
     if ((yawEstimator == nullptr) && (frontend->_gsfRunMask & (1U<<core_index))) {
@@ -171,7 +174,6 @@ void NavEKF2_core::InitialiseVariables()
     lastVelReset_ms = 0;
     lastPosResetD_ms = 0;
     lastRngMeasTime_ms = 0;
-    terrainHgtStableSet_ms = 0;
 
     // initialise other variables
     gpsNoiseScaler = 1.0f;
@@ -337,6 +339,12 @@ void NavEKF2_core::InitialiseVariables()
     extNavUsedForPos = false;
     extNavYawResetRequest = false;
 
+    extNavVelNew = {};
+    extNavVelDelayed = {};
+    extNavVelToFuse = false;
+    extNavVelMeasTime_ms = 0;
+    useExtNavVel = false;
+
     // zero data buffers
     storedIMU.reset();
     storedGPS.reset();
@@ -346,6 +354,7 @@ void NavEKF2_core::InitialiseVariables()
     storedOutput.reset();
     storedRangeBeacon.reset();
     storedExtNav.reset();
+    storedExtNavVel.reset();
 
     // now init mag variables
     yawAlignComplete = false;

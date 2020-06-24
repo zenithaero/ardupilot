@@ -147,8 +147,9 @@ SPIDEV sdcard SPI3 DEVID3 SDCARD_CS MODE0 400*KHZ 25*MHZ
 # one IMU
 IMU Invensense SPI:mpu6000 ROTATION_YAW_180
 
-# one baro
+# one baro, multiple possible choices for different board varients
 BARO BMP280 I2C:0:0x76
+BARO DPS280 I2C:0:0x76
 
 define HAL_OS_FATFS_IO 1
 define HAL_BOARD_LOG_DIRECTORY "/APM/LOGS"
@@ -188,8 +189,6 @@ define HAL_BATTMON_FUEL_ENABLE 0
 # disable parachute and sprayer to save flash
 define HAL_PARACHUTE_ENABLED 0
 define HAL_SPRAYER_ENABLED 0
-
-define HAL_NAVEKF2_AVAILABLE 0
 
 # reduce max size of embedded params for apj_tool.py
 define AP_PARAM_MAX_EMBEDDED_PARAM 1024

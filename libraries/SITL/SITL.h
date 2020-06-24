@@ -74,7 +74,9 @@ public:
 
     SITL() {
         // set a default compass offset
-        mag_ofs.set(Vector3f(5, 13, -18));
+        for (uint8_t i = 0; i < HAL_COMPASS_MAX_SENSORS; i++) {
+            mag_ofs[i].set(Vector3f(5, 13, -18));
+        }
         AP_Param::setup_object_defaults(this, var_info);
         AP_Param::setup_object_defaults(this, var_info2);
         AP_Param::setup_object_defaults(this, var_info3);
@@ -149,15 +151,13 @@ public:
     AP_Float gps_noise; // amplitude of the gps altitude error
     AP_Int16 gps_lock_time; // delay in seconds before GPS gets lock
     AP_Int16 gps_alt_offset; // gps alt error
-    AP_Int8  vicon_observation_history_length; // frame delay for vicon messages
 
     AP_Float mag_noise;   // in mag units (earth field is 818)
-    AP_Float mag_error;   // in degrees
     AP_Vector3f mag_mot;  // in mag units per amp
-    AP_Vector3f mag_ofs;  // in mag units
-    AP_Vector3f mag_diag;  // diagonal corrections
-    AP_Vector3f mag_offdiag;  // off-diagonal corrections
-    AP_Int8 mag_orient;   // external compass orientation
+    AP_Vector3f mag_ofs[HAL_COMPASS_MAX_SENSORS];  // in mag units
+    AP_Vector3f mag_diag[HAL_COMPASS_MAX_SENSORS];  // diagonal corrections
+    AP_Vector3f mag_offdiag[HAL_COMPASS_MAX_SENSORS];  // off-diagonal corrections
+    AP_Int8 mag_orient[HAL_COMPASS_MAX_SENSORS];   // external compass orientation
     AP_Float servo_speed; // servo speed in seconds
 
     AP_Float sonar_glitch;// probablility between 0-1 that any given sonar sample will read as max distance
@@ -197,6 +197,7 @@ public:
     AP_Float mag_scaling; // scaling factor on first compasses
     AP_Int32 mag_devid[MAX_CONNECTED_MAGS]; // Mag devid
     AP_Float buoyancy; // submarine buoyancy in Newtons
+    AP_Int16 loop_rate_hz;
 
     // EFI type
     enum EFIType {
@@ -369,6 +370,9 @@ public:
     AP_Vector3f vicon_glitch;   // glitch in meters in vicon's local NED frame
     AP_Int8 vicon_fail;         // trigger vicon failure
     AP_Int16 vicon_yaw;         // vicon local yaw in degrees
+    AP_Int16 vicon_yaw_error;   // vicon yaw error in degrees (added to reported yaw sent to vehicle)
+    AP_Int8 vicon_type_mask;    // vicon message type mask (bit0:vision position estimate, bit1:vision speed estimate, bit2:vicon position estimate)
+    AP_Vector3f vicon_vel_glitch;   // velocity glitch in m/s in vicon's local frame
 };
 
 } // namespace SITL

@@ -19,7 +19,10 @@
  */
 #pragma once
 
-#pragma GCC optimize("O2")
+
+#if !defined(HAL_DEBUG_BUILD) || !HAL_DEBUG_BUILD
+    #pragma GCC optimize("O2")
+#endif
 
 #define EK3_DISABLE_INTERRUPTS 0
 
@@ -231,9 +234,10 @@ public:
      * delAng is the XYZ angular rotation measured in body frame and relative to the inertial reference at time_ms (rad)
      * delTime is the time interval for the measurement of delPos and delAng (sec)
      * timeStamp_ms is the timestamp of the last image used to calculate delPos and delAng (msec)
+     * delay_ms is the average delay of external nav system measurements relative to inertial measurements
      * posOffset is the XYZ body frame position of the camera focal point (m)
     */
-    void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset);
+    void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
     /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
@@ -295,10 +299,21 @@ public:
     * posErr     : 1-sigma spherical position error (m)
     * angErr     : 1-sigma spherical angle error (rad)
     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+    * delay_ms   : average delay of external nav system measurements relative to inertial measurements
     * resetTime_ms : system time of the last position reset request (mSec)
     *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+
+    /*
+     * Write velocity data from an external navigation system
+     *
+     * vel : velocity in NED (m)
+     * err : velocity error (m/s)
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms : average delay of external nav system measurements relative to inertial measurements
+    */
+    void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
 
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
@@ -310,7 +325,8 @@ public:
 
     // Set to true if the terrain underneath is stable enough to be used as a height reference
     // in combination with a range finder. Set to false if the terrain underneath the vehicle
-    // cannot be used as a height reference
+    // cannot be used as a height reference. Use to prevent range finder operation otherwise
+    // enabled by the combination of EK3_RNG_USE_HGT and EK3_RNG_USE_SPD parameters.
     void setTerrainHgtStable(bool val);
 
     /*
@@ -591,6 +607,12 @@ private:
         float           posErr;     // spherical poition measurement error 1-std (m)
         uint32_t        time_ms;    // measurement timestamp (msec)
         bool            posReset;   // true when the position measurement has been reset
+    };
+
+    struct ext_nav_vel_elements {
+        Vector3f vel;               // velocity in NED (m/s)
+        float err;                  // velocity measurement error (m/s)
+        uint32_t time_ms;           // measurement timestamp (msec)
     };
 
     // bias estimates for the IMUs that are enabled but not being used
@@ -923,6 +945,9 @@ private:
     // correct external navigation earth-frame position using sensor body-frame offset
     void CorrectExtNavForSensorOffset(Vector3f &ext_position);
 
+    // correct external navigation earth-frame velocity using sensor body-frame offset
+    void CorrectExtNavVelForSensorOffset(Vector3f &ext_velocity) const;
+
     // Runs the IMU prediction step for an independent GSF yaw estimator algorithm
     // that uses IMU, GPS horizontal velocity and optionally true airspeed data.
     void runYawEstimatorPrediction(void);
@@ -1213,7 +1238,6 @@ private:
     uint32_t lastRngMeasTime_ms;            // Timestamp of last range measurement
     uint8_t rngMeasIndex[2];                // Current range measurement ringbuffer index for dual range sensors
     bool terrainHgtStable;                  // true when the terrain height is stable enough to be used as a height reference
-    uint32_t terrainHgtStableSet_ms;        // system time at which terrainHgtStable was set
 
     // body frame odometry fusion
     obs_ring_buffer_t<vel_odm_elements> storedBodyOdm;    // body velocity data buffer
@@ -1329,14 +1353,17 @@ private:
 
     // external navigation fusion
     obs_ring_buffer_t<ext_nav_elements> storedExtNav; // external navigation data buffer
-    ext_nav_elements extNavDataNew;     // External nav data at the current time horizon
     ext_nav_elements extNavDataDelayed; // External nav at the fusion time horizon
     uint32_t extNavMeasTime_ms;         // time external measurements were accepted for input to the data buffer (msec)
     uint32_t extNavLastPosResetTime_ms; // last time the external nav systen performed a position reset (msec)
-    uint32_t lastExtNavPassTime_ms;     // time stamp when external nav position measurement last passed innovation consistency check (msec)
     bool extNavDataToFuse;              // true when there is new external nav data to fuse
     bool extNavUsedForPos;              // true when the external nav data is being used as a position reference.
-    bool extNavTimeout;                 // true if external nav measurements have failed innovation consistency checks for too long
+    obs_ring_buffer_t<ext_nav_vel_elements> storedExtNavVel;    // external navigation velocity data buffer
+    ext_nav_vel_elements extNavVelNew;  // external navigation velocity data at the current time horizon
+    ext_nav_vel_elements extNavVelDelayed;  // external navigation velocity data at the fusion time horizon.  Already corrected for sensor position
+    uint32_t extNavVelMeasTime_ms;      // time external navigation velocity measurements were accepted for input to the data buffer (msec)
+    bool extNavVelToFuse;               // true when there is new external navigation velocity to fuse
+    bool useExtNavVel;                  // true if external nav velocity should be used
 
     // flags indicating severe numerical errors in innovation variance calculation for different fusion operations
     struct {
@@ -1390,7 +1417,6 @@ private:
         ftype magXbias;
         ftype magYbias;
         ftype magZbias;
-        uint8_t obsIndex;
         Matrix3f DCM;
         Vector3f MagPred;
         ftype R_MAG;

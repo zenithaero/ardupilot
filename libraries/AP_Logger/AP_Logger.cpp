@@ -9,6 +9,7 @@
 
 #include <AP_InternalError/AP_InternalError.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AP_BoardConfig/AP_BoardConfig.h>
 
 AP_Logger *AP_Logger::_singleton;
 
@@ -92,7 +93,15 @@ const AP_Param::GroupInfo AP_Logger::var_info[] = {
     // @User: Standard
     // @Units: s
     AP_GROUPINFO("_FILE_TIMEOUT",  6, AP_Logger, _params.file_timeout,     HAL_LOGGING_FILE_TIMEOUT),
-    
+
+    // @Param: _FILE_MB_FREE
+    // @DisplayName: Old logs on the SD card will be deleted to maintain this amount of free space
+    // @Description: Set this such that the free space is larger than your largest typical flight log
+    // @Units: MB
+    // @Range: 10 1000
+    // @User: Standard
+    AP_GROUPINFO("_FILE_MB_FREE",  7, AP_Logger, _params.min_MB_free, 500),
+
     AP_GROUPEND
 };
 
@@ -300,10 +309,14 @@ void AP_Logger::dump_structures(const struct LogStructure *logstructures, const 
 
 bool AP_Logger::labels_string_is_good(const char *labels) const
 {
+    bool passed = true;
+    if (strlen(labels) >= LS_LABELS_SIZE) {
+        Debug("Labels string too long (%u > %u)", unsigned(strlen(labels)), unsigned(LS_LABELS_SIZE));
+        passed = false;
+    }
     // This goes through and slices labels up into substrings by
     // changing commas to nulls - keeping references to each string in
     // label_offsets.
-    bool passed = true;
     char *label_offsets[LS_LABELS_SIZE];
     uint8_t label_offsets_offset = 0;
     char labels_copy[LS_LABELS_SIZE];
@@ -505,8 +518,7 @@ void AP_Logger::validate_structures(const struct LogStructure *logstructures, co
     }
 
     if (!passed) {
-        Debug("Log structures are invalid");
-        abort();
+        AP_BoardConfig::config_error("See console: Log structures invalid");
     }
 }
 
@@ -780,6 +792,19 @@ void AP_Logger::Write_Rally()
     FOR_EACH_BACKEND(Write_Rally());
 }
 
+// output a FMT message for each backend if not already done so
+void AP_Logger::Safe_Write_Emit_FMT(log_write_fmt *f)
+{
+    for (uint8_t i=0; i<_next_backend; i++) {
+        if (!(f->sent_mask & (1U<<i))) {
+            if (!backends[i]->Write_Emit_FMT(f->msg_type)) {
+                continue;
+            }
+            f->sent_mask |= (1U<<i);
+        }
+    }
+}
+
 uint32_t AP_Logger::num_dropped() const
 {
     if (_next_backend == 0) {
@@ -894,24 +919,34 @@ void AP_Logger::assert_same_fmt_for_name(const AP_Logger::log_write_fmt *f,
         passed = false;
     }
     if (!passed) {
-        Debug("Format definition must be consistent for every call of Write");
-        abort();
+        AP_BoardConfig::config_error("See console: Format definition must be consistent for every call of Write");
     }
 }
 #endif
 
-AP_Logger::log_write_fmt *AP_Logger::msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt)
+AP_Logger::log_write_fmt *AP_Logger::msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, const bool direct_comp)
 {
     WITH_SEMAPHORE(log_write_fmts_sem);
 
     struct log_write_fmt *f;
     for (f = log_write_fmts; f; f=f->next) {
-        if (f->name == name) { // ptr comparison
-            // already have an ID for this name:
+        if (!direct_comp) {
+            if (f->name == name) { // ptr comparison
+                // already have an ID for this name:
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-            assert_same_fmt_for_name(f, name, labels, units, mults, fmt);
+                assert_same_fmt_for_name(f, name, labels, units, mults, fmt);
 #endif
-            return f;
+                return f;
+            }
+        } else {
+            // direct comparison used from scripting where pointer is not maintained
+            if (strcmp(f->name,name) == 0) {
+                // already have an ID for this name:
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+                assert_same_fmt_for_name(f, name, labels, units, mults, fmt);
+#endif
+                return f;
+            }
         }
     }
     f = (struct log_write_fmt *)calloc(1, sizeof(*f));
@@ -973,8 +1008,7 @@ AP_Logger::log_write_fmt *AP_Logger::msg_fmt_for_name(const char *name, const ch
         memset((char*)ls_multipliers, '?', MIN(sizeof(ls_format), strlen(f->fmt)));
     }
     if (!validate_structure(&ls, (int16_t)-1)) {
-        Debug("Log structure invalid");
-        abort();
+        AP_BoardConfig::config_error("See console: Log structure invalid");
     }
 #endif
 

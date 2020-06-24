@@ -281,12 +281,13 @@ public:
                           uint8_t sequence,
                           const RallyLocation &rally_point);
     void Write_VisualOdom(float time_delta, const Vector3f &angle_delta, const Vector3f &position_delta, float confidence);
-    void Write_VisualPosition(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, uint8_t reset_counter);
+    void Write_VisualPosition(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, float pos_err, float ang_err, uint8_t reset_counter);
+    void Write_VisualVelocity(uint64_t remote_time_us, uint32_t time_ms, const Vector3f &vel, float vel_err, uint8_t reset_counter);
     void Write_AOA_SSA(AP_AHRS &ahrs);
     void Write_Beacon(AP_Beacon &beacon);
     void Write_Proximity(AP_Proximity &proximity);
     void Write_SRTL(bool active, uint16_t num_points, uint16_t max_points, uint8_t action, const Vector3f& point);
-    void Write_OABendyRuler(bool active, float target_yaw, float margin, const Location &final_dest, const Location &oa_dest);
+    void Write_OABendyRuler(bool active, float target_yaw, bool ignore_chg, float margin, const Location &final_dest, const Location &oa_dest);
     void Write_OADijkstra(uint8_t state, uint8_t error_id, uint8_t curr_point, uint8_t tot_points, const Location &final_dest, const Location &oa_dest);
 
     void Write(const char *name, const char *labels, const char *fmt, ...);
@@ -345,6 +346,7 @@ public:
         AP_Int8 log_replay;
         AP_Int8 mav_bufsize; // in kilobytes
         AP_Int16 file_timeout; // in seconds
+        AP_Int16 min_MB_free;
     } _params;
 
     const struct LogStructure *structure(uint16_t num) const;
@@ -375,6 +377,31 @@ public:
 
     // returns true if msg_type is associated with a message
     bool msg_type_in_use(uint8_t msg_type) const;
+
+    // calculate the length of a message using fields specified in
+    // fmt; includes the message header
+    int16_t Write_calc_msg_len(const char *fmt) const;
+
+    // this structure looks much like struct LogStructure in
+    // LogStructure.h, however we need to remember a pointer value for
+    // efficiency of finding message types
+    struct log_write_fmt {
+        struct log_write_fmt *next;
+        uint8_t msg_type;
+        uint8_t msg_len;
+        uint8_t sent_mask; // bitmask of backends sent to
+        const char *name;
+        const char *fmt;
+        const char *labels;
+        const char *units;
+        const char *mults;
+    } *log_write_fmts;
+
+    // return (possibly allocating) a log_write_fmt for a name
+    struct log_write_fmt *msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, const bool direct_comp = false);
+
+    // output a FMT message for each backend if not already done so
+    void Safe_Write_Emit_FMT(log_write_fmt *f);
 
 protected:
 
@@ -408,25 +435,9 @@ private:
      * support for dynamic Write; user-supplies name, format,
      * labels and values in a single function call.
      */
-
-    // this structure looks much like struct LogStructure in
-    // LogStructure.h, however we need to remember a pointer value for
-    // efficiency of finding message types
-    struct log_write_fmt {
-        struct log_write_fmt *next;
-        uint8_t msg_type;
-        uint8_t msg_len;
-        uint8_t sent_mask; // bitmask of backends sent to
-        const char *name;
-        const char *fmt;
-        const char *labels;
-        const char *units;
-        const char *mults;
-    } *log_write_fmts;
     HAL_Semaphore log_write_fmts_sem;
 
     // return (possibly allocating) a log_write_fmt for a name
-    struct log_write_fmt *msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt);
     const struct log_write_fmt *log_write_fmt_for_msg_type(uint8_t msg_type) const;
 
     const struct LogStructure *structure_for_msg_type(uint8_t msg_type);
@@ -436,10 +447,6 @@ private:
 
     // fill LogStructure with information about msg_type
     bool fill_log_write_logstructure(struct LogStructure &logstruct, const uint8_t msg_type) const;
-
-    // calculate the length of a message using fields specified in
-    // fmt; includes the message header
-    int16_t Write_calc_msg_len(const char *fmt) const;
 
     bool _armed;
 

@@ -51,8 +51,9 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #if ADVANCED_FAILSAFE == ENABLED
     SCHED_TASK(afs_fs_check,           10,    100),
 #endif
+    SCHED_TASK(ekf_check,              10,     75),
     SCHED_TASK_CLASS(GCS,            (GCS*)&plane._gcs,       update_receive,   300,  500),
-    SCHED_TASK_CLASS(GCS,            (GCS*)&plane._gcs,       update_send,      300,  500),
+    SCHED_TASK_CLASS(GCS,            (GCS*)&plane._gcs,       update_send,      300,  750),
     SCHED_TASK_CLASS(AP_ServoRelayEvents, &plane.ServoRelayEvents, update_events,          50,  150),
     SCHED_TASK_CLASS(AP_BattMonitor, &plane.battery, read, 10, 300),
     SCHED_TASK_CLASS(AP_Baro, &plane.barometer, accumulate, 50, 150),
@@ -109,7 +110,6 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #if EFI_ENABLED
     SCHED_TASK(efi_update,             10,    200),
 #endif
-    SCHED_TASK(update_dynamic_notch,   50,    200),
 };
 
 void Plane::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
@@ -217,11 +217,15 @@ void Plane::update_logging2(void)
         Log_Write_Control_Tuning();
 #if HAL_GYROFFT_ENABLED
         gyro_fft.write_log_messages();
+#else
+        write_notch_log_messages();
 #endif
     }
     
-    if (should_log(MASK_LOG_NTUN))
+    if (should_log(MASK_LOG_NTUN)) {
         Log_Write_Nav_Tuning();
+        Log_Write_Guided();
+    }
 
     if (should_log(MASK_LOG_RC))
         Log_Write_RC();
@@ -552,6 +556,10 @@ void Plane::update_alt()
 {
     barometer.update();
 
+    if (quadplane.available()) {
+        quadplane.motors->set_air_density_ratio(barometer.get_air_density_ratio());
+    }
+
     // calculate the sink rate.
     float sink_rate;
     Vector3f vel;
@@ -578,8 +586,17 @@ void Plane::update_alt()
         if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && current_loc.past_interval_finish_line(prev_WP_loc, next_WP_loc)) {
             distance_beyond_land_wp = current_loc.get_distance(next_WP_loc);
         }
-        // printf("alt cmd %d airspeed cmd %d\n", relative_target_altitude_cm(), target_airspeed_cm);
-        SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
+
+        float target_alt = relative_target_altitude_cm();
+
+        if (control_mode == &mode_rtl && !rtl.done_climb && g2.rtl_climb_min > 0) {
+            // ensure we do the initial climb in RTL. We add an extra
+            // 10m in the demanded height to push TECS to climb
+            // quickly
+            target_alt = MAX(target_alt, prev_WP_loc.alt + (g2.rtl_climb_min+10)*100);
+        }
+
+        SpdHgt_Controller->update_pitch_throttle(target_alt,
                                                  target_airspeed_cm,
                                                  flight_stage,
                                                  distance_beyond_land_wp,

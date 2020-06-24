@@ -896,6 +896,9 @@ bool Compass::register_compass(int32_t dev_id, uint8_t& instance)
 Compass::StateIndex Compass::_get_state_id(Compass::Priority priority) const
 {
 #if COMPASS_MAX_INSTANCES > 1
+    if (_priority_did_list[priority] == 0) {
+        return StateIndex(COMPASS_MAX_INSTANCES);
+    }
     for (StateIndex i(0); i<COMPASS_MAX_INSTANCES; i++) {
         if (_priority_did_list[priority] == _state[i].expected_dev_id) {
             return i;
@@ -1003,7 +1006,6 @@ void Compass::_probe_external_i2c_compasses(void)
         }
     }
 
-#if !HAL_MINIMIZE_FEATURES
 #ifndef HAL_BUILD_AP_PERIPH
     // AK09916 on ICM20948
     FOREACH_I2C_EXTERNAL(i) {
@@ -1093,8 +1095,6 @@ void Compass::_probe_external_i2c_compasses(void)
         ADD_BACKEND(DRIVER_RM3100, AP_Compass_RM3100::probe(GET_I2C_DEVICE(i, HAL_COMPASS_RM3100_I2C_ADDR),
                     all_external, ROTATION_NONE));
     }
-
-#endif // HAL_MINIMIZE_FEATURES
 }
 
 /*
@@ -1478,6 +1478,24 @@ Compass::use_for_yaw(uint8_t i) const
     return _use_for_yaw[Priority(i)] && _learn.get() != LEARN_INFLIGHT;
 }
 
+/*
+  return the number of enabled sensors. Used to determine if
+  non-compass operation is desired
+ */
+uint8_t Compass::get_num_enabled(void) const
+{
+    if (get_count() == 0) {
+        return 0;
+    }
+    uint8_t count = 0;
+    for (uint8_t i=0; i<COMPASS_MAX_INSTANCES; i++) {
+        if (use_for_yaw(i)) {
+            count++;
+        }
+    }
+    return count;
+}
+
 void
 Compass::set_use_for_yaw(uint8_t i, bool use)
 {
@@ -1551,7 +1569,8 @@ bool Compass::configured(uint8_t i)
 
     StateIndex id = _get_state_id(Priority(i));
     // exit immediately if dev_id hasn't been detected
-    if (_state[id].detected_dev_id == 0) {
+    if (_state[id].detected_dev_id == 0 || 
+        id == COMPASS_MAX_INSTANCES) {
         return false;
     }
 
@@ -1655,7 +1674,7 @@ const Vector3f& Compass::getHIL(uint8_t instance) const
 void Compass::_setup_earth_field(void)
 {
     // assume a earth field strength of 400
-    _hil.Bearth(400, 0, 0);
+    _hil.Bearth = {400, 0, 0};
 
     // rotate _Bearth for inclination and declination. -66 degrees
     // is the inclination in Canberra, Australia

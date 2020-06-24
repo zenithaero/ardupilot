@@ -20,7 +20,9 @@
  */
 #pragma once
 
-#pragma GCC optimize("O2")
+#if !defined(HAL_DEBUG_BUILD) || !HAL_DEBUG_BUILD
+    #pragma GCC optimize("O2")
+#endif
 
 #define EK2_DISABLE_INTERRUPTS 0
 
@@ -234,7 +236,8 @@ public:
 
     // Set to true if the terrain underneath is stable enough to be used as a height reference
     // in combination with a range finder. Set to false if the terrain underneath the vehicle
-    // cannot be used as a height reference
+    // cannot be used as a height reference. Use to prevent range finder operation otherwise
+    // enabled by the combination of EK2_RNG_AID_HGT and EK2_RNG_USE_SPD parameters.
     void setTerrainHgtStable(bool val);
 
     /*
@@ -326,12 +329,22 @@ public:
      * posErr     : 1-sigma spherical position error (m)
      * angErr     : 1-sigma spherical angle error (rad)
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
      * resetTime_ms : system time of the last position reset request (mSec)
      *
      * Sensor offsets are pulled directly from the AP_VisualOdom library
      *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+
+    /*
+     * Write velocity data from an external navigation system
+     * vel : velocity in NED (m)
+     * err : velocity error (m/s)
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
+     */
+    void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
 
     // return true when external nav data is also being used as a yaw observation
     bool isExtNavUsedForYaw(void);
@@ -504,6 +517,12 @@ private:
         Vector3f gyro_scale;
         float accel_zbias;
     } inactiveBias[INS_MAX_INSTANCES];
+
+    struct ext_nav_vel_elements {
+        Vector3f vel;               // velocity in NED (m)
+        float err;                  // velocity measurement error (m/s)
+        uint32_t time_ms;           // measurement timestamp (msec)
+    };
 
     // update the navigation filter status
     void  updateFilterStatus(void);
@@ -804,7 +823,10 @@ private:
 
     // correct external navigation earth-frame position using sensor body-frame offset
     void CorrectExtNavForSensorOffset(Vector3f &ext_position) const;
-    
+
+    // correct external navigation earth-frame velocity using sensor body-frame offset
+    void CorrectExtNavVelForSensorOffset(Vector3f &ext_velocity) const;
+
     // Runs the IMU prediction step for an independent GSF yaw estimator algorithm
     // that uses IMU, GPS horizontal velocity and optionally true airspeed data.
     void runYawEstimatorPrediction(void);
@@ -829,6 +851,7 @@ private:
     // Must be larger than the time period defined by IMU_BUFFER_LENGTH
     static const uint32_t OBS_BUFFER_LENGTH = 5;
     static const uint32_t FLOW_BUFFER_LENGTH = 15;
+    static const uint32_t EXTNAV_BUFFER_LENGTH = 15;
 
     // Variables
     bool statesInitialised;         // boolean true when filter states have been initialised
@@ -879,7 +902,6 @@ private:
     ftype innovVtas;                // innovation output from fusion of airspeed measurements
     ftype varInnovVtas;             // innovation variance output from fusion of airspeed measurements
     bool magFusePerformed;          // boolean set to true when magnetometer fusion has been performed in that time step
-    bool magFuseRequired;           // boolean set to true when magnetometer fusion will be performed in the next time step
     uint32_t prevTasStep_ms;        // time stamp of last TAS fusion step
     uint32_t prevBetaStep_ms;       // time stamp of last synthetic sideslip fusion step
     uint32_t lastMagUpdate_us;      // last time compass was updated in usec
@@ -1083,7 +1105,6 @@ private:
     uint32_t lastRngMeasTime_ms;            // Timestamp of last range measurement
     uint8_t rngMeasIndex[2];                // Current range measurement ringbuffer index for dual range sensors
     bool terrainHgtStable;                  // true when the terrain height is stable enough to be used as a height reference
-    uint32_t terrainHgtStableSet_ms;        // system time at which terrainHgtStable was set
 
     // Range Beacon Sensor Fusion
     obs_ring_buffer_t<rng_bcn_elements> storedRangeBeacon; // Beacon range buffer
@@ -1172,6 +1193,13 @@ private:
     bool extNavUsedForPos;              // true when the external nav data is being used as a position reference.
     bool extNavYawResetRequest;         // true when a reset of vehicle yaw using the external nav data is requested
 
+    obs_ring_buffer_t<ext_nav_vel_elements> storedExtNavVel; // external navigation velocity data buffer
+    ext_nav_vel_elements extNavVelNew;                       // external navigation velocity data at the current time horizon
+    ext_nav_vel_elements extNavVelDelayed;                   // external navigation velocity data at the fusion time horizon
+    uint32_t extNavVelMeasTime_ms;                           // time external navigation velocity measurements were accepted for input to the data buffer (msec)
+    bool extNavVelToFuse;                                    // true when there is new external navigation velocity to fuse
+    bool useExtNavVel;                                       // true external navigation velocity should be used
+
     // flags indicating severe numerical errors in innovation variance calculation for different fusion operations
     struct {
         bool bad_xmag:1;
@@ -1221,7 +1249,6 @@ private:
         ftype magXbias;
         ftype magYbias;
         ftype magZbias;
-        uint8_t obsIndex;
         Matrix3f DCM;
         Vector3f MagPred;
         ftype R_MAG;

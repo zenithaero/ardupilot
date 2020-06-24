@@ -338,6 +338,12 @@ int SITL_State::sim_fd(const char *name, const char *arg)
     //     }
     //     frsky_sport = new SITL::Frsky_SPortPassthrough();
     //     return frsky_sportpassthrough->fd();
+    } else if (streq(name, "rplidara2")) {
+        if (rplidara2 != nullptr) {
+            AP_HAL::panic("Only one rplidara2 at a time");
+        }
+        rplidara2 = new SITL::PS_RPLidarA2();
+        return rplidara2->fd();
     }
 
     AP_HAL::panic("unknown simulated device: %s", name);
@@ -419,6 +425,11 @@ int SITL_State::sim_fd_write(const char *name)
             AP_HAL::panic("No frsky-d created");
         }
         return frsky_d->write_fd();
+    } else if (streq(name, "rplidara2")) {
+        if (rplidara2 == nullptr) {
+            AP_HAL::panic("No rplidara2 created");
+        }
+        return rplidara2->write_fd();
     }
     AP_HAL::panic("unknown simulated device: %s", name);
 }
@@ -625,6 +636,7 @@ void SITL_State::_fdm_input_local(void)
         sitl_model->get_attitude(attitude);
         vicon->update(sitl_model->get_location(),
                       sitl_model->get_position(),
+                      sitl_model->get_velocity_ef(),
                       attitude);
     }
     if (benewake_tf02 != nullptr) {
@@ -676,6 +688,9 @@ void SITL_State::_fdm_input_local(void)
     // if (frsky_sportpassthrough != nullptr) {
     //     frsky_sportpassthrough->update();
     // }
+    if (rplidara2 != nullptr) {
+        rplidara2->update(sitl_model->get_location());
+    }
 
     if (_sitl) {
         _sitl->efi_ms.update();

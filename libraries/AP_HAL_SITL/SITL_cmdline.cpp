@@ -36,6 +36,7 @@
 #include <SITL/SIM_Z1_Matlab.h>
 #include <SITL/SIM_Z1_Wrapper.h>
 #include <SITL/SIM_Z1_Lookup.h>
+#include <SITL/SIM_JSON.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -157,6 +158,7 @@ static const struct {
     {"Z1_Wrapper",          Z1_Wrapper::create},
     {"Z1_Matlab",           Z1_Matlab::create},
     {"Z1_Lookup",           Z1_Lookup::create},
+    { "JSON",               JSON::create },
 };
 
 void SITL_State::_set_signal_handlers(void) const

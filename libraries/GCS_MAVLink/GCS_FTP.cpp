@@ -85,8 +85,17 @@ void GCS_MAVLINK::handle_file_transfer_protocol(const mavlink_message_t &msg) {
     }
 }
 
-void GCS_MAVLINK::send_ftp_replies(void) {
-    if (ftp.replies == nullptr || ftp.replies->empty()) {
+void GCS_MAVLINK::send_ftp_replies(void)
+{
+    /*
+      provide same banner we would give with old param download
+    */
+    if (ftp.need_banner_send_mask & (1U<<chan)) {
+        ftp.need_banner_send_mask &= ~(1U<<chan);
+        send_banner();
+    }
+    
+    if (ftp.replies == nullptr || ftp.replies->is_empty()) {
         return;
     }
 
@@ -114,7 +123,7 @@ void GCS_MAVLINK::send_ftp_replies(void) {
                     reply.chan,
                     0, reply.sysid, reply.compid,
                     payload);
-                ftp.replies->pop(reply);
+                ftp.replies->pop();
                 ftp.last_send_ms = AP_HAL::millis();
         } else {
             return;
@@ -159,6 +168,8 @@ void GCS_MAVLINK::ftp_worker(void) {
     reply.session = -1; // flag the reply as invalid for any reuse
 
     while (true) {
+        bool skip_push_reply = false;
+
         while (!ftp.requests->pop(request)) {
             // nothing to handle, delay ourselves a bit then check again. Ideally we'd use conditional waits here
             hal.scheduler->delay(2);
@@ -273,6 +284,11 @@ void GCS_MAVLINK::ftp_worker(void) {
                         reply.opcode = FTP_OP::Ack;
                         reply.size = sizeof(uint32_t);
                         *((int32_t *)reply.data) = (int32_t)file_size;
+
+                        // provide compatibility with old protocol banner download
+                        if (strncmp((const char *)request.data, "@PARAM/param.pck", 16) == 0) {
+                            ftp.need_banner_send_mask |= 1U<<reply.chan;
+                        }
                         break;
                     }
                 case FTP_OP::ReadFile:
@@ -513,6 +529,11 @@ void GCS_MAVLINK::ftp_worker(void) {
                             reply.seq_number++;
                         }
 
+                        if (reply.opcode != FTP_OP::Nack) {
+                            // prevent a duplicate packet send for
+                            // normal replies of burst reads
+                            skip_push_reply = true;
+                        }
                         break;
                     }
                 case FTP_OP::TruncateFile:
@@ -525,7 +546,10 @@ void GCS_MAVLINK::ftp_worker(void) {
             }
         }
 
-        ftp_push_replies(reply);
+        if (!skip_push_reply) {
+            ftp_push_replies(reply);
+        }
+
         continue;
     }
 }

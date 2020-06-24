@@ -220,9 +220,10 @@ public:
      * delAng is the XYZ angular rotation measured in body frame and relative to the inertial reference at timeStamp_ms (rad)
      * delTime is the time interval for the measurement of delPos and delAng (sec)
      * timeStamp_ms is the timestamp of the last image used to calculate delPos and delAng (msec)
+     * delay_ms is the average delay of external nav system measurements relative to inertial measurements
      * posOffset is the XYZ body frame position of the camera focal point (m)
     */
-    void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset);
+    void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
     /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
@@ -289,10 +290,21 @@ public:
      * posErr     : 1-sigma spherical position error (m)
      * angErr     : 1-sigma spherical angle error (rad)
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
      * resetTime_ms : system time of the last position reset request (mSec)
      *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+
+    /*
+     * Write velocity data from an external navigation system
+     *
+     * vel : velocity in NED (m)
+     * err : velocity error (m/s)
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
+    */
+    void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
 
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
@@ -304,7 +316,8 @@ public:
 
     // Set to true if the terrain underneath is stable enough to be used as a height reference
     // in combination with a range finder. Set to false if the terrain underneath the vehicle
-    // cannot be used as a height reference
+    // cannot be used as a height reference. Use to prevent range finder operation otherwise
+    // enabled by the combination of EK3_RNG_USE_HGT and EK3_RNG_USE_SPD parameters.
     void setTerrainHgtStable(bool val);
 
     /*
@@ -491,6 +504,7 @@ private:
     const float gpsNEVelVarAccScale = 0.05f;       // Scale factor applied to NE velocity measurement variance due to manoeuvre acceleration
     const float gpsDVelVarAccScale = 0.07f;        // Scale factor applied to vertical velocity measurement variance due to manoeuvre acceleration
     const float gpsPosVarAccScale = 0.05f;         // Scale factor applied to horizontal position measurement variance due to manoeuvre acceleration
+    const float extNavVelVarAccScale = 0.05f;      // Scale factor applied to ext nav velocity measurement variance due to manoeuvre acceleration
     const uint16_t magDelay_ms = 60;               // Magnetometer measurement delay (msec)
     const uint16_t tasDelay_ms = 100;              // Airspeed measurement delay (msec)
     const uint16_t tiltDriftTimeMax_ms = 15000;    // Maximum number of ms allowed without any form of tilt aiding (GPS, flow, TAS, etc)
@@ -516,6 +530,7 @@ private:
     const uint16_t fusionTimeStep_ms = 10;         // The minimum time interval between covariance predictions and measurement fusions in msec
     const uint8_t sensorIntervalMin_ms = 50;       // The minimum allowed time between measurements from any non-IMU sensor (msec)
     const uint8_t flowIntervalMin_ms = 20;         // The minimum allowed time between measurements from optical flow sensors (msec)
+    const uint8_t extNavIntervalMin_ms = 20;       // The minimum allowed time between measurements from external navigation sensors (msec)
 
     struct {
         bool enabled:1;

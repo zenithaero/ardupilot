@@ -410,7 +410,7 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: THR_MAX
     // @DisplayName: Maximum Throttle
-    // @Description: Maximum throttle percentage used in automatic throttle modes.
+    // @Description: Maximum throttle percentage used in all modes except manual, provided THR_PASS_STAB is not set.
     // @Units: %
     // @Range: 0 100
     // @Increment: 1
@@ -1250,7 +1250,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 
     // @Param: FWD_BAT_VOLT_MAX
     // @DisplayName: Forward throttle battery voltage compensation maximum voltage
-    // @Description: Forward throttle battery voltage compensation maximum voltage (voltage above this will have no additional scaling effect on thrust).  Recommend 4.4 * cell count, 0 = Disabled
+    // @Description: Forward throttle battery voltage compensation maximum voltage (voltage above this will have no additional scaling effect on thrust). Recommend 4.2 * cell count, 0 = Disabled. Recommend THR_MAX is set to no more than 100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX, THR_MIN is set to no less than -100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX and climb descent rate limits are set accordingly.
     // @Range: 6 35
     // @Units: V
     // @User: Advanced
@@ -1258,7 +1258,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 
     // @Param: FWD_BAT_VOLT_MIN
     // @DisplayName: Forward throttle battery voltage compensation minimum voltage
-    // @Description: Forward throttle battery voltage compensation minimum voltage (voltage below this will have no additional scaling effect on thrust).  Recommend 3.5 * cell count, 0 = Disabled
+    // @Description: Forward throttle battery voltage compensation minimum voltage (voltage below this will have no additional scaling effect on thrust).  Recommend 3.5 * cell count, 0 = Disabled. Recommend THR_MAX is set to no more than 100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX, THR_MIN is set to no less than -100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX and climb descent rate limits are set accordingly.
     // @Range: 6 35
     // @Units: V
     // @User: Advanced
@@ -1270,6 +1270,28 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Values: 0:First battery, 1:Second battery
     // @User: Advanced
     AP_GROUPINFO("FWD_BAT_IDX", 25, ParametersG2, fwd_thr_batt_idx, 0),
+
+    // @Param: FS_EKF_THRESH
+    // @DisplayName: EKF failsafe variance threshold
+    // @Description: Allows setting the maximum acceptable compass and velocity variance used to check navigation health in VTOL modes
+    // @Values: 0.6:Strict, 0.8:Default, 1.0:Relaxed
+    // @User: Advanced
+    AP_GROUPINFO("FS_EKF_THRESH", 26, ParametersG2, fs_ekf_thresh, FS_EKF_THRESHOLD_DEFAULT),
+
+    // @Param: RTL_CLIMB_MIN
+    // @DisplayName: RTL minimum climb
+    // @Description: The vehicle will climb this many m during the initial climb portion of the RTL. During this time the roll will be limited to LEVEL_ROLL_LIMIT degrees.
+    // @Units: m
+    // @Range: 0 30
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("RTL_CLIMB_MIN", 27, ParametersG2, rtl_climb_min, 0),
+
+#if OFFBOARD_GUIDED == ENABLED
+    // @Group: GUIDED_
+    // @Path: ../libraries/AC_PID/AC_PID.cpp
+    AP_SUBGROUPINFO(guidedHeading, "GUIDED_", 28, ParametersG2, AC_PID),
+#endif // OFFBOARD_GUIDED == ENABLED
 
     AP_GROUPEND
 };

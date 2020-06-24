@@ -24,7 +24,8 @@
 #include <AP_HAL/AP_HAL.h>
 
 #ifndef HAL_NAVEKF2_AVAILABLE
-#define HAL_NAVEKF2_AVAILABLE 1
+// only default to EK2 enabled on boards with over 1M flash
+#define HAL_NAVEKF2_AVAILABLE (BOARD_FLASH_SIZE>1024)
 #endif
 
 #ifndef HAL_NAVEKF3_AVAILABLE
@@ -177,13 +178,16 @@ public:
     void writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawFlowRates, const Vector2f &rawGyroRates, const uint32_t msecFlowMeas, const Vector3f &posOffset);
 
     // write body odometry measurements to the EKF
-    void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset);
+    void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
     // Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed);
 
     // Write position and quaternion data from an external navigation system
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms) override;
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms) override;
+
+    // Write velocity data from an external navigation system
+    void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms) override;
 
     // inhibit GPS usage
     uint8_t setInhibitGPS(void);
@@ -244,6 +248,10 @@ public:
     // this is used to limit height during optical flow navigation
     // it will return invalid when no limiting is required
     bool get_hgt_ctrl_limit(float &limit) const override;
+
+    // Set to true if the terrain underneath is stable enough to be used as a height reference
+    // this is not related to terrain following
+    void set_terrain_hgt_stable(bool stable) override;
 
     // get_location - updates the provided location with the latest
     // calculated location including absolute altitude

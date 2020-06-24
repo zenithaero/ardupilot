@@ -169,7 +169,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
 
     // @Param: POSNE_M_NSE
     // @DisplayName: GPS horizontal position measurement noise (m)
-    // @Description: This sets the GPS horizontal position or external navigation system position observation noise. Increasing it reduces the weighting of GPS horizontal position or external navigation system position measurements.
+    // @Description: This sets the GPS horizontal position observation noise. Increasing it reduces the weighting of GPS horizontal position measurements.
     // @Range: 0.1 10.0
     // @Increment: 0.1
     // @User: Advanced
@@ -199,7 +199,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
 
     // @Param: ALT_SOURCE
     // @DisplayName: Primary altitude sensor source
-    // @Description: Primary height sensor used by the EKF. If the selected option cannot be used, baro is used. 1 uses the range finder and only with optical flow navigation (EK2_GPS_TYPE = 3), Do not use "1" for terrain following. NOTE: the EK2_RNG_USE_HGT parameter can be used to switch to range-finder when close to the ground.
+    // @Description: Primary height sensor used by the EKF. If a sensor other than Baro is selected and becomes unavailable, then the Baro sensor will be used as a fallback. NOTE: The EK2_RNG_USE_HGT parameter can be used to switch to range-finder when close to the ground in conjunction with EK2_ALT_SOURCE = 0 or 2 (Baro or GPS).
     // @Values: 0:Use Baro, 1:Use Range Finder, 2:Use GPS, 3:Use Range Beacon
     // @User: Advanced
     // @RebootRequired: True
@@ -245,7 +245,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
 
     // @Param: MAG_CAL
     // @DisplayName: Magnetometer default fusion mode
-    // @Description: This determines when the filter will use the 3-axis magnetometer fusion model that estimates both earth and body fixed magnetic field states, when it will use a simpler magnetic heading fusion model that does not use magnetic field states and when it will use an alternative method of yaw determination to the magnetometer. The 3-axis magnetometer fusion is only suitable for use when the external magnetic field environment is stable. EK3_MAG_CAL = 0 uses heading fusion on ground, 3-axis fusion in-flight, and is the default setting for Plane users. EK3_MAG_CAL = 1 uses 3-axis fusion only when manoeuvring. EK3_MAG_CAL = 2 uses heading fusion at all times, is recommended if the external magnetic field is varying and is the default for rovers. EK3_MAG_CAL = 3 uses heading fusion on the ground and 3-axis fusion after the first in-air field and yaw reset has completed, and is the default for copters. EK3_MAG_CAL = 4 uses 3-axis fusion at all times. NOTE: The fusion mode can be forced to 2 for specific EKF cores using the EK2_MAG_MASK parameter. NOTE: limited operation without a magnetometer or any other yaw sensor is possible by setting the COMPASS_USE parameters to 0. If this is done, the EK2_GSF_RUN and EK2_GSF_USE masks must be set to the same as EK3_IMU_MASK.
+    // @Description: This determines when the filter will use the 3-axis magnetometer fusion model that estimates both earth and body fixed magnetic field states, when it will use a simpler magnetic heading fusion model that does not use magnetic field states and when it will use an alternative method of yaw determination to the magnetometer. The 3-axis magnetometer fusion is only suitable for use when the external magnetic field environment is stable. EK2_MAG_CAL = 0 uses heading fusion on ground, 3-axis fusion in-flight, and is the default setting for Plane users. EK2_MAG_CAL = 1 uses 3-axis fusion only when manoeuvring. EK2_MAG_CAL = 2 uses heading fusion at all times, is recommended if the external magnetic field is varying and is the default for rovers. EK2_MAG_CAL = 3 uses heading fusion on the ground and 3-axis fusion after the first in-air field and yaw reset has completed, and is the default for copters. EK2_MAG_CAL = 4 uses 3-axis fusion at all times. NOTE: The fusion mode can be forced to 2 for specific EKF cores using the EK2_MAG_MASK parameter. NOTE: limited operation without a magnetometer or any other yaw sensor is possible by setting the COMPASS_USE parameters to 0. If this is done, the EK2_GSF_RUN and EK2_GSF_USE masks must be set to the same as EK2_IMU_MASK.
     // @Values: 0:When flying,1:When manoeuvring,2:Never,3:After first climb yaw reset,4:Always
     // @User: Advanced
     AP_GROUPINFO("MAG_CAL", 14, NavEKF2, _magCal, MAG_CAL_DEFAULT),
@@ -482,7 +482,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
 
     // @Param: RNG_USE_HGT
     // @DisplayName: Range finder switch height percentage
-    // @Description: Range finder can be used as the primary height source when below this percentage of its maximum range (see RNGFND_MAX_CM). Set to -1 when EK2_ALT_SOURCE is not set to range finder.  This is not for terrain following.
+    // @Description: Range finder can be used as the primary height source when below this percentage of its maximum range (see RNGFND_MAX_CM). This will not work unless Baro or GPS height is selected as the primary height source vis EK2_ALT_SOURCE = 0 or 2 respectively.  This feature should not be used for terrain following as it is designed  for vertical takeoff and landing with climb above  the range finder use height before commencing the mission, and with horizontal position changes below that height being limited to a flat region around the takeoff and landing point.
     // @Range: -1 70
     // @Increment: 1
     // @User: Advanced
@@ -549,15 +549,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("OGN_HGT_MASK", 49, NavEKF2, _originHgtMode, 0),
 
-    // @Param: EXTNAV_DELAY
-    // @DisplayName: external navigation system measurement delay (msec)
-    // @Description: This is the number of msec that the external navigation system measurements lag behind the inertial measurements.
-    // @Range: 0 127
-    // @Increment: 1
-    // @User: Advanced
-    // @Units: ms
-    // @RebootRequired: True
-    AP_GROUPINFO("EXTNAV_DELAY", 50, NavEKF2, _extnavDelay_ms, 10),
+    // EXTNAV_DELAY was 50
 
     // @Param: FLOW_USE
     // @DisplayName: Optical flow use bitmask
@@ -1323,7 +1315,8 @@ void NavEKF2::setTouchdownExpected(bool val)
 
 // Set to true if the terrain underneath is stable enough to be used as a height reference
 // in combination with a range finder. Set to false if the terrain underneath the vehicle
-// cannot be used as a height reference
+// cannot be used as a height reference. Use to prevent range finder operation otherwise
+// enabled by the combination of EK2_RNG_AID_HGT and EK2_RNG_USE_SPD parameters.
 void NavEKF2::setTerrainHgtStable(bool val)
 {
     if (core) {
@@ -1661,16 +1654,17 @@ void NavEKF2::getTimingStatistics(int8_t instance, struct ekf_timing &timing) co
  * posErr     : 1-sigma spherical position error (m)
  * angErr     : 1-sigma spherical angle error (rad)
  * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+ * delay_ms   : average delay of external nav system measurements relative to inertial measurements
  * resetTime_ms : system time of the last position reset request (mSec)
  *
  * Sensor offsets are pulled directly from the AP_VisualOdom library
  *
 */
-void NavEKF2::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+void NavEKF2::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, resetTime_ms);
+            core[i].writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
         }
     }
 }
@@ -1710,6 +1704,21 @@ void NavEKF2::writeDefaultAirSpeed(float airspeed)
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
             core[i].writeDefaultAirSpeed(airspeed);
+        }
+    }
+}
+
+/* Write velocity data from an external navigation system
+ * vel : velocity in NED (m)
+ * err : velocity error (m/s) 
+ * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+ * delay_ms   : average delay of external nav system measurements relative to inertial measurements
+ */
+void NavEKF2::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeExtNavVelData(vel, err, timeStamp_ms, delay_ms);
         }
     }
 }

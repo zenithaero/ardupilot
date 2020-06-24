@@ -245,7 +245,8 @@ public:
 
     // Set to true if the terrain underneath is stable enough to be used as a height reference
     // in combination with a range finder. Set to false if the terrain underneath the vehicle
-    // cannot be used as a height reference
+    // cannot be used as a height reference. Use to prevent range finder operation otherwise
+    // enabled by the combination of EK2_RNG_AID_HGT and EK2_RNG_USE_SPD parameters.
     void setTerrainHgtStable(bool val);
 
     /*
@@ -335,12 +336,22 @@ public:
      * posErr     : 1-sigma spherical position error (m)
      * angErr     : 1-sigma spherical angle error (rad)
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
      * resetTime_ms : system time of the last position reset request (mSec)
      *
      * Sensor offsets are pulled directly from the AP_VisualOdom library
      *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+
+    /*
+     * Write velocity data from an external navigation system
+     * vel : velocity in NED (m)
+     * err : velocity error (m/s)
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
+     */
+    void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
 
     /*
       check if switching lanes will reduce the normalised
@@ -428,7 +439,6 @@ private:
     AP_Float _useRngSwSpd;          // Maximum horizontal ground speed to use range finder as the primary height source (m/s)
     AP_Int8 _magMask;               // Bitmask forcng specific EKF core instances to use simple heading magnetometer fusion.
     AP_Int8 _originHgtMode;         // Bitmask controlling post alignment correction and reporting of the EKF origin height.
-    AP_Int8 _extnavDelay_ms;        // effective average delay of external nav system measurements relative to inertial measurements (msec)
     AP_Int8 _flowUse;               // Controls if the optical flow data is fused into the main navigation estimator and/or the terrain estimator.
     AP_Int16 _mag_ef_limit;         // limit on difference between WMM tables and learned earth field.
     AP_Float _hrt_filt_freq;        // frequency of output observer height rate complementary filter in Hz
@@ -445,6 +455,7 @@ private:
     // Tuning parameters
     const float gpsNEVelVarAccScale = 0.05f;       // Scale factor applied to NE velocity measurement variance due to manoeuvre acceleration
     const float gpsDVelVarAccScale = 0.07f;        // Scale factor applied to vertical velocity measurement variance due to manoeuvre acceleration
+    const float extNavVelVarAccScale = 0.05f;      // Scale factor applied to ext nav velocity measurement variance due to manoeuvre acceleration
     const float gpsPosVarAccScale = 0.05f;         // Scale factor applied to horizontal position measurement variance due to manoeuvre acceleration
     const uint8_t magDelay_ms = 60;               // Magnetometer measurement delay (msec)
     const uint8_t tasDelay_ms = 240;              // Airspeed measurement delay (msec)

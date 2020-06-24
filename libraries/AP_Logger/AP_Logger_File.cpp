@@ -34,6 +34,9 @@ extern const AP_HAL::HAL& hal;
 #define HAL_LOGGER_WRITE_CHUNK_SIZE 4096
 #endif
 
+#define MB_to_B 1000000
+#define B_to_MB 0.000001
+
 /*
   constructor
  */
@@ -55,10 +58,8 @@ AP_Logger_File::AP_Logger_File(AP_Logger &front,
 }
 
 
-void AP_Logger_File::Init()
+void AP_Logger_File::ensure_log_directory_exists()
 {
-    AP_Logger_Backend::Init();
-    // create the log directory if need be
     int ret;
     struct stat st;
 
@@ -75,6 +76,11 @@ void AP_Logger_File::Init()
     if (ret == -1 && errno != EEXIST) {
         printf("Failed to create log directory %s : %s\n", _log_directory, strerror(errno));
     }
+}
+
+void AP_Logger_File::Init()
+{
+    AP_Logger_Backend::Init();
 
     // determine and limit file backend buffersize
     uint32_t bufsize = _front._params.file_bufsize;
@@ -190,22 +196,6 @@ int64_t AP_Logger_File::disk_space()
     return AP::FS().disk_space(_log_directory);
 }
 
-// returns the available space in _log_directory as a percentage
-// returns -1.0f on error
-float AP_Logger_File::avail_space_percent()
-{
-    int64_t avail = disk_space_avail();
-    if (avail == -1) {
-        return -1.0f;
-    }
-    int64_t space = disk_space();
-    if (space == -1) {
-        return -1.0f;
-    }
-
-    return (avail/(float)space) * 100;
-}
-
 // find_oldest_log - find oldest log in _log_directory
 // returns 0 if no log was found
 uint16_t AP_Logger_File::find_oldest_log()
@@ -286,17 +276,19 @@ void AP_Logger_File::Prep_MinSpace()
         return;
     }
 
+    const int64_t target_free = (int64_t)_front._params.min_MB_free * MB_to_B;
+
     _cached_oldest_log = 0;
 
     uint16_t log_to_remove = first_log_to_remove;
 
     uint16_t count = 0;
     do {
-        float avail = avail_space_percent();
-        if (is_equal(avail, -1.0f)) {
+        int64_t avail = disk_space_avail();
+        if (avail == -1) {
             break;
         }
-        if (avail >= min_avail_space_percent) {
+        if (avail >= target_free) {
             break;
         }
         if (count++ > MAX_LOG_FILES+10) {
@@ -310,8 +302,8 @@ void AP_Logger_File::Prep_MinSpace()
             break;
         }
         if (file_exists(filename_to_remove)) {
-            hal.console->printf("Removing (%s) for minimum-space requirements (%.2f%% < %.0f%%)\n",
-                                filename_to_remove, (double)avail, (double)min_avail_space_percent);
+            hal.console->printf("Removing (%s) for minimum-space requirements (%.0fMB < %.0fMB)\n",
+                                filename_to_remove, (double)avail*B_to_MB, (double)target_free*B_to_MB);
             EXPECT_DELAY_MS(2000);
             if (AP::FS().unlink(filename_to_remove) == -1) {
                 hal.console->printf("Failed to remove %s: %s\n", filename_to_remove, strerror(errno));
@@ -352,7 +344,12 @@ bool AP_Logger_File::NeedPrep()
         return false;
     }
 
-    if (avail_space_percent() < min_avail_space_percent) {
+    const int64_t actual = disk_space_avail();
+    if (actual == -1) {
+        return false;
+    }
+
+    if (actual < (int64_t)_front._params.min_MB_free * MB_to_B) {
         return true;
     }
 
@@ -767,6 +764,10 @@ void AP_Logger_File::stop_logging(void)
 
 void AP_Logger_File::PrepForArming()
 {
+    if (_rotate_pending) {
+        _rotate_pending = false;
+        stop_logging();
+    }
     if (logging_started()) {
         return;
     }
@@ -778,15 +779,23 @@ void AP_Logger_File::PrepForArming()
  */
 void AP_Logger_File::start_new_log(void)
 {
-    stop_logging();
-
-    start_new_log_reset_variables();
-
     if (_open_error) {
         // we have previously failed to open a file - don't try again
         // to prevent us trying to open files while in flight
         return;
     }
+
+    // set _open_error here to avoid infinite recursion.  Simply
+    // writing a prioritised block may try to open a log - which means
+    // if anything in the start_new_log path does a gcs().send_text()
+    // (for example), you will end up recursing if we don't take
+    // precautions.  We will reset _open_error if we actually manage
+    // to open the log...
+    _open_error = true;
+
+    stop_logging();
+
+    start_new_log_reset_variables();
 
     if (_read_fd != -1) {
         AP::FS().close(_read_fd);
@@ -795,7 +804,6 @@ void AP_Logger_File::start_new_log(void)
 
     if (disk_space_avail() < _free_space_min_avail && disk_space() > 0) {
         hal.console->printf("Out of space for logging\n");
-        _open_error = true;
         return;
     }
 
@@ -808,7 +816,6 @@ void AP_Logger_File::start_new_log(void)
         log_num = 1;
     }
     if (!write_fd_semaphore.take(1)) {
-        _open_error = true;
         return;
     }
     if (_write_filename) {
@@ -817,7 +824,6 @@ void AP_Logger_File::start_new_log(void)
     }
     _write_filename = _log_file_name(log_num);
     if (_write_filename == nullptr) {
-        _open_error = true;
         write_fd_semaphore.give();
         return;
     }
@@ -828,13 +834,15 @@ void AP_Logger_File::start_new_log(void)
     _need_rtc_update = !AP::rtc().get_utc_usec(utc_usec);
 #endif
 
+    // create the log directory if need be
+    ensure_log_directory_exists();
+
     EXPECT_DELAY_MS(3000);
     _write_fd = AP::FS().open(_write_filename, O_WRONLY|O_CREAT|O_TRUNC);
     _cached_oldest_log = 0;
 
     if (_write_fd == -1) {
         _initialised = false;
-        _open_error = true;
         write_fd_semaphore.give();
         int saved_errno = errno;
         ::printf("Log open fail for %s - %s\n",
@@ -851,13 +859,10 @@ void AP_Logger_File::start_new_log(void)
     // now update lastlog.txt with the new log number
     char *fname = _lastlog_file_name();
 
-    // we avoid fopen()/fprintf() here as it is not available on as many
-    // systems as open/write
     EXPECT_DELAY_MS(3000);
     int fd = AP::FS().open(fname, O_WRONLY|O_CREAT);
     free(fname);
     if (fd == -1) {
-        _open_error = true;
         return;
     }
 
@@ -868,9 +873,9 @@ void AP_Logger_File::start_new_log(void)
     AP::FS().close(fd);
 
     if (written < to_write) {
-        _open_error = true;
         return;
     }
+    _open_error = false;
 
     return;
 }

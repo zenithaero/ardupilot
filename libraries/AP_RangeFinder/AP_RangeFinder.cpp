@@ -39,6 +39,7 @@
 #include "AP_RangeFinder_Benewake_TFMini.h"
 #include "AP_RangeFinder_Benewake_TFMiniPlus.h"
 #include "AP_RangeFinder_PWM.h"
+#include "AP_RangeFinder_HC_SR04.h"
 #include "AP_RangeFinder_BLPing.h"
 #include "AP_RangeFinder_UAVCAN.h"
 #include "AP_RangeFinder_Lanbao.h"
@@ -255,10 +256,11 @@ void RangeFinder::convert_params(void) {
  */
 void RangeFinder::init(enum Rotation orientation_default)
 {
-    if (num_instances != 0) {
+    if (init_done) {
         // init called a 2nd time?
         return;
     }
+    init_done = true;
 
     convert_params();
 
@@ -270,11 +272,14 @@ void RangeFinder::init(enum Rotation orientation_default)
     for (uint8_t i=0, serial_instance = 0; i<RANGEFINDER_MAX_INSTANCES; i++) {
         // serial_instance will be increased inside detect_instance
         // if a serial driver is loaded for this instance
+        WITH_SEMAPHORE(detect_sem);
         detect_instance(i, serial_instance);
         if (drivers[i] != nullptr) {
             // we loaded a driver for this instance, so it must be
-            // present (although it may not be healthy)
-            num_instances = i+1;
+            // present (although it may not be healthy). We use MAX()
+            // here as a UAVCAN rangefinder may already have been
+            // found
+            num_instances = MAX(num_instances, i+1);
         }
 
         // initialise status
@@ -455,6 +460,14 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         }
 #endif
         break;
+    case Type::HC_SR04:
+#ifndef HAL_BUILD_AP_PERIPH
+        // note that this will always come back as present if the pin is valid
+        if (AP_RangeFinder_HC_SR04::detect(params[instance])) {
+            drivers[instance] = new AP_RangeFinder_HC_SR04(state[instance], params[instance]);
+        }
+#endif
+        break;
     case Type::NMEA:
         if (AP_RangeFinder_NMEA::detect(serial_instance)) {
             drivers[instance] = new AP_RangeFinder_NMEA(state[instance], params[instance], serial_instance++);
@@ -502,6 +515,18 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
             drivers[instance] = new AP_RangeFinder_LeddarVu8(state[instance], params[instance], serial_instance++);
         }
         break;
+
+#if HAL_WITH_UAVCAN
+    case Type::UAVCAN:
+        /*
+          the UAVCAN driver gets created when we first receive a
+          measurement. We take the instance slot now, even if we don't
+          yet have the driver
+         */
+        num_instances = MAX(num_instances, instance+1);
+        break;
+#endif
+
     default:
         break;
     }
