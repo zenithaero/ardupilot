@@ -164,18 +164,20 @@ protected:
     float angle_of_attack;
     float beta;
 
+    // TODO: move to matlab exported model
     struct {
-        float mass = 2.6;
-        float s = 0.5350;
-        float b = 1.9000;
-        float c = 0.2920;
+        float mass = 2.74;
+        float s = 0.51297;
+        float b = 1.8800;
+        float c = 0.28244;
         Vector3f CGOffset{0, 0, 0};
         Matrix3f I{
-            0.2343f, -0.1821e-08f, 0.1173e-02f,
-            -0.1821e-08f, 0.1425f, -0.1232e-09f,
-            0.1173e-02f, -0.1232E-09f, 0.3731f
+            0.1767f, 0.f, 0.8740E-02,
+            0.f, 0.1263f, -0.1232e-09f,
+            0.8740E-02, -0.1232E-09f, 0.2963f
         };
         Matrix3f I_inv;
+        float staticThrustKg = 2.670f;
     } coefficient;
 
     float thrust_scale;
@@ -183,7 +185,7 @@ protected:
     // float liftCoeff(float alpha) const;
     // float dragCoeff(float alpha) const;
     FM getAeroFM(const std::vector<double> lookup);
-    FM getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud, float thr);
+    FM getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud);
     FM getDampingFM(const std::vector<double> lookup, Vector3f pqr);
     Vector3f getForce(float inputAileron, float inputElevator, float inputRudder) const;
     Vector3f getTorque(float inputAileron, float inputElevator, float inputRudder, float inputThrust, const Vector3f &force) const;

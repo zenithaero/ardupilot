@@ -17,7 +17,7 @@ Startup startup;
     FM _fm;                                                         \
     _fm.force.x = aeroData->get(ZenithAeroData::CX##name, lookup);  \
     _fm.force.y = aeroData->get(ZenithAeroData::CY##name, lookup);  \
-    _fm.force.z = -aeroData->get(ZenithAeroData::CL##name, lookup); \
+    _fm.force.z = aeroData->get(ZenithAeroData::CZ##name, lookup); \
     _fm.moment.x = aeroData->get(ZenithAeroData::Cl##name, lookup); \
     _fm.moment.y = aeroData->get(ZenithAeroData::Cm##name, lookup); \
     _fm.moment.z = aeroData->get(ZenithAeroData::Cn##name, lookup); \
@@ -68,19 +68,17 @@ Z1_Lookup::~Z1_Lookup() {
 }
 
 FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
-    auto fm = INTERP(0, lookup);
-    printf("lookup: [%.4f, %.4f, %.4f]: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n", lookup[0], lookup[1], lookup[2], fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
+    // auto fm = INTERP(0, lookup);
+    // printf("lookup: [%.4f, %.4f, %.4f]: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n", lookup[0], lookup[1], lookup[2], fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
     return INTERP(0, lookup);
 }
 
-FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud, float thr) {
+FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud) {
     FM fm;
     // Actuators
     fm += INTERP(dF_1, lookup) * ail; // CldF_1 ~= 7e-3
     fm += INTERP(dF_2, lookup) * elev; // CmdF_2 ~= -2e-2
     fm += INTERP(dF_3, lookup) * rud; // CldF_3 ~=  7e-4
-    // Motors
-    fm += INTERP(dP_1, lookup) * thr; // CXdP_1 ~= 0.9
     return fm;
 }
 
@@ -98,9 +96,9 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
 
 void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, Vector3f &body_accel)
 {
-    float ail  = filtered_servo_angle(input, 0) * 45;
-    float elev = -filtered_servo_angle(input, 1) * 45;
-    float rud  = filtered_servo_angle(input, 3) * 45;
+    float ail  = -filtered_servo_angle(input, 0) * 25;
+    float elev = -filtered_servo_angle(input, 1) * 15; // TODO: export those from matlab
+    float rud  = -filtered_servo_angle(input, 3) * 15; // TODO: export those from matlab
     float thr = filtered_servo_range(input, 2);
 
     // TEMP
@@ -108,7 +106,9 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     actuators[1] = elev;
     actuators[2] = rud;
     actuators[3] = thr;
-    // printf("elev %.2f, ail %.2f\n", elev, ail);
+
+
+    // printf("elev %.2f, ail %.2f, thr: %.2f\n", elev, ail, thr);
 
     // TEMP HACK
     // elev = 0.0035;
@@ -142,7 +142,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // Get aero FM
     // printf("lookup (alpha %.2f, beta %.2f, airspeed %.2f)\n", angle_of_attack, beta, airspeed);
     FM aeroFM = getAeroFM(lookup);
-    FM actuatorFM = getActuatorFM(lookup, ail, elev, rud, thr);
+    FM actuatorFM = getActuatorFM(lookup, ail, elev, rud);
     FM dampingFM = getDampingFM(lookup, gyro);
     // printf("qbar: %.2f\n", qbar);
     // printf("aeroFM (%.3f, %.3f, %.3f; %.3f, %.3f, %.3f)\n", aeroFM.force.x, aeroFM.force.y, aeroFM.force.z, aeroFM.moment.x, aeroFM.moment.y, aeroFM.moment.z);
@@ -163,22 +163,21 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     Vector3f armMoment = fm.force % CGOffset;
     fm.moment += armMoment;
     
-    // Add thrust at low speeds to compensate for the lack of model there
-    // Reduce contribution linearly up to minAirspeed
-    // That component is not captured by modelFit
-    std::vector<double> zero = {0, 0, 0};
-    std::vector<double> zeroClamped = aeroData->clamp(zero);
-    double minAirspeed = MAX(1, zeroClamped[2]);
-    double r = MAX(0, MIN(1, (minAirspeed - airspeed) / minAirspeed));
-    // (void)r;
-    double thrust = mass * GRAVITY_MSS * thr * r;
+    // Simple static thrust motor model
+    double thrust = GRAVITY_MSS * coefficient.staticThrustKg * thr;
+    fm.force += Vector3f(thrust, 0, 0);
+
+    // Try adding a bit of drag
+    // auto drag = -velocity_air_bf * 0.3f;
+    // fm.force += drag;
 
     // Store forces & moments
     force_bf = fm.force;
     moment_bf = fm.moment;
 
     // Determine body acceleration & rotational acceleration
-    accel_body = (Vector3f(thrust, 0, 0) + fm.force) / mass;
+    accel_body = fm.force / mass;
+
     // printf("thr %.2f accel_x %.2f airspeed %.2f\n", thr, accel_body.x, airspeed);
     // printf("thr %f, thrust: %f accel_body: %f, %f, %f\n", thr, thrust, accel_body.x, accel_body.y, accel_body.z);
 

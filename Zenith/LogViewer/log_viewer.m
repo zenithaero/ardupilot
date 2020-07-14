@@ -13,7 +13,7 @@
 if ~exist('core', 'var'); core = Core(); end
 
 % Time range presets -----
-core.timeRange = {-1, 200}; % Plots time window
+core.timeRange = {77, -1}; % Plots time window
 % ------------------------
 
 % Figure preferences -----
@@ -25,7 +25,7 @@ core.saveFigs      = false;         % Save figures
 % -----------------------
 
 % Plot descriptor --------
-core.logFiles     = {};     % {folder of logs, log files or empty for latest sim logs}
+core.logFiles     = {} ; % '/Users/bbevillard/Documents/Zenith/ardupilot/Zenith/Flight logs/07-07-20/log.mat'};     % {folder of logs, log files or empty for latest sim logs}
 core.cacheLogs    = false;  % Keep logs in memory (prevent re-loading)
 % ------------------------
 
@@ -53,7 +53,7 @@ for k = core.loopIndices()
         rows = 1;
         % Scale AGL
         aglScaling = 1;
-        if core.isPlot('3d_map'); aglScaling = 3; end
+        if core.isPlot('3d_map'); aglScaling = 1; end
         
         [N, E, agl, ~] = getPosVar(core, log);
         
@@ -98,48 +98,51 @@ for k = core.loopIndices()
         rows = [3, 3]; % [column 1, column 2]...
         
         [N, E, agl, t] = getPosVar(core, log);
-        if isfield(log, 'CMD')
-            [NCmd, ECmd, aglCmd, tCmd] = getPosCmd(core, log);
-        end
+%         if isfield(log, 'CMD')
+%             [NCmd, ECmd, aglCmd, tCmd] = getPosCmd(core, log);
+%         end
         % [X, Y] = Helpers.NEtoXY(N, E, estimator.yaw);
 
         % N pos
         core.subplotInit(rows);
-        if isfield(log, 'CMD')
-            core.plotCurve(tCmd, NCmd, 'nCmd', '-.');
-        end
+%         if isfield(log, 'CMD')
+%             core.plotCurve(tCmd, NCmd, 'nCmd', '-.');
+%         end
         core.plotCurve(t, N, 'N', '-', 2);
         core.subplotFinalize('time (s)', 'm', 'N pos');
         
         % E pos
         core.subplotInit(rows);
-        if isfield(log, 'CMD')
-            core.plotCurve(tCmd, ECmd, 'ECmd', '-.');
-        end
+%         if isfield(log, 'CMD')
+%             core.plotCurve(tCmd, ECmd, 'ECmd', '-.');
+%         end
         core.plotCurve(t, E, 'E', '-', 2);
         core.subplotFinalize('time (s)', 'm', 'E pos');
         
         % Alt
         core.subplotInit(rows);
-        if isfield(log, 'CMD')
-            core.plotCurve(tCmd, aglCmd, 'aglCmd', '-.');
-        end
-        core.plotCurve(t, agl, 'agl', '-', 2);
+        core.plotCurve(log.TECS.timestamp, log.TECS.hdem, 'hDem', '--', 2);
+        core.plotCurve(log.TECS.timestamp, log.TECS.h, 'h', '-', 2);
+        core.plotCurve(t, agl, 'agl', '-.', 2);
         core.subplotFinalize('time (s)', 'm', 'AGL');
 
         % Velocity
         core.subplotInit(rows);
-        if isfield(log, 'TECS')
-            core.plotCurve(log.TECS.timestamp, log.TECS.spdem, 'spCmd', '-.');
-            core.plotCurve(log.TECS.timestamp, log.TECS.sp, 'sp', '-');
-            core.subplotFinalize('', 'm/s', 'Speed');
-        end
+        core.plotCurve(log.TECS.timestamp, log.TECS.spdem, 'spDem', '--');
+        core.plotCurve(log.TECS.timestamp, log.TECS.sp, 'sp', '-');
+        core.plotCurve(log.ARSP.timestamp, log.ARSP.Airspeed, 'ias', '-.');
+        core.subplotFinalize('', 'm/s', 'Airspeed');
 
         % Pitch
         core.subplotInit(rows);
         core.plotCurve(log.ATT.timestamp, log.ATT.DesPitch, 'pitchCmd', '-.');
         core.plotCurve(log.ATT.timestamp, log.ATT.Pitch, 'pitch', '-');
         core.subplotFinalize('', 'deg', 'Pitch');
+        
+        % Throttle
+        core.subplotInit(rows);
+        core.plotCurve(log.TECS.timestamp, log.TECS.th, 'thr', '-');
+        core.subplotFinalize('', '', 'Throttle');
     end
     
     % Body lateral ---------------------------------------------------

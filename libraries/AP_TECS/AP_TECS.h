@@ -136,6 +136,9 @@ public:
     static const struct AP_Param::GroupInfo var_info[];
 
 private:
+    // TEMP
+    uint32_t _mode_enabled_millis = 0;
+
     // Last time update_50Hz was called
     uint64_t _update_50hz_last_usec;
 

@@ -5,7 +5,6 @@
 #include <AP_Logger/AP_Logger.h>
 #include <Zenith/ZenithGains.h>
 
-
 extern const AP_HAL::HAL& hal;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -370,6 +369,7 @@ void AP_TECS::_update_speed(float load_factor)
     _TAS_dem = _EAS_dem * EAS2TAS;
     _TASmax   = aparm.airspeed_max * EAS2TAS;
     _TASmin   = aparm.airspeed_min * EAS2TAS;
+    printf("tas dem %.3f, tas min %.3f, tas max %.3f\n", _TAS_dem, _TASmin, _TASmax);
 
     if (aparm.stall_prevention) {
         // when stall prevention is active we raise the mimimum
@@ -437,6 +437,7 @@ void AP_TECS::_update_speed_demand(void)
     // Use 50% of maximum energy rate to allow margin for total energy contgroller
     const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
     const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
+    printf("velratemax %.3f, velratemin %.3f\n", velRateMax, velRateMin);
     const float TAS_dem_previous = _TAS_dem_adj;
 
     // assume fixed 10Hz call rate
@@ -460,6 +461,7 @@ void AP_TECS::_update_speed_demand(void)
     }
     // Constrain speed demand again to protect against bad values on initialisation.
     _TAS_dem_adj = constrain_float(_TAS_dem_adj, _TASmin, _TASmax);
+    printf("TAS_dem_adj: %.3f\n", _TAS_dem_adj);
 }
 
 void AP_TECS::_update_height_demand(void)
@@ -538,6 +540,16 @@ void AP_TECS::_update_height_demand(void)
     }
     _hgt_dem_adj_last = _hgt_dem_adj;
     _hgt_dem_adj = new_hgt_dem;
+
+    // Step
+    // if (_mode_enabled_millis == 0)
+    //     _mode_enabled_millis = AP_HAL::millis();
+    // if (AP_HAL::millis() - _mode_enabled_millis > 80e3) {
+    //     _hgt_dem_adj = 40; // 10m height step
+    // }
+
+
+    // printf("HGT_dem_adj: %.3f\n", _hgt_dem_adj);
 }
 
 void AP_TECS::_detect_underspeed(void)
@@ -600,15 +612,15 @@ void AP_TECS::_update_energies(void)
  */
 float AP_TECS::timeConstant(void) const
 {
-    if (_flags.is_doing_auto_land) {
-        if (_landTimeConst < 0.1f) {
-            return 0.1f;
-        }
-        return _landTimeConst;
-    }
-    if (_timeConst < 0.1f) {
-        return 0.1f;
-    }
+    // if (_flags.is_doing_auto_land) {
+    //     if (_landTimeConst < 0.1f) {
+    //         return 0.1f;
+    //     }
+    //     return _landTimeConst;
+    // }
+    // if (_timeConst < 0.1f) {
+    //     return 0.1f;
+    // }
     return 1 / ZenithGains::tecs.TcInv;
 }
 
@@ -889,7 +901,7 @@ void AP_TECS::_update_pitch(void)
     temp += SEBdot_error * pitch_damp;
 
     if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
-        temp += _PITCHminf * gainInv;
+        temp += _PITCHminf * gainInv; // TODO: check that guy
     }
     float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - temp;
     float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - temp;
@@ -1016,6 +1028,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Convert inputs
     _hgt_dem = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
+    printf("TECS cmd: h: %.3f, ais: %.3f\n", _hgt_dem, _EAS_dem);
 
     // Update the speed estimate using a 2nd order complementary filter
     _update_speed(load_factor);

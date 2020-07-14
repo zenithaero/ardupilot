@@ -251,15 +251,15 @@ class VehicleInfo(object):
             },
             "Z1_Wrapper": {
                 "waf_target": "bin/arduplane",
-                "default_params_filename": "default_params/z1.parm",
+                "default_params_filename": "default_params/xuav.parm",
             },
             "Z1_Matlab": {
                 "waf_target": "bin/arduplane",
-                "default_params_filename": "default_params/z1.parm",
+                "default_params_filename": "default_params/xuav.parm",
             },
             "Z1_Lookup": {
                 "waf_target": "bin/arduplane",
-                "default_params_filename": "default_params/plane.parm",
+                "default_params_filename": "default_params/xuav.parm",
             }
         },
     },
