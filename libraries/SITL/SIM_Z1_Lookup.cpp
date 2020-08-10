@@ -165,6 +165,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     
     // Simple static thrust motor model
     double thrust = GRAVITY_MSS * coefficient.staticThrustKg * thr;
+    // thrust *= MIN(1, MAX(0, 0.85 - 0.01 * airspeed));
     fm.force += Vector3f(thrust, 0, 0);
 
     // Try adding a bit of drag
