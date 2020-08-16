@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "SIM_Aircraft.h"
-#include "SIM_ICEngine.h"
+#include <SITL/SIM_Aircraft.h>
+#include <SITL/SIM_ICEngine.h>
 #include <Filter/LowPassFilter.h>
 #include <vector>
 

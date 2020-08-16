@@ -17,7 +17,7 @@
 
 #include <AP_Param/AP_Param.h>
 #include <SITL/SIM_JSBSim.h>
-#include <SITL/SIM_Z1_Matlab.h>
+#include <Zenith/MatlabSim/SIM_Z1_Matlab.h>
 #include <AP_HAL/utility/Socket.h>
 
 extern const AP_HAL::HAL& hal;

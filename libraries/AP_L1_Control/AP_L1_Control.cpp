@@ -1,6 +1,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include "AP_L1_Control.h"
-#include <Zenith/ZenithGains.h>
+#include <Zenith/ArdupilotGains/ZenithGains.h>
 #include <stdio.h>
 
 extern const AP_HAL::HAL& hal;

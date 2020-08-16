@@ -33,9 +33,9 @@
 #include <SITL/SIM_AirSim.h>
 #include <SITL/SIM_Scrimmage.h>
 #include <SITL/SIM_Webots.h>
-#include <SITL/SIM_Z1_Matlab.h>
-#include <SITL/SIM_Z1_Wrapper.h>
-#include <SITL/SIM_Z1_Lookup.h>
+// #include <SITL/SIM_Z1_Matlab.h>
+// #include <SITL/SIM_Z1_Wrapper.h>
+#include <Zenith/Simulator/SIM_Z1_Lookup.h>
 #include <SITL/SIM_JSON.h>
 
 #include <signal.h>
@@ -155,8 +155,8 @@ static const struct {
     { "airsim",             AirSim::create},
     { "scrimmage",          Scrimmage::create },
     { "webots",             Webots::create },
-    {"Z1_Wrapper",          Z1_Wrapper::create},
-    {"Z1_Matlab",           Z1_Matlab::create},
+    // {"Z1_Wrapper",          Z1_Wrapper::create},
+    // {"Z1_Matlab",           Z1_Matlab::create},
     {"Z1_Lookup",           Z1_Lookup::create},
     { "JSON",               JSON::create },
 };

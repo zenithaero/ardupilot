@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "SIM_Aircraft.h"
+#include <SITL/SIM_Aircraft.h>
 #include <AP_HAL/utility/Socket.h>
 
 namespace SITL {

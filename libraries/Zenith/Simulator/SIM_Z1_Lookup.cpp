@@ -5,7 +5,7 @@
  */
 
 #include "SIM_Z1_Lookup.h"
-#include <Zenith/ZenithAeroData.h>
+#include "ZenithAeroData.h"
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <vector>
 #include <stdio.h>

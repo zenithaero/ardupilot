@@ -8,7 +8,7 @@
 
 #include "SIM_Aircraft.h"
 #include <AP_HAL/utility/Socket.h>
-#include <Zenith/Simulator/Simulator.h>
+#include "Generated/Simulator.h"
 
 namespace SITL
 {

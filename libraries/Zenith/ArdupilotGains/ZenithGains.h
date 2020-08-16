@@ -16,6 +16,7 @@ namespace ZenithGains {
 		float Kp = 0.58646;
 		float Kd = 0;
 		float Ki = 0.001113;
+		float mat[2][3] = {{.1f, .2f, .5f}, {.2f, .3f, .4f}};
 	} pitch;
 
 	static struct {
