@@ -115,6 +115,8 @@
 #include <SITL/SITL.h>
 #endif
 
+#include <Zenith/Controller/ZenithController.h>
+
 /*
   main APM:Plane class
  */
@@ -199,6 +201,9 @@ private:
     AP_PitchController pitchController{ahrs, aparm};
     AP_YawController yawController{ahrs, aparm};
     AP_SteerController steerController{ahrs};
+
+    // Zenith controller
+    ZenithController zenithController{ahrs};
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     SITL::SITL sitl;

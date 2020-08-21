@@ -16,21 +16,43 @@ public:
     ZenithController(const ZenithController &other) = delete;
     ZenithController &operator=(const ZenithController&) = delete;
 
-    void pitch_ctrl(float theta_cmd_deg);
-    void roll_yaw_ctrl(float phi_cmd_deg);
+protected:
+	AP_AHRS &ahrs;
+};
 
-	// int32_t get_rate_out(float desired_rate, float scaler);
-	// int32_t get_servo_out(int32_t angle_err, float scaler, bool disable_integrator);
 
-private:
-    // Common
+class LinearController {
+public:
+    typedef struct {
+        const size_t m;
+        const size_t n;
+    } dim_t;
+
+    LinearController(AP_AHRS &ahrs, dim_t dim, char *stateNames[], char *expectedNames[], float *K[]);
+
+    /* Do not allow copies */
+    LinearController(const LinearController &other) = delete;
+    LinearController &operator=(const LinearController&) = delete;
+
+protected:
 	AP_AHRS &ahrs;
     uint32_t t_prev;
-
-    // Pitch control
-    const std::vector<double> Kp;
-    float theta_err_i;
+    float dt;
+    std::vector<const std::vector<float>> K;
+    dim_t dim;
 
     float clamp(float value, float min, float max);
-    void matmul(float** mat, float *vec, size_t m, size_t n, float* res);
+    void update_dt();
+    void init_gains();
+    std::vector<float> matmul(std::vector<float> vec);
+};
+
+class PitchController: public LinearController {
+public:
+    PitchController(AP_AHRS &ahrs);
+    void update(float theta_cmd_deg);
+
+private:
+    float theta_err_i; // Integrator state
+    int elev_saturation; // Elevator saturation state [-1, 0, 1]
 };

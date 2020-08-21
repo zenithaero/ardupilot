@@ -6,44 +6,47 @@
 
 namespace ZenithControllerData {
 	static struct {
-		float scalingSpeed = 12.000000;
+		double scalingSpeed = 12.000000;
 	} constants;
 
 	static struct {
-		float enable = 1.000000;
-		float FF = -2.378180;
-		float maxCmdDeg = 30.000000;
-		float maxErrDeg = 30.000000;
-		float maxElevDeg = 30.000000;
-		float K[1][4] = {{0.100200, 0.557900, -0.147400, -2.651400}};
+		double enable = 1.000000;
+		double FF = -2.378180;
+		double maxCmdDeg = 30.000000;
+		double maxErrDeg = 30.000000;
+		double maxElevDeg = 30.000000;
+		char *stateNames[4] = {"thetaErrDeg", "thetaErrInt", "<qDeg>", "<hDot>"};
+		double K[1][4] = {{0.100200, 0.557900, -0.147400, -2.651400}};
 	} pitch;
 
 	static struct {
-		float enable = 1.000000;
-		float ailFF = -0.000540;
-		float rudFF = -0.001560;
-		float maxCmdDeg = 30.000000;
-		float maxErrDeg = 30.000000;
-		float maxAilDeg = 30.000000;
-		float maxRudDeg = 30.000000;
-		float K[2][4] = {{-0.274900, -0.196000, -0.378800, 0.609000}, {0.159000, -0.018400, -0.122600, 0.100000}};
+		double enable = 1.000000;
+		double ailFF = -0.000540;
+		double rudFF = -0.001560;
+		double maxCmdDeg = 30.000000;
+		double maxErrDeg = 30.000000;
+		double maxAilDeg = 30.000000;
+		double maxRudDeg = 30.000000;
+		char *stateNames[4] = {"phiErrDeg", "phiErrInt", "<pDeg>", "<rDeg>"};
+		double K[2][4] = {{0.159000, -0.018400, -0.122600, 0.100000}, {-0.274900, -0.196000, -0.378800, 0.609000}};
 	} rollYaw;
 
 	static struct {
-		float enable = 1.000000;
-		float thrFF = 0.024360;
-		float pitchFF = 1.088620;
-		float maxAltErr = 5.000000;
-		float maxTasErr = 5.000000;
-		float maxSpdCmd = 20.000000;
-		float maxThr = 1.000000;
-		float K[2][7] = {{8.141400, -0.019000, -1.209400, -0.494300, 12.884400, 0.188700, -0.757000}, {0.003500, 0.001500, 0.026800, 0.038300, 0.255400, 0.067100, -0.005900}};
+		double enable = 1.000000;
+		double thrFF = 0.024360;
+		double pitchFF = 1.088620;
+		double maxAltErr = 5.000000;
+		double maxTasErr = 5.000000;
+		double maxSpdCmd = 20.000000;
+		double maxThr = 1.000000;
+		char *stateNames[7] = {"hErr", "hErrInt", "tasErr", "tasErrInt", "hDotErr", "<thetaDeg>", "<qDeg>"};
+		double K[2][7] = {{0.003500, 0.001500, 0.026800, 0.038300, 0.255400, 0.067100, -0.005900}, {8.141400, -0.019000, -1.209400, -0.494300, 12.884400, 0.188700, -0.757000}};
 	} spdalt;
 
 	static struct {
-		float enable = 1.000000;
-		float rollFF = 0.000000;
-		float L1 = 80.000000;
+		double enable = 1.000000;
+		double rollFF = 0.000000;
+		double L1 = 80.000000;
 	} xTrack;
 
 };

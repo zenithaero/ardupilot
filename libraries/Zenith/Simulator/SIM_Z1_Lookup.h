@@ -28,6 +28,7 @@ typedef enum {
 private:
     const std::vector<const std::vector<double>> lookups;
     oorBehavior_e oorBehavior;
+    size_t lookupProd;
     // std::vector<size_t> lookupLength;
 
     lookupIdx_t findIndex(size_t lookupIdx, double value) const {
@@ -43,10 +44,10 @@ private:
         };
     }
 
-    double getValue(const double *table, const std::vector<size_t> &indices) const {
+    double getValue(const double *table, const std::vector<size_t> &indices, size_t tableIdx) const {
         assert(indices.size() > 0);
-        size_t idx = indices[0];
-        for (size_t l = 1; l < lookups.size(); l++) {
+        size_t idx = tableIdx;
+        for (size_t l = 0; l < lookups.size(); l++) {
             idx = idx * lookups[l].size() + indices[l];
         };
         return table[idx];
@@ -56,12 +57,15 @@ public:
     Interp(const std::vector<const std::vector<double>> &lookups, oorBehavior_e oorBehavior = CLIP) 
         : lookups(lookups), oorBehavior(oorBehavior) {
             assert(lookups.size() > 0 && lookups.size() < 32);
+            lookupProd = 1;
             for (auto lookup : lookups) {
                 // Lookup must be large enough for interpolation
                 assert(lookup.size() > 1);
                 // Assert that the lookup is monotically increasing
                 for (size_t k = 0; k < lookup.size() - 1; k++)
                     assert(lookup[k] < lookup[k + 1]);
+                // Increment table size
+                lookupProd *= lookup.size();
             }
         };
 
@@ -75,7 +79,7 @@ public:
         return rtn;
     }
     
-    double get(const double *table, const std::vector<double> &values) const {
+    double get(const double *table, const std::vector<double> &values, size_t tableIdx = 0) const {
         assert(values.size() == lookups.size());
         std::vector<lookupIdx_t> indices;
         std::vector<size_t> indList;
@@ -95,7 +99,7 @@ public:
                 frac *= on ? indices[l].frac : 1 - indices[l].frac;
             }
             // Now get value at indList
-            value += frac * getValue(table, indList);
+            value += frac * getValue(table, indList, tableIdx);
         }
         return value;
     }

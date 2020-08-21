@@ -249,18 +249,10 @@ class VehicleInfo(object):
             "ASWING": {
                 "waf_target": "bin/arduplane",
             },
-            "Z1_Wrapper": {
+            "Z1": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "default_params/xuav.parm",
             },
-            "Z1_Matlab": {
-                "waf_target": "bin/arduplane",
-                "default_params_filename": "default_params/xuav.parm",
-            },
-            "Z1_Lookup": {
-                "waf_target": "bin/arduplane",
-                "default_params_filename": "default_params/xuav.parm",
-            }
         },
     },
     "Rover": {

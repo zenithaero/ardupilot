@@ -13,16 +13,18 @@
 using namespace SITL;
 
 Startup startup;
-#define INTERP(name, lookup) ({                                     \
-    FM _fm;                                                         \
-    _fm.force.x = aeroData->get(ZenithAeroData::CX##name, lookup);  \
-    _fm.force.y = aeroData->get(ZenithAeroData::CY##name, lookup);  \
-    _fm.force.z = aeroData->get(ZenithAeroData::CZ##name, lookup); \
-    _fm.moment.x = aeroData->get(ZenithAeroData::Cl##name, lookup); \
-    _fm.moment.y = aeroData->get(ZenithAeroData::Cm##name, lookup); \
-    _fm.moment.z = aeroData->get(ZenithAeroData::Cn##name, lookup); \
-    _fm;                                                            \
+#define INTERP(name, lookup, tableIdx) ({                                     \
+    FM _fm;                                                                   \
+    _fm.force.x = aeroData->get(ZenithAeroData::CX##name, lookup, tableIdx);  \
+    _fm.force.y = aeroData->get(ZenithAeroData::CY##name, lookup, tableIdx);  \
+    _fm.force.z = aeroData->get(ZenithAeroData::CZ##name, lookup, tableIdx);  \
+    _fm.moment.x = aeroData->get(ZenithAeroData::Cl##name, lookup, tableIdx); \
+    _fm.moment.y = aeroData->get(ZenithAeroData::Cm##name, lookup, tableIdx); \
+    _fm.moment.z = aeroData->get(ZenithAeroData::Cn##name, lookup, tableIdx); \
+    _fm;                                                                      \
 })
+
+#define DIM(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
 
 
 Z1_Lookup::Z1_Lookup(const char *frame_str) :
@@ -39,28 +41,35 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
         printf("Warning: Inertia matrice inversion failure\n");
 
     // Create interp struct
-    size_t dim;
-    dim = sizeof(ZenithAeroData::As) / sizeof(double);
-    std::vector<double> as(ZenithAeroData::As, ZenithAeroData::As + dim);
-    dim = sizeof(ZenithAeroData::Bs) / sizeof(double);
-    std::vector<double> bs(ZenithAeroData::Bs, ZenithAeroData::Bs + dim);
-    dim = sizeof(ZenithAeroData::Vs) / sizeof(double);
-    std::vector<double> vs(ZenithAeroData::Vs, ZenithAeroData::Vs + dim);
+    std::vector<double> as(ZenithAeroData::As, ZenithAeroData::As + DIM(ZenithAeroData::As));
+    std::vector<double> bs(ZenithAeroData::Bs, ZenithAeroData::Bs + DIM(ZenithAeroData::Bs));
+    std::vector<double> vs(ZenithAeroData::Vs, ZenithAeroData::Vs + DIM(ZenithAeroData::Vs));
     std::vector<const std::vector<double>> interp = {as, bs, vs};
     aeroData = new Interp(interp);
 
-    // TEST Lookup
+    // // TEST Lookup
     // double _alpha[] = {-2, 3, 5, 6};
     // double _beta[] = {-2, -4, 3, 4};
-    // double _airspeed[] = {9, 10, 15, 18};
+    // double _airspeed[] = {11, 15, 18, 22};
     // for (size_t k = 0; k < sizeof(_alpha) / sizeof(double); k++) {
     //     std::vector<double> lookup = {_alpha[k], _beta[k], _airspeed[k]};
     //     double CX0 = aeroData->get(ZenithAeroData::CX0, lookup);
     //     double Cmq = aeroData->get(ZenithAeroData::Cmq, lookup);
-    //     double CldF_1 = aeroData->get(ZenithAeroData::CldF_1, lookup);
-    //     printf("CX0 %.4f Cmq %.4f CldF_1 %.4f\n", CX0, Cmq, CldF_1);
+    //     double CmdF_1 = aeroData->get(ZenithAeroData::CmdF, lookup, 0);
+    //     double CmdF_2 = aeroData->get(ZenithAeroData::CmdF, lookup, 1);
+    //     double CmdF_3 = aeroData->get(ZenithAeroData::CmdF, lookup, 2);
+    //     printf("CX0 %.4f Cmq %.4f CmdF [%.4f, %.4f, %.4f]\n", CX0, Cmq, CmdF_1, CmdF_2, CmdF_3);
     // }
     // exit(-1);
+    // // MATLAB // alpha = [-2, 3, 5, 6];
+    // // MATLAB // beta = [-2, -4, 3, 4];
+    // // MATLAB // airspeed = [11, 15, 18, 22];
+    // // MATLAB // for k = 1:length(alpha)
+    // // MATLAB //     CX0 = getDataPoints('xuav', 'CX0', alpha(k), beta(k), airspeed(k));
+    // // MATLAB //     Cmq = getDataPoints('xuav', 'Cmq', alpha(k), beta(k), airspeed(k));
+    // // MATLAB //     CmdF = getDataPoints('xuav', 'CmdF', alpha(k), beta(k), airspeed(k));
+    // // MATLAB //     fprintf('CX0 %.4f Cmq %.4f CldF [%.4f, %.4f, %.4f]\n', CX0, Cmq, CmdF(1), CmdF(2), CmdF(3)); 
+    // // MATLAB // end
 }
 
 Z1_Lookup::~Z1_Lookup() {
@@ -70,15 +79,17 @@ Z1_Lookup::~Z1_Lookup() {
 FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
     // auto fm = INTERP(0, lookup);
     // printf("lookup: [%.4f, %.4f, %.4f]: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n", lookup[0], lookup[1], lookup[2], fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
-    return INTERP(0, lookup);
+    return INTERP(0, lookup, 0);
 }
 
 FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud) {
     FM fm;
-    // Actuators
-    fm += INTERP(dF_1, lookup) * ail; // CldF_1 ~= 7e-3
-    fm += INTERP(dF_2, lookup) * elev; // CmdF_2 ~= -2e-2
-    fm += INTERP(dF_3, lookup) * rud; // CldF_3 ~=  7e-4
+    // Apply map
+    std::vector<float> map = {ail, elev, rud};
+    // Lookup map
+    for (size_t k = 0; k < map.size(); k++) {
+        fm += INTERP(dF, lookup, k) * map[k];
+    }
     return fm;
 }
 
@@ -86,9 +97,9 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
     FM fm;
     float denom = 2 * airspeed;
     if (!is_zero(denom)) {
-        fm += INTERP(p, lookup) * pqr.x * coefficient.b * (1 / denom);
-        fm += INTERP(q, lookup) * pqr.y * coefficient.c * (1 / denom);
-        fm += INTERP(r, lookup) * pqr.z * coefficient.b * (1 / denom);
+        fm += INTERP(p, lookup, 0) * pqr.x * coefficient.b * (1 / denom);
+        fm += INTERP(q, lookup, 0) * pqr.y * coefficient.c * (1 / denom);
+        fm += INTERP(r, lookup, 0) * pqr.z * coefficient.b * (1 / denom);
     }
     return fm;
 }
