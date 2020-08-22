@@ -5,45 +5,47 @@
  */
 
 #include "SIM_Z1_Lookup.h"
-#include "ZenithAeroData.h"
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <vector>
 #include <stdio.h>
-
+#include <Zenith/constants.h>
 using namespace SITL;
 
 Startup startup;
 #define INTERP(name, lookup, tableIdx) ({                                     \
     FM _fm;                                                                   \
-    _fm.force.x = aeroData->get(ZenithAeroData::CX##name, lookup, tableIdx);  \
-    _fm.force.y = aeroData->get(ZenithAeroData::CY##name, lookup, tableIdx);  \
-    _fm.force.z = aeroData->get(ZenithAeroData::CZ##name, lookup, tableIdx);  \
-    _fm.moment.x = aeroData->get(ZenithAeroData::Cl##name, lookup, tableIdx); \
-    _fm.moment.y = aeroData->get(ZenithAeroData::Cm##name, lookup, tableIdx); \
-    _fm.moment.z = aeroData->get(ZenithAeroData::Cn##name, lookup, tableIdx); \
+    _fm.force.x = aeroData->get(ModelAeroData::CX##name, lookup, tableIdx);  \
+    _fm.force.y = aeroData->get(ModelAeroData::CY##name, lookup, tableIdx);  \
+    _fm.force.z = aeroData->get(ModelAeroData::CZ##name, lookup, tableIdx);  \
+    _fm.moment.x = aeroData->get(ModelAeroData::Cl##name, lookup, tableIdx); \
+    _fm.moment.y = aeroData->get(ModelAeroData::Cm##name, lookup, tableIdx); \
+    _fm.moment.z = aeroData->get(ModelAeroData::Cn##name, lookup, tableIdx); \
     _fm;                                                                      \
 })
-
-#define DIM(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
 
 
 Z1_Lookup::Z1_Lookup(const char *frame_str) :
     Aircraft(frame_str)
 {
-    mass = coefficient.mass;
+    mass = ModelConfig::M;
     frame_height = 0.1f;
     num_motors = 1;
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
 
     // Compute inverse intertia
-    bool success = coefficient.I.inverse(coefficient.I_inv);
+    Matrix3f I(
+        ModelConfig::I[0][0], ModelConfig::I[0][1], ModelConfig::I[0][2],
+        ModelConfig::I[1][0], ModelConfig::I[1][1], ModelConfig::I[1][2],
+        ModelConfig::I[2][0], ModelConfig::I[2][1], ModelConfig::I[2][2]
+    );
+    bool success = I.inverse(coefficient.I_inv);
     if (!success)
         printf("Warning: Inertia matrice inversion failure\n");
 
     // Create interp struct
-    std::vector<double> as(ZenithAeroData::As, ZenithAeroData::As + DIM(ZenithAeroData::As));
-    std::vector<double> bs(ZenithAeroData::Bs, ZenithAeroData::Bs + DIM(ZenithAeroData::Bs));
-    std::vector<double> vs(ZenithAeroData::Vs, ZenithAeroData::Vs + DIM(ZenithAeroData::Vs));
+    std::vector<double> as(ModelAeroData::As, ModelAeroData::As + DIM(ModelAeroData::As));
+    std::vector<double> bs(ModelAeroData::Bs, ModelAeroData::Bs + DIM(ModelAeroData::Bs));
+    std::vector<double> vs(ModelAeroData::Vs, ModelAeroData::Vs + DIM(ModelAeroData::Vs));
     std::vector<const std::vector<double>> interp = {as, bs, vs};
     aeroData = new Interp(interp);
 
@@ -53,11 +55,11 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     // double _airspeed[] = {11, 15, 18, 22};
     // for (size_t k = 0; k < sizeof(_alpha) / sizeof(double); k++) {
     //     std::vector<double> lookup = {_alpha[k], _beta[k], _airspeed[k]};
-    //     double CX0 = aeroData->get(ZenithAeroData::CX0, lookup);
-    //     double Cmq = aeroData->get(ZenithAeroData::Cmq, lookup);
-    //     double CmdF_1 = aeroData->get(ZenithAeroData::CmdF, lookup, 0);
-    //     double CmdF_2 = aeroData->get(ZenithAeroData::CmdF, lookup, 1);
-    //     double CmdF_3 = aeroData->get(ZenithAeroData::CmdF, lookup, 2);
+    //     double CX0 = aeroData->get(ModelAeroData::CX0, lookup);
+    //     double Cmq = aeroData->get(ModelAeroData::Cmq, lookup);
+    //     double CmdF_1 = aeroData->get(ModelAeroData::CmdF, lookup, 0);
+    //     double CmdF_2 = aeroData->get(ModelAeroData::CmdF, lookup, 1);
+    //     double CmdF_3 = aeroData->get(ModelAeroData::CmdF, lookup, 2);
     //     printf("CX0 %.4f Cmq %.4f CmdF [%.4f, %.4f, %.4f]\n", CX0, Cmq, CmdF_1, CmdF_2, CmdF_3);
     // }
     // exit(-1);
@@ -97,9 +99,9 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
     FM fm;
     float denom = 2 * airspeed;
     if (!is_zero(denom)) {
-        fm += INTERP(p, lookup, 0) * pqr.x * coefficient.b * (1 / denom);
-        fm += INTERP(q, lookup, 0) * pqr.y * coefficient.c * (1 / denom);
-        fm += INTERP(r, lookup, 0) * pqr.z * coefficient.b * (1 / denom);
+        fm += INTERP(p, lookup, 0) * pqr.x * ModelConfig::b * (1 / denom);
+        fm += INTERP(q, lookup, 0) * pqr.y * ModelConfig::c * (1 / denom);
+        fm += INTERP(r, lookup, 0) * pqr.z * ModelConfig::b * (1 / denom);
     }
     return fm;
 }
@@ -142,9 +144,9 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     std::vector<double> lookupClamped = aeroData->clamp(lookup);
 
     // Extract normalization coefficients
-    const float s = coefficient.s;
-    const float c = coefficient.c;
-    const float b = coefficient.b;
+    const float s = ModelConfig::S;
+    const float c = ModelConfig::c;
+    const float b = ModelConfig::b;
 
     // Calculate dynamic pressure
     float rho = air_density;
@@ -170,7 +172,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     fm.moment.x *= b * s * qbar;
     fm.moment.y *= c * s * qbar;
     fm.moment.z *= b * s * qbar;
-    const Vector3f &CGOffset = coefficient.CGOffset;
+    const Vector3f CGOffset(ModelConfig::CG[0][0], ModelConfig::CG[0][1], ModelConfig::CG[0][2]);
     Vector3f armMoment = fm.force % CGOffset;
     fm.moment += armMoment;
     

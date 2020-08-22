@@ -6,22 +6,31 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include "ZenithController.h"
-#include <Zenith/Controller/ZenithControllerData.h>
 #include <assert.h>
-// #include 
+#include <Zenith/constants.h>
 
 extern const AP_HAL::HAL& hal;
 
-LinearController::LinearController(AP_AHRS &ahrs, dim_t dim, char *stateNames[], char *expectedNames[], float *K[])
-        : ahrs(ahrs), dim(dim) {
-	for (size_t j = 0; j < dim.n; j++) {
+void ZenithController::stabilize() {
+	// Full stabilisation, or input (/state) based mode?
+	// Ignore ardupilot state machine?
+}
+
+
+template<size_t m, size_t n>
+LinearController::LinearController(
+	AP_AHRS &ahrs,
+	const char *stateNames[],
+	const char *expectedNames[],
+	const double (&K)[m][n]) : ahrs(ahrs) {
+	for (size_t j = 0; j < n; j++) {
 		if (strcmp(stateNames[j], expectedNames[j]) != 0) {
 			fprintf(stderr, "State mismatch: %s (expected %s)\n", stateNames[j], expectedNames[j]);
 			exit(1);
 		}
 	}
-	for (size_t i = 0; i < dim.m; i++) {
-		const std::vector<float> row(K[i], K[i] + dim.n);
+	for (size_t i = 0; i < m; i++) {
+		const std::vector<float> row(K[i], K[i] + n);
 		this->K.push_back(row);
 	}
 }
@@ -38,28 +47,23 @@ void LinearController::update_dt() {
 	t_prev = t_now;
 }
 
-// PitchController::PitchController(AP_AHRS &ahrs) {
-// // 	: LinearController() {
-		
-// 	};
-// auto c = LinearController(
-// 	ahrs,
-// 	ZenithControllerData::pitch.K,
-// 	(LinearController::dim_t) { 
-// 		.m = sizeof(ZenithControllerData::pitch.K) / sizeof(float),
-// 		.n = sizeof(ZenithControllerData::pitch.K[0]) / sizeof(float),
-// 	});
+PitchController::PitchController(AP_AHRS &ahrs)
+	: LinearController(
+		ahrs,
+		ControllerData::pitch.stateNames,
+		(const char*[]) {"thetaErrDeg", "thetaErrInt", "<qDeg>", "<hDot>"},
+		ControllerData::pitch.K
+	) {};
 
 template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
-
 void PitchController::update(float theta_cmd_deg) {
 	update_dt();
 	float theta_deg = (float)ahrs.pitch_sensor / 100.f;
 	float theta_err_deg = theta_cmd_deg - theta_deg;
-	theta_err_deg = clamp(theta_err_deg, -ZenithControllerData::pitch.maxErrDeg, ZenithControllerData::pitch.maxErrDeg);
+	theta_err_deg = clamp(theta_err_deg, -ControllerData::pitch.maxErrDeg, ControllerData::pitch.maxErrDeg);
 
 	// Determine delta time
 	float di = theta_err_deg * dt;
@@ -74,7 +78,8 @@ void PitchController::update(float theta_cmd_deg) {
 	// Retreive q & hDot
 	float qDeg = ToDeg(ahrs.get_gyro().y);
 	Vector3f vel;
-	ahrs.get_velocity_NED(vel);
+	if (!ahrs.get_velocity_NED(vel))
+		vel.z = 0;
 	float hDot = -vel.z;
 
 	// Prepare the error vector
@@ -92,10 +97,10 @@ void PitchController::update(float theta_cmd_deg) {
 	float elev = res[0];
 
 	// Add feedforward
-	elev += ZenithControllerData::pitch.FF;
+	elev += ControllerData::pitch.FF;
 
 	// Clip the elevator
-	float elev_clipped = clamp(elev, -ZenithControllerData::pitch.maxElevDeg, ZenithControllerData::pitch.maxElevDeg);
+	float elev_clipped = clamp(elev, -ControllerData::pitch.maxElevDeg, ControllerData::pitch.maxElevDeg);
 	elev_saturation = sgn(elev - elev_clipped);
 
 	// Assign the output

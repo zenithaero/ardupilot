@@ -16,6 +16,8 @@ public:
     ZenithController(const ZenithController &other) = delete;
     ZenithController &operator=(const ZenithController&) = delete;
 
+    void stabilize();
+
 protected:
 	AP_AHRS &ahrs;
 };
@@ -23,12 +25,12 @@ protected:
 
 class LinearController {
 public:
-    typedef struct {
-        const size_t m;
-        const size_t n;
-    } dim_t;
-
-    LinearController(AP_AHRS &ahrs, dim_t dim, char *stateNames[], char *expectedNames[], float *K[]);
+    template<size_t m, size_t n>
+    LinearController(
+        AP_AHRS &ahrs,
+        const char *stateNames[],
+        const char *expectedNames[],
+        const double (&K)[m][n]);
 
     /* Do not allow copies */
     LinearController(const LinearController &other) = delete;
@@ -38,8 +40,9 @@ protected:
 	AP_AHRS &ahrs;
     uint32_t t_prev;
     float dt;
+    // size_t m;
+    // size_t n;
     std::vector<const std::vector<float>> K;
-    dim_t dim;
 
     float clamp(float value, float min, float max);
     void update_dt();

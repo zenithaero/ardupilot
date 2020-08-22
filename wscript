@@ -32,6 +32,12 @@ default_prefix = '/usr/'
 Build.BuildContext.execute = ardupilotwaf.ap_autoconfigure(Build.BuildContext.execute)
 Configure.ConfigurationContext.post_recurse = ardupilotwaf.ap_configure_post_recurse()
 
+ZENITH_MODELS = {
+    'xuav_asw': 'MODEL_XUAV_ASW',
+    'xuav_avl': 'MODEL_XUAV_AVL',
+    'Z1f_asw': 'MODEL_Z1F_ASW',
+    'Z1f_avl': 'MODEL_Z1F_AVL'
+}
 
 def _set_build_context_variant(board):
     for c in Context.classes:
@@ -219,6 +225,11 @@ configuration in order to save typing.
         action='store_true',
         default=False,
         help='Force a static build')
+
+    g.add_option('--model',
+        action='store',
+        default=None,
+        help='Target model. Choices are: %s.' % ', '.join(ZENITH_MODELS.keys()))
 
 def _collect_autoconfig_files(cfg):
     for m in sys.modules.values():
@@ -522,6 +533,12 @@ def _load_pre_build(bld):
         brd.pre_build(bld)    
 
 def build(bld):
+    # Handle zenith model (slow recompilation time. Update Zenith/constants.h)
+    # if bld.options.model:
+    #     bld.env.DEFINES.append(
+    #         'ZENITH_MODEL=' + ZENITH_MODELS[bld.options.model]
+    #     )
+
     config_hash = Utils.h_file(bld.bldnode.make_node('ap_config.h').abspath())
     bld.env.CCDEPS = config_hash
     bld.env.CXXDEPS = config_hash

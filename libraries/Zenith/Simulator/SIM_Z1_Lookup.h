@@ -170,16 +170,6 @@ protected:
 
     // TODO: move to matlab exported model
     struct {
-        float mass = 2.74;
-        float s = 0.51297;
-        float b = 1.8800;
-        float c = 0.28244;
-        Vector3f CGOffset{0, 0, 0};
-        Matrix3f I{
-            0.1767f, 0.f, 0.8740E-02,
-            0.f, 0.1263f, -0.1232e-09f,
-            0.8740E-02, -0.1232E-09f, 0.2963f
-        };
         Matrix3f I_inv;
         float staticThrustKg = 2.670f;
     } coefficient;
