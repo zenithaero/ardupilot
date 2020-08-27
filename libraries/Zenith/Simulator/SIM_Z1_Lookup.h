@@ -170,11 +170,15 @@ protected:
 
     // TODO: move to matlab exported model
     struct {
-        Matrix3f I_inv;
+        Matrix3f I, I_inv;
         float staticThrustKg = 2.670f;
     } coefficient;
 
     float thrust_scale;
+
+    // Temp
+    uint64_t t0 = 0;
+    float acc = 0;
 
     // float liftCoeff(float alpha) const;
     // float dragCoeff(float alpha) const;

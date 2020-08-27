@@ -108,13 +108,13 @@ void SRV_Channel::aux_servo_function_setup(void)
         break;
     case k_aileron_with_input:
     case k_elevator_with_input:
-    case k_aileron:
-    case k_elevator:
+    // case k_aileron:
+    // case k_elevator:
     case k_dspoilerLeft1:
     case k_dspoilerLeft2:
     case k_dspoilerRight1:
     case k_dspoilerRight2:
-    case k_rudder:
+    // case k_rudder:
     case k_steering:
     case k_flaperon_left:
     case k_flaperon_right:
@@ -129,6 +129,17 @@ void SRV_Channel::aux_servo_function_setup(void)
     case k_yaw_out:
         set_angle(4500);
         break;
+    // TODO: find a better way
+    case k_aileron:
+        set_angle(2500);
+        break;
+    case k_elevator:
+        set_angle(1500);
+        break;
+    case k_rudder:
+        set_angle(1500);
+        break;
+    // End
     case k_throttle:
     case k_throttleLeft:
     case k_throttleRight:

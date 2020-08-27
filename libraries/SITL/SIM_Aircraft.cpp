@@ -209,11 +209,12 @@ void Aircraft::update_position(void)
         gyro.x, gyro.y, gyro.z,
         alpha, beta, airspeed);
 
-    AP::logger().Write("SIM3", "TimeUS,fx,fy,fz,mx,my,mz,ail,elev,rud,thr", "Qffffffffff",
+    AP::logger().Write("SIM3", "TimeUS,fx,fy,fz,mx,my,mz,ail,elev,rud,thr,n,e,d", "Qfffffffffffff",
         AP_HAL::micros64(),
         force_bf.x, force_bf.y, force_bf.z,
         moment_bf.x, moment_bf.y, moment_bf.z,
-        actuators[0], actuators[1], actuators[2], actuators[3]);
+        actuators[0], actuators[1], actuators[2], actuators[3],
+        position.x, position.y, position.z);
 }
 
 /*

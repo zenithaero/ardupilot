@@ -735,8 +735,9 @@ void Plane::set_servos(void)
         steering_control.rudder = channel_rudder->get_control_in();
     }
     
-    SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, steering_control.rudder);
-    SRV_Channels::set_output_scaled(SRV_Channel::k_steering, steering_control.steering);
+    // Zenith: Cleared that guy. TODO: defer upstream?
+    // SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, steering_control.rudder);
+    // SRV_Channels::set_output_scaled(SRV_Channel::k_steering, steering_control.steering);
 
     if (control_mode == &mode_manual) {
         set_servos_manual_passthrough();

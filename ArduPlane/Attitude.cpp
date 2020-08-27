@@ -380,13 +380,31 @@ void Plane::stabilize_acro(float speed_scaler)
  */
 void Plane::stabilize()
 {
+    Vector3f vel, pos;
+    if (!ahrs.get_velocity_NED(vel))
+        printf("Velocity retrieval error");
+    Vector3f gyro = ahrs.get_gyro();
+    if (!ahrs.get_relative_position_NED_home(pos))
+        printf("Position retrieval error");
+    AP::logger().Write("AHRS", "TimeUS,gx,gy,gz,vn,ve,vd,n,e,d", "Qfffffffff",
+        AP_HAL::micros64(),
+        gyro.x, gyro.y, gyro.z,
+        vel.x, vel.y, vel.z,
+        pos.x, pos.y, pos.z);
+
     if (control_mode == &mode_manual) {
         // reset steering controls
         steer_state.locked_course = false;
         steer_state.locked_course_err = 0;
         return;
     }
-    zenithController.stabilize();
+
+    // Defer to zenithController
+    // Warning: If disabled, uncomment servos.cpp ln 739-740 to re-enable rudder control
+    zenithController.stabilize(nav_pitch_cd / 100.f, nav_roll_cd / 100.f);
+    return;
+
+
     float speed_scaler = get_speed_scaler();
 
     if (quadplane.in_tailsitter_vtol_transition()) {

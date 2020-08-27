@@ -1,3 +1,5 @@
+#pragma once
+
 // Models definitions
 #define MODEL_XUAV_ASW 0
 #define MODEL_XUAV_AVL 1
@@ -20,3 +22,9 @@
 
 // Common macros
 #define DIM(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
+
+#define CLAMP(value, min, max) MAX(min, MIN(max, value))
+
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}

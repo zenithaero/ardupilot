@@ -11,9 +11,23 @@
 
 extern const AP_HAL::HAL& hal;
 
-void ZenithController::stabilize() {
+void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg) {
 	// Full stabilisation, or input (/state) based mode?
 	// Ignore ardupilot state machine?
+
+	// Compute speed scaler
+	float speed_scaler = 1;
+	float airspeed;
+    if (ahrs.airspeed_estimate(airspeed)) {
+		airspeed = MAX(1, airspeed);
+		speed_scaler = ControllerData::constants.scalingSpeed / airspeed;
+		speed_scaler = CLAMP(speed_scaler, 0.2, 2);
+    }
+	// printf("airspeed %.2f, scaler %.2f\n", airspeed, speed_scaler);
+
+	// Stabilize pitch, roll & yaw
+	pitch_controller.update(theta_cmd_deg, speed_scaler);
+	roll_yaw_controller.update(phi_cmd_deg, speed_scaler);
 }
 
 
@@ -35,16 +49,24 @@ LinearController::LinearController(
 	}
 }
 
-float LinearController::clamp(float value, float min, float max) {
-	return MAX(min, MIN(max, value));
-}
-
 void LinearController::update_dt() {
-	uint32_t t_now = AP_HAL::millis();
-	dt = (float)(t_now - t_prev) / 1e3f;
+	uint64_t t_now = AP_HAL::micros64();
+	dt = (float)(t_now - t_prev) / 1e6f;
 	if (t_prev == 0 || dt > 1)
 		dt = 0.f;
 	t_prev = t_now;
+}
+
+std::vector<float> LinearController::matmul(std::vector<float> vec) {
+	std::vector<float> rtn(K.size(), 0);
+	if (vec.size() != K[0].size()) {
+		fprintf(stderr, "Invalid vector size: %lu, expected %lu\n", vec.size(), K[0].size());
+		return rtn;
+	}
+	for (size_t i = 0; i < K.size(); i++)
+		for (size_t j = 0; j < K[0].size(); j++)
+			rtn[i] += K[i][j] * vec[j];
+	return rtn;
 }
 
 PitchController::PitchController(AP_AHRS &ahrs)
@@ -55,55 +77,128 @@ PitchController::PitchController(AP_AHRS &ahrs)
 		ControllerData::pitch.K
 	) {};
 
-template <typename T> int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
-
-void PitchController::update(float theta_cmd_deg) {
+void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	update_dt();
-	float theta_deg = (float)ahrs.pitch_sensor / 100.f;
-	float theta_err_deg = theta_cmd_deg - theta_deg;
-	theta_err_deg = clamp(theta_err_deg, -ControllerData::pitch.maxErrDeg, ControllerData::pitch.maxErrDeg);
 
-	// Determine delta time
+	float theta_deg = ahrs.pitch_sensor / 100.f;
+	float theta_err_deg = theta_cmd_deg - theta_deg;
+	theta_err_deg = CLAMP(theta_err_deg, -ControllerData::pitch.maxErrDeg, ControllerData::pitch.maxErrDeg);
+
+	// Handle integrator
+	if (dt > 1)
+		theta_err_i = 0;
 	float di = theta_err_deg * dt;
 	// Anti-windup - Make sure the index is appropriate
-	if (sgn(di * K[0][1]) != sgn(elev_saturation))
+	if (sgn(di * K[0][1]) != sgn(elev_saturation) || true)
 		theta_err_i += di;
 
 	// Clip the integrator
 	float max_i = INFINITY; // TODO: export max_i with the gains ?
-	theta_err_i = clamp(theta_err_i, -max_i, max_i);
+	theta_err_i = CLAMP(theta_err_i, -max_i, max_i);
 
-	// Retreive q & hDot
-	float qDeg = ToDeg(ahrs.get_gyro().y);
+	// Retreive q & h_dot
+	float q_deg = ToDeg(ahrs.get_gyro().y);
 	Vector3f vel;
 	if (!ahrs.get_velocity_NED(vel))
 		vel.z = 0;
-	float hDot = -vel.z;
+	float h_dot = -vel.z;
 
 	// Prepare the error vector
 	std::vector<float> vec = {
 		theta_err_deg,
 		theta_err_i,
-		qDeg,
-		hDot
+		q_deg,
+		h_dot
 	};
 
 	// Compute the controller output
 	std::vector<float> res = matmul(vec);
 	if (res.size() != 1)
-		printf("Invalid result size\n");
-	float elev = res[0];
+		fprintf(stderr, "Invalid output size: %lu\n", res.size());
+	
+	float elev = res[0] * speed_scaler;
 
 	// Add feedforward
 	elev += ControllerData::pitch.FF;
 
 	// Clip the elevator
-	float elev_clipped = clamp(elev, -ControllerData::pitch.maxElevDeg, ControllerData::pitch.maxElevDeg);
-	elev_saturation = sgn(elev - elev_clipped);
+	float elev_clamped = CLAMP(elev, -ControllerData::pitch.maxElevDeg, ControllerData::pitch.maxElevDeg);
+	elev_saturation = sgn(elev - elev_clamped);
 
 	// Assign the output
-	int16_t elev_cd = (int16_t)(elev_clipped * 100);
-	SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elev_cd);
+	printf("theta_cmd_deg %.2f, theta_deg %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, elev_clamped);
+	int16_t elev_cd = (int16_t)(elev_clamped * 100);
+	SRV_Channels::move_servo(SRV_Channel::k_elevator, -elev_cd, -1500, 1500);
+}
+
+RollYawController::RollYawController(AP_AHRS &ahrs)
+	: LinearController(
+		ahrs,
+		ControllerData::rollYaw.stateNames,
+		(const char*[]) {"phiErrDeg", "phiErrInt", "<pDeg>", "rDegHP"},
+		ControllerData::rollYaw.K
+	) {};
+
+void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
+	update_dt();
+	float phi_deg = ahrs.roll_sensor / 100.f;
+	float phi_err_deg = phi_cmd_deg - phi_deg;
+	phi_err_deg = CLAMP(phi_err_deg, -ControllerData::rollYaw.maxErrDeg, ControllerData::rollYaw.maxErrDeg);
+
+	// Handle integrator
+	if (dt > 1)
+		phi_err_i = 0;
+	float di = phi_err_deg * dt;
+	// Anti-windup - Make sure the index is appropriate
+	if (sgn(di * K[0][1]) != sgn(ail_saturation) || true)
+		phi_err_i += di;
+
+	// Clip the integrator
+	float max_i = INFINITY; // TODO: export max_i with the gains ?
+	phi_err_i = CLAMP(phi_err_i, -max_i, max_i);
+
+	// Retreive q & h_dot
+	float p_deg = ToDeg(ahrs.get_gyro().x);
+	float r_deg = ToDeg(ahrs.get_gyro().z);
+
+	// UNUSED
+	// Apply a high-pass filter to the rate
+	// Could make this adjustable by replacing 0.9960080 with (1 - omega * dt)
+	float omega = 1; // rad/s
+	r_deg_hp = (1 - omega * dt) * r_deg_hp + r_deg - r_deg_prev;
+	r_deg_prev = r_deg;
+	// UNUSED
+
+	// Prepare the error vector
+	std::vector<float> vec = {
+		phi_err_deg,
+		phi_err_i,
+		p_deg,
+		r_deg
+	};
+
+	// Compute the controller output
+	std::vector<float> res = matmul(vec);
+	if (res.size() != 2)
+		fprintf(stderr, "Invalid output size: %lu\n", res.size());
+	float ail = res[0] * speed_scaler;
+	float rud = res[1] * speed_scaler;
+
+	// Add feedforward
+	ail += ControllerData::rollYaw.ailFF;
+	rud += ControllerData::rollYaw.rudFF;
+
+	// Clip the output
+	float ail_clamped = CLAMP(ail, -ControllerData::rollYaw.maxAilDeg, ControllerData::rollYaw.maxAilDeg);
+	float rud_clamped = CLAMP(rud, -ControllerData::rollYaw.maxRudDeg, ControllerData::rollYaw.maxRudDeg);
+	ail_saturation = sgn(ail - ail_clamped);
+	rud_saturation = sgn(ail - rud_clamped);
+
+	// Assign the output
+	int16_t ail_cd = (int16_t)(ail_clamped * 100);
+	int16_t rud_cd = (int16_t)(rud_clamped * 100);
+	SRV_Channels::move_servo(SRV_Channel::k_aileron, ail_cd, -2500, 2500);
+	SRV_Channels::move_servo(SRV_Channel::k_rudder,  rud_cd, -1500, 1500);
+	printf("phi_cmd %.2f, phi %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, ail_clamped, rud_clamped);
+	// printf("phi_cmd %.2f, phi %.2f, phi_err %.2f, phi_err_i: %.2f, p %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, phi_err_deg, phi_err_i, p_deg, ail, rud);
 }
