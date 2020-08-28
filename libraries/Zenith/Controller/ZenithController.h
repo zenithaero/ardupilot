@@ -69,5 +69,8 @@ protected:
 	AP_AHRS &ahrs;
     PitchController pitch_controller{ahrs};
     RollYawController roll_yaw_controller{ahrs};
+
+    // TEMP
+    uint64_t t0 = 0;
 };
 

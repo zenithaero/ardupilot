@@ -401,6 +401,8 @@ void Plane::stabilize()
 
     // Defer to zenithController
     // Warning: If disabled, uncomment servos.cpp ln 739-740 to re-enable rudder control
+    // TODO
+    // nav_pitch_cd = (int32_t)(degrees(-0.02389) * 100);
     zenithController.stabilize(nav_pitch_cd / 100.f, nav_roll_cd / 100.f);
     return;
 

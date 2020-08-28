@@ -126,26 +126,53 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // elev = -12.f;
     // rud = 10.f;
     // thr = 0.5f;
+    
 
     // TEMP
-    thr = 0.11996;
-    ail = 0.00040;
-    elev = -0.87232;
-    rud = 0.00217;
+    // thr = 0.11996;
+    // ail = 0.00040;
+    // elev = -0.87232;
+    // rud = 0.00217;
 
     if (t0 == 0)
         t0 = time_now_us;
     float dt = (time_now_us - t0) / 1e6f;
-    // if (dt > 5)
-    elev += 1;
+    if (dt < 1) {
+        gyro = Vector3f(0, 0, 0);
+        dcm.from_euler(0.00000, -0.02389, 0.00000);
+        Vector3f velocity_bf = {14.99572, 0.00071, -0.35834};
+        velocity_ef = dcm * velocity_bf;
+        position = {0, 0, -200};
+        update_position();
+        // AIS computations
+        velocity_air_bf = velocity_bf;
+        velocity_air_ef = velocity_ef;
+        airspeed = velocity_air_ef.length();
+        airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+    }
+    // Force longitudinal
+    // float roll, pitch, yaw;
+    // dcm.to_euler(&roll, &pitch, &yaw);
+    // dcm.from_euler(0, pitch, 0);
 
-    // TEMP
+    // if (dt > 90)
+    //     exit(-1);
+
+    // else {
+    //     ail += 1;
+    //     elev -= 1;
+    // }
+    // if (dt > 30)
+    //     exit(-1);
+    // elev += 1;
+    // TEMP END
+
     actuators[0] = ail;
     actuators[1] = elev;
     actuators[2] = rud;
     actuators[3] = thr;
 
-    printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail, elev, rud, thr);
+    // printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail, elev, rud, thr);
 
     // simulate engine RPM
     rpm[0] = thr * 7000;
@@ -208,8 +235,8 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     moment_bf = fm.moment;
 
     // Determine body acceleration & rotational acceleration
-    accel_body = fm.force / mass + velocity_air_bf % gyro;
-    rot_accel = coefficient.I_inv * (fm.moment - gyro % (coefficient.I * gyro));
+    accel_body = fm.force / mass + velocity_air_bf % gyro * 0; // TODO
+    rot_accel = coefficient.I_inv * (fm.moment - gyro % (coefficient.I * gyro) * 0);
 
     // TEMP Debug
     // printf("force: %.4f, %.4f, %.4f; moment: %.4f, %.4f, %.4f\n", force_bf.x, force_bf.y, force_bf.z, moment_bf.x, moment_bf.y, moment_bf.z);
@@ -258,35 +285,7 @@ void Z1_Lookup::update(const struct sitl_input &input)
     // float V = velocity_ef.length();
     // if (V > FLT_EPSILON)
     //     velocity_ef = velocity_ef.normalized() * MIN(25, V);
-    
 
-    // TEMP: place the plane in a known state
-    if (t0 == 0)
-        t0 = time_now_us;
-    float dt = (time_now_us - t0) / 1e6f;
-    // float val = 0.f;
-    // if (dt > 50)
-    //     val = -5;
-    // if (dt > 70)
-    //     exit(-1);
-    // const float delta_time = frame_time_us * 1.0e-6f;
-    // acc += val * delta_time;
-
-    if (t0 == time_now_us) {
-        gyro = Vector3f(0, 0, 0);
-        dcm.from_euler(0.00000, -0.02389, 0.00000);
-        Vector3f velocity_bf = {14.99572, 0.00071, -0.35834};
-        velocity_ef = dcm * velocity_bf;
-        position = {0, 0, -20};
-        update_position();
-        // AIS computations
-        airspeed = velocity_air_ef.length();
-        airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
-    }
-    if (dt > 20) {
-        exit(-1);
-    }
-    // TEMP DONE
 
     // printf("Pos %f %f %f; vel %f %f %f; accel_body %f %f %f; euler %f %f %f\n", position.x, position.y, position.z, velocity_ef.x, velocity_ef.y, velocity_ef.z, accel_body.x, accel_body.y, accel_body.z, r, p, y);
     // Pos 0.000000 0.000000 -0.099976; vel 0.000000 0.000000 0.000000; accel_body 0.000000 0.000000 -9.806650; euler 0.000000 0.000000 -0.122173

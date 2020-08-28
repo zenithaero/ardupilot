@@ -15,6 +15,11 @@ void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg) {
 	// Full stabilisation, or input (/state) based mode?
 	// Ignore ardupilot state machine?
 
+	// TEMP
+	if (t0 == 0)
+        t0 = AP_HAL::micros64();
+    float dt = (AP_HAL::micros64() - t0) / 1e6f;
+
 	// Compute speed scaler
 	float speed_scaler = 1;
 	float airspeed;
@@ -24,6 +29,10 @@ void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg) {
 		speed_scaler = CLAMP(speed_scaler, 0.2, 2);
     }
 	// printf("airspeed %.2f, scaler %.2f\n", airspeed, speed_scaler);
+
+	// phi_cmd_deg = 0;
+	// if (dt > 70)
+	// 	phi_cmd_deg += 5;
 
 	// Stabilize pitch, roll & yaw
 	pitch_controller.update(theta_cmd_deg, speed_scaler);
@@ -92,7 +101,7 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	if (sgn(di * K[0][1]) != sgn(elev_saturation) || true)
 		theta_err_i += di;
 
-	// Clip the integrator
+	// Clamp the integrator
 	float max_i = INFINITY; // TODO: export max_i with the gains ?
 	theta_err_i = CLAMP(theta_err_i, -max_i, max_i);
 
@@ -121,7 +130,7 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	// Add feedforward
 	elev += ControllerData::pitch.FF;
 
-	// Clip the elevator
+	// Clamp the elevator
 	float elev_clamped = CLAMP(elev, -ControllerData::pitch.maxElevDeg, ControllerData::pitch.maxElevDeg);
 	elev_saturation = sgn(elev - elev_clamped);
 
@@ -153,7 +162,7 @@ void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
 	if (sgn(di * K[0][1]) != sgn(ail_saturation) || true)
 		phi_err_i += di;
 
-	// Clip the integrator
+	// Clamp the integrator
 	float max_i = INFINITY; // TODO: export max_i with the gains ?
 	phi_err_i = CLAMP(phi_err_i, -max_i, max_i);
 
@@ -163,7 +172,6 @@ void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
 
 	// UNUSED
 	// Apply a high-pass filter to the rate
-	// Could make this adjustable by replacing 0.9960080 with (1 - omega * dt)
 	float omega = 1; // rad/s
 	r_deg_hp = (1 - omega * dt) * r_deg_hp + r_deg - r_deg_prev;
 	r_deg_prev = r_deg;
@@ -188,17 +196,17 @@ void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
 	ail += ControllerData::rollYaw.ailFF;
 	rud += ControllerData::rollYaw.rudFF;
 
-	// Clip the output
+	// Clamp the output
 	float ail_clamped = CLAMP(ail, -ControllerData::rollYaw.maxAilDeg, ControllerData::rollYaw.maxAilDeg);
 	float rud_clamped = CLAMP(rud, -ControllerData::rollYaw.maxRudDeg, ControllerData::rollYaw.maxRudDeg);
 	ail_saturation = sgn(ail - ail_clamped);
-	rud_saturation = sgn(ail - rud_clamped);
+	rud_saturation = sgn(rud - rud_clamped);
 
 	// Assign the output
 	int16_t ail_cd = (int16_t)(ail_clamped * 100);
 	int16_t rud_cd = (int16_t)(rud_clamped * 100);
 	SRV_Channels::move_servo(SRV_Channel::k_aileron, ail_cd, -2500, 2500);
-	SRV_Channels::move_servo(SRV_Channel::k_rudder,  rud_cd, -1500, 1500);
+	SRV_Channels::move_servo(SRV_Channel::k_rudder,  -rud_cd, -1500, 1500);
 	printf("phi_cmd %.2f, phi %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, ail_clamped, rud_clamped);
 	// printf("phi_cmd %.2f, phi %.2f, phi_err %.2f, phi_err_i: %.2f, p %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, phi_err_deg, phi_err_i, p_deg, ail, rud);
 }

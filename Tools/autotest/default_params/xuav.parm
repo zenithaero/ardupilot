@@ -110,4 +110,4 @@ SIM_GPS_NOISE 0 9
 
 
 # Disable servo filter
-SIM_SERVO_SPEED  0.03
+SIM_SERVO_SPEED  0.032
