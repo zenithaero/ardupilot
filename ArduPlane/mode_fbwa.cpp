@@ -1,5 +1,6 @@
 #include "mode.h"
 #include "Plane.h"
+#include <Zenith/constants.h>
 
 bool ModeFBWA::_enter()
 {
@@ -12,6 +13,11 @@ bool ModeFBWA::_enter()
 
 void ModeFBWA::update()
 {
+    // Zenith fbwa mode
+    plane.nav_pitch_cd = (int32_t)(plane.channel_pitch->norm_input() * ControllerData::pitch.maxCmdDeg * 100);
+    plane.nav_roll_cd = (int32_t)(plane.channel_roll->norm_input() * ControllerData::rollYaw.maxCmdDeg * 100);
+    return;
+    
     // set nav_roll and nav_pitch using sticks
     plane.nav_roll_cd  = plane.channel_roll->norm_input() * plane.roll_limit_cd;
     plane.update_load_factor();

@@ -11,7 +11,36 @@
 
 extern const AP_HAL::HAL& hal;
 
-void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg) {
+ZenithController::ZenithController(AP_AHRS &_ahrs) : ahrs(_ahrs) {
+	// Init doublet handlers (channel, deflection, duration, settle_time)
+	ail_doublet = DoubletHandler(SRV_Channel::k_aileron, 2, 1, 5); 
+	elev_doublet = DoubletHandler(SRV_Channel::k_elevator, 2, 1, 5);
+	rud_doublet = DoubletHandler(SRV_Channel::k_rudder, 2, 1, 5);
+};
+
+void DoubletHandler::start() {
+	t_start = AP_HAL::micros64();
+}
+
+bool DoubletHandler::udpate(float last_command) {
+	uint64_t now = AP_HAL::micros64();
+	float dt = (now - t_start) / 1e6f;
+	bool active = dt < duration + settle_time;
+	// Time constant of 5s
+	if (!active) {
+		command_filter.set_cutoff_frequency(1/5);
+		command_filter.apply(last_command);
+	} else {
+		// Apply doublet
+		float command = command_filter.get();
+		if (dt < duration)
+			command += deflection;
+		SRV_Channels::set_output_scaled(channel, (int16_t)(command * 100));
+	}
+	return active;
+}
+
+void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg, float rudder_deg) {
 	// Full stabilisation, or input (/state) based mode?
 	// Ignore ardupilot state machine?
 
@@ -30,71 +59,115 @@ void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg) {
     }
 	// printf("airspeed %.2f, scaler %.2f\n", airspeed, speed_scaler);
 
-	// phi_cmd_deg = 0;
-	// if (dt > 70)
-	// 	phi_cmd_deg += 5;
+	phi_cmd_deg = 0;
+	theta_cmd_deg = degrees(0.00557);
+	if (dt > 70)
+		theta_cmd_deg += 5;
+	else {
+		// reset integrators
+		pitch_controller.reset();
+	}
+	// if (dt > 90)
+	// 	exit(-1);
+
+	// Execute doublets if needed
+	bool ail_doublet_active = ail_doublet.udpate(roll_yaw_controller.ail_command);
+	bool elev_doublet_active = elev_doublet.udpate(pitch_controller.elev_command);
+	bool rud_doublet_active = rud_doublet.udpate(roll_yaw_controller.rud_command);
 
 	// Stabilize pitch, roll & yaw
-	pitch_controller.update(theta_cmd_deg, speed_scaler);
-	roll_yaw_controller.update(phi_cmd_deg, speed_scaler);
+	if (!elev_doublet_active)
+		pitch_controller.update(theta_cmd_deg, speed_scaler);
+	if (!ail_doublet_active || !rud_doublet_active)
+		roll_yaw_controller.update(phi_cmd_deg, rudder_deg, speed_scaler);
 }
 
+void ZenithController::update_spd_alt(float tas_cmd, float h_cmd) {
+	// Step command
+
+	// TEMP
+	// h_cmd = 0;
+	// tas_cmd = 15;
+
+	// float dt = (AP_HAL::micros64() - t0) / 1e6f;
+	// if (dt > 90)
+	// 	h_cmd = 10;
+	// if (dt > 130)
+	// 	tas_cmd = 20;
+	// if (dt > 160)
+	// 	exit(-1);
+
+	spd_alt_controller.update(tas_cmd, h_cmd);
+}
+
+float ZenithController::get_pitch_command() {
+	return spd_alt_controller.pitch_command;
+}
+
+float ZenithController::get_throttle_command() {
+	return spd_alt_controller.thr_command;
+}
+
+float ZenithController::get_elev_command() {
+	return pitch_controller.elev_command;
+}
+
+float ZenithController::get_ail_command() {
+	return roll_yaw_controller.ail_command;
+}
+
+float ZenithController::get_rudder_command() {
+	return roll_yaw_controller.rud_command;
+}
 
 template<size_t m, size_t n>
 LinearController::LinearController(
-	AP_AHRS &ahrs,
+	AP_AHRS &_ahrs,
 	const char *stateNames[],
 	const char *expectedNames[],
-	const double (&K)[m][n]) : ahrs(ahrs) {
+	const float (&_K)[m][n]) : ahrs(_ahrs) {
 	for (size_t j = 0; j < n; j++) {
 		if (strcmp(stateNames[j], expectedNames[j]) != 0) {
-			fprintf(stderr, "State mismatch: %s (expected %s)\n", stateNames[j], expectedNames[j]);
+			printf("State mismatch: %s (expected %s)\n", stateNames[j], expectedNames[j]);
 			exit(1);
 		}
 	}
-	for (size_t i = 0; i < m; i++) {
-		const std::vector<float> row(K[i], K[i] + n);
-		this->K.push_back(row);
-	}
+	buildMat(_K, this->K);
 }
 
 void LinearController::update_dt() {
 	uint64_t t_now = AP_HAL::micros64();
 	dt = (float)(t_now - t_prev) / 1e6f;
-	if (t_prev == 0 || dt > 1)
+	if (t_prev == 0)
 		dt = 0.f;
 	t_prev = t_now;
 }
 
-std::vector<float> LinearController::matmul(std::vector<float> vec) {
-	std::vector<float> rtn(K.size(), 0);
-	if (vec.size() != K[0].size()) {
-		fprintf(stderr, "Invalid vector size: %lu, expected %lu\n", vec.size(), K[0].size());
-		return rtn;
-	}
-	for (size_t i = 0; i < K.size(); i++)
-		for (size_t j = 0; j < K[0].size(); j++)
-			rtn[i] += K[i][j] * vec[j];
-	return rtn;
-}
+const char* pitchFields[] = {"thetaErrDeg", "thetaErrInt", "<qDeg>"}; // , "<hDot>"},
 
-PitchController::PitchController(AP_AHRS &ahrs)
+PitchController::PitchController(AP_AHRS &_ahrs)
 	: LinearController(
-		ahrs,
+		_ahrs,
 		ControllerData::pitch.stateNames,
-		(const char*[]) {"thetaErrDeg", "thetaErrInt", "<qDeg>", "<hDot>"},
+		pitchFields,
 		ControllerData::pitch.K
 	) {};
+
+static uint32_t counter, counter2 = 0; // TEMP
+
+void PitchController::reset() {
+	theta_err_i = 0;
+}
 
 void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	update_dt();
 
 	float theta_deg = ahrs.pitch_sensor / 100.f;
 	float theta_err_deg = theta_cmd_deg - theta_deg;
-	theta_err_deg = CLAMP(theta_err_deg, -ControllerData::pitch.maxErrDeg, ControllerData::pitch.maxErrDeg);
+	theta_err_deg = CLAMP(theta_err_deg, -ControllerData::pitch.maxCmdDeg, ControllerData::pitch.maxCmdDeg);
 
 	// Handle integrator
-	if (dt > 1)
+	if (dt > 0.1)
 		theta_err_i = 0;
 	float di = theta_err_deg * dt;
 	// Anti-windup - Make sure the index is appropriate
@@ -102,8 +175,7 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 		theta_err_i += di;
 
 	// Clamp the integrator
-	float max_i = INFINITY; // TODO: export max_i with the gains ?
-	theta_err_i = CLAMP(theta_err_i, -max_i, max_i);
+	theta_err_i = CLAMP(theta_err_i, -ControllerData::pitch.maxErrI, ControllerData::pitch.maxErrI);
 
 	// Retreive q & h_dot
 	float q_deg = ToDeg(ahrs.get_gyro().y);
@@ -112,18 +184,26 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 		vel.z = 0;
 	float h_dot = -vel.z;
 
+	// Retrieve and filter ax
+	float ax = -AP::ins().get_accel().x;
+	ax_filter.set_cutoff_frequency(1 / (M_PI * 2 * 0.1));
+	float ax_filt = ax_filter.apply(ax, dt);
+
+	// printf("ax: %.3f, ax_filt: %.3f\n", ax, ax_filt);
+
 	// Prepare the error vector
 	std::vector<float> vec = {
 		theta_err_deg,
 		theta_err_i,
-		q_deg,
-		h_dot
+		q_deg
+		// ax_filt
+		// h_dot
 	};
 
 	// Compute the controller output
-	std::vector<float> res = matmul(vec);
+	std::vector<float> res = matmul(K, vec);
 	if (res.size() != 1)
-		fprintf(stderr, "Invalid output size: %lu\n", res.size());
+		printf("Invalid output size: %lu\n", res.size());
 	
 	float elev = res[0] * speed_scaler;
 
@@ -137,25 +217,29 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	// Assign the output
 	printf("theta_cmd_deg %.2f, theta_deg %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, elev_clamped);
 	int16_t elev_cd = (int16_t)(elev_clamped * 100);
-	SRV_Channels::move_servo(SRV_Channel::k_elevator, -elev_cd, -1500, 1500);
+	// SRV_Channels::move_servo(SRV_Channel::k_elevator, elev_cd, -1500, 1500); // doesn't seem to work with mixing
+	SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elev_cd);
+	// SRV_Channels:set_scaled
 }
 
-RollYawController::RollYawController(AP_AHRS &ahrs)
+const char* rollFields[] = {"phiErrDeg", "phiErrInt", "<pDeg>", "rDegHP"};
+
+RollYawController::RollYawController(AP_AHRS &_ahrs)
 	: LinearController(
-		ahrs,
+		_ahrs,
 		ControllerData::rollYaw.stateNames,
-		(const char*[]) {"phiErrDeg", "phiErrInt", "<pDeg>", "rDegHP"},
+		rollFields,
 		ControllerData::rollYaw.K
 	) {};
 
-void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
+void RollYawController::update(float phi_cmd_deg, float rudder_deg, float speed_scaler) {
 	update_dt();
 	float phi_deg = ahrs.roll_sensor / 100.f;
 	float phi_err_deg = phi_cmd_deg - phi_deg;
-	phi_err_deg = CLAMP(phi_err_deg, -ControllerData::rollYaw.maxErrDeg, ControllerData::rollYaw.maxErrDeg);
+	phi_err_deg = CLAMP(phi_err_deg, -ControllerData::rollYaw.maxCmdDeg, ControllerData::rollYaw.maxCmdDeg);
 
 	// Handle integrator
-	if (dt > 1)
+	if (dt > 0.1)
 		phi_err_i = 0;
 	float di = phi_err_deg * dt;
 	// Anti-windup - Make sure the index is appropriate
@@ -163,8 +247,7 @@ void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
 		phi_err_i += di;
 
 	// Clamp the integrator
-	float max_i = INFINITY; // TODO: export max_i with the gains ?
-	phi_err_i = CLAMP(phi_err_i, -max_i, max_i);
+	phi_err_i = CLAMP(phi_err_i, -ControllerData::rollYaw.maxErrI, ControllerData::rollYaw.maxErrI);
 
 	// Retreive q & h_dot
 	float p_deg = ToDeg(ahrs.get_gyro().x);
@@ -186,9 +269,9 @@ void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
 	};
 
 	// Compute the controller output
-	std::vector<float> res = matmul(vec);
+	std::vector<float> res = matmul(K, vec);
 	if (res.size() != 2)
-		fprintf(stderr, "Invalid output size: %lu\n", res.size());
+		printf("Invalid output size: %lu\n", res.size());
 	float ail = res[0] * speed_scaler;
 	float rud = res[1] * speed_scaler;
 
@@ -196,17 +279,127 @@ void RollYawController::update(float phi_cmd_deg, float speed_scaler) {
 	ail += ControllerData::rollYaw.ailFF;
 	rud += ControllerData::rollYaw.rudFF;
 
+	// Add manual rudder input
+	rud += rudder_deg;
+
 	// Clamp the output
-	float ail_clamped = CLAMP(ail, -ControllerData::rollYaw.maxAilDeg, ControllerData::rollYaw.maxAilDeg);
-	float rud_clamped = CLAMP(rud, -ControllerData::rollYaw.maxRudDeg, ControllerData::rollYaw.maxRudDeg);
-	ail_saturation = sgn(ail - ail_clamped);
-	rud_saturation = sgn(rud - rud_clamped);
+	ail_command = CLAMP(ail, -ControllerData::rollYaw.maxAilDeg, ControllerData::rollYaw.maxAilDeg);
+	rud_command = CLAMP(rud, -ControllerData::rollYaw.maxRudDeg, ControllerData::rollYaw.maxRudDeg);
+	ail_saturation = sgn(ail - ail_command);
+	rud_saturation = sgn(rud - rud_command);
 
 	// Assign the output
-	int16_t ail_cd = (int16_t)(ail_clamped * 100);
-	int16_t rud_cd = (int16_t)(rud_clamped * 100);
-	SRV_Channels::move_servo(SRV_Channel::k_aileron, ail_cd, -2500, 2500);
-	SRV_Channels::move_servo(SRV_Channel::k_rudder,  -rud_cd, -1500, 1500);
-	printf("phi_cmd %.2f, phi %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, ail_clamped, rud_clamped);
-	// printf("phi_cmd %.2f, phi %.2f, phi_err %.2f, phi_err_i: %.2f, p %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, phi_err_deg, phi_err_i, p_deg, ail, rud);
+	int16_t ail_cd = (int16_t)(ail_command * 100);
+	// SRV_Channels::move_servo(SRV_Channel::k_aileron, ail_cd, -2500, 2500); // DOESN'T SEEM TO WORK
+	SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, ail_cd);
+	int16_t rud_cd = (int16_t)(rud_command * 100);
+	// SRV_Channels::move_servo(SRV_Channel::k_rudder,  -rud_cd, -1500, 1500); // DOESN'T SEEM TO WORK
+	SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, rud_cd);
+	printf("phi_cmd %.2f, phi %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, ail_command, rud_command);
 }
+
+const char* spdAltFields[] = {"hErr", "hErrInt", "tasErr", "tasErrInt", "hDotErr", "<thetaDeg>", "<qDeg>"};
+
+SpdAltController::SpdAltController(AP_AHRS &_ahrs)
+	: LinearController(
+		_ahrs,
+		ControllerData::spdAlt.stateNames,
+		spdAltFields,
+		ControllerData::spdAlt.K
+	) {};
+
+void SpdAltController::update(float tas_cmd, float h_cmd) {
+	update_dt();
+
+	// Retreive measurements
+	float h;
+	ahrs.get_relative_position_D_home(h);
+	h *= -1;
+	Vector3f vel;
+	if (!ahrs.get_velocity_NED(vel))
+		vel.z = 0;
+	float h_dot = -vel.z;
+	float theta_deg = ahrs.pitch_sensor / 100.f;
+	theta_deg -= ControllerData::spdAlt.pitchFF; // TODO: replace with a lookup table
+	float q_deg = ToDeg(ahrs.get_gyro().y);
+	float eas;
+	if (!ahrs.airspeed_estimate(eas))
+		printf("Estimated airspeed error\n"); // TODO
+	float tas = eas * ahrs.get_EAS2TAS();
+
+	// Compute errors
+	float h_err = h_cmd - h;
+	float tas_err = tas_cmd - tas;
+	float h_dot_err = 0 - h_dot;
+	h_err = CLAMP(h_err, -ControllerData::spdAlt.maxAltErr, ControllerData::spdAlt.maxAltErr);
+	tas_err = CLAMP(tas_err, -ControllerData::spdAlt.maxTasErr, ControllerData::spdAlt.maxTasErr);
+
+	// Handle integrator
+	if (dt > 0.1) {
+		h_err_i = 0;
+		tas_err_i = 0;
+	}
+	float h_di = h_err * dt;
+	float tas_di = tas_err * dt;
+	// Anti-windup - Make sure the index is appropriate
+	if (sgn(h_di * K[2][2]) != sgn(pitch_saturation) || true)
+		h_err_i += h_di;
+	if (sgn(tas_di * K[1][4]) != sgn(thr_saturation) || true)
+		tas_err_i += tas_di;
+
+	// Clamp the integrator
+	h_err_i = CLAMP(h_err_i, -ControllerData::spdAlt.maxAltErrI, ControllerData::spdAlt.maxAltErrI);
+	tas_err_i = CLAMP(tas_err_i, -ControllerData::spdAlt.maxTasErrI, ControllerData::spdAlt.maxTasErrI);
+
+	// Prepare the error vector
+	std::vector<float> vec = {
+		h_err,
+		h_err_i,
+		tas_err,
+		tas_err_i,
+		h_dot_err,
+		theta_deg,
+		q_deg
+	};
+
+	// Compute the controller output
+	std::vector<float> res = matmul(K, vec);
+	if (res.size() != 2)
+		printf("Invalid output size: %lu\n", res.size());
+	float thr = res[0];
+	float pitch = res[1];
+
+	// Add feedforward
+	thr += ControllerData::spdAlt.thrFF;
+	pitch += ControllerData::spdAlt.pitchFF;
+
+	// Clamp the output
+	float thr_clamped = CLAMP(thr, 0, ControllerData::spdAlt.maxThr);
+	float pitch_clamped = CLAMP(pitch, -ControllerData::pitch.maxCmdDeg, ControllerData::pitch.maxCmdDeg);
+	thr_saturation = sgn(thr - thr_clamped);
+	pitch_saturation = sgn(pitch - pitch_clamped);
+
+	// Assign the output
+	pitch_command = pitch_clamped;
+	thr_command = thr_clamped;
+	// printf("hErr %.2f hErrI %.2f tasErr %.2f tassErrI %.2f hDot %.2f thetaDeg %.2f qDeg %.2f\n", h_err, h_err_i, tas_err, tas_err_i, h_dot, theta_deg, q_deg);
+	// printf("hCmd %.2f h %.2f tasCmd %.2f tas %.2f pitchCmd %.2f pitch %.2f thrCmd %.2f\n", h_cmd, h, tas_cmd, tas, pitch_command, theta_deg, thr_command);
+}
+
+
+// TODO: implement those
+// void CrossTrackController::update_waypoint(const Location &prev_WP, const Location &next_WP, float dist_min) {
+// 	Location loc;
+// 	if (!ahrs.get_position(loc)) {
+// 		// Maintain the last command
+// 		return;
+// 	}
+
+// 	Vector2f gnd_spd = ahrs.groundspeed_vector();
+	
+
+// }
+
+// void CrossTrackController::update_loiter(const Location &center_WP, float radius, int8_t loiter_direction) {
+
+// }

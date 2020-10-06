@@ -31,14 +31,15 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     frame_height = 0.1f;
     num_motors = 1;
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
+    buildMat(ModelConfig::servoMap, servo_map);
 
     // Compute inverse intertia
-    coefficient.I = Matrix3f(
+    I = Matrix3f(
         ModelConfig::I[0][0], ModelConfig::I[0][1], ModelConfig::I[0][2],
         ModelConfig::I[1][0], ModelConfig::I[1][1], ModelConfig::I[1][2],
         ModelConfig::I[2][0], ModelConfig::I[2][1], ModelConfig::I[2][2]
     );
-    bool success = coefficient.I.inverse(coefficient.I_inv);
+    bool success = I.inverse(I_inv);
     if (!success) {
         fprintf(stderr, "Warning: Inertia matrice inversion failure\n");
         exit(-1);
@@ -49,7 +50,7 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     std::vector<double> bs(ModelAeroData::Bs, ModelAeroData::Bs + DIM(ModelAeroData::Bs));
     std::vector<double> vs(ModelAeroData::Vs, ModelAeroData::Vs + DIM(ModelAeroData::Vs));
     std::vector<const std::vector<double>> interp = {as, bs, vs};
-    aeroData = new Interp(interp);
+    aeroData = new Interp<double>(interp);
 
     // // TEST Lookup
     // double _alpha[] = {-2, 3, 5, 6};
@@ -89,10 +90,11 @@ FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
 FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud) {
     FM fm;
     // Apply map
-    std::vector<float> map = {ail, elev, rud};
+    std::vector<float> vec = {ail, elev, rud, 0, 0};
+    std::vector<float> act = matmul(servo_map, vec);
     // Lookup map
-    for (size_t k = 0; k < map.size(); k++) {
-        fm += INTERP(dF, lookup, k) * map[k];
+    for (size_t k = 0; k < act.size(); k++) {
+        fm += INTERP(dF, lookup, k) * act[k] * ModelConfig::servoMaxDeg[0][k];
     }
     return fm;
 }
@@ -109,12 +111,14 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
 }
 
 
-void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, Vector3f &body_accel)
+void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
 {
-    float ail  = filtered_servo_angle(input, 0) * 25;
-    float elev = -filtered_servo_angle(input, 1) * 15; // TODO: export those from matlab
-    float rud  = -filtered_servo_angle(input, 3) * 15; // TODO: export those from matlab
+    float ail  = filtered_servo_angle(input, 0);
+    float elev = filtered_servo_angle(input, 1);
+    float rud  = filtered_servo_angle(input, 3);
     float thr = filtered_servo_range(input, 2);
+
+    printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 15, rud * 15, thr);
 
     // Dummy state
     // gyro = Vector3f(3.5f, -4.f, -2.8f);
@@ -126,30 +130,44 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // elev = -12.f;
     // rud = 10.f;
     // thr = 0.5f;
-    
 
     // TEMP
-    // thr = 0.11996;
-    // ail = 0.00040;
-    // elev = -0.87232;
-    // rud = 0.00217;
+    thr = 0.02124;
+    ail = 0;
+    rud = 0;
+    elev = 0.86159 / 15;
 
     if (t0 == 0)
         t0 = time_now_us;
     float dt = (time_now_us - t0) / 1e6f;
-    if (dt < 1) {
+    if (dt < 15) {
         gyro = Vector3f(0, 0, 0);
-        dcm.from_euler(0.00000, -0.02389, 0.00000);
-        Vector3f velocity_bf = {14.99572, 0.00071, -0.35834};
+        dcm.from_euler(0.00000, -0.02408, 0.00000);
+        velocity_ef = Vector3f(0, 0, 0);
+        velocity_air_bf = Vector3f(0, 0, 0);
+        velocity_air_ef = Vector3f(0, 0, 0);
+        airspeed_pitot = 0.f;
+        airspeed = 0.f;
+    }
+    if (dt > 15 && dt < 45) {
+        gyro = Vector3f(0, 0, 0);
+        dcm.from_euler(0.00000, -0.02408, 0.00000);
+        Vector3f velocity_bf = {14.99565, -0.00000, -0.36111};
         velocity_ef = dcm * velocity_bf;
-        position = {0, 0, -200};
-        update_position();
+        position.z = -200;
+
+        // update_position();
         // AIS computations
         velocity_air_bf = velocity_bf;
         velocity_air_ef = velocity_ef;
-        airspeed = velocity_air_ef.length();
         airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+        airspeed = velocity_air_ef.length();
     }
+    if (dt > 45)
+        elev += 1.f / 15;
+    if (dt > 65)
+        exit(-1);
+
     // Force longitudinal
     // float roll, pitch, yaw;
     // dcm.to_euler(&roll, &pitch, &yaw);
@@ -172,7 +190,6 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     actuators[2] = rud;
     actuators[3] = thr;
 
-    // printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail, elev, rud, thr);
 
     // simulate engine RPM
     rpm[0] = thr * 7000;
@@ -221,7 +238,9 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     fm.moment += armMoment;
     
     // Simple static thrust motor model
-    double thrust = GRAVITY_MSS * coefficient.staticThrustKg * thr;
+    double coeff = ModelConfig::thrustStatic - qbar * ModelConfig::thrustGain;
+    double thrust = CLAMP(GRAVITY_MSS * thr * coeff, 0, INFINITY);
+    
     // thrust *= MIN(1, MAX(0, 0.85 - 0.01 * airspeed));
     fm.force += Vector3f(thrust, 0, 0);
     // printf("Thrust force: %.2f\n", thrust);
@@ -235,8 +254,8 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     moment_bf = fm.moment;
 
     // Determine body acceleration & rotational acceleration
-    accel_body = fm.force / mass + velocity_air_bf % gyro * 0; // TODO
-    rot_accel = coefficient.I_inv * (fm.moment - gyro % (coefficient.I * gyro) * 0);
+    accel_body = fm.force / mass;
+    rot_accel = I_inv * fm.moment;
 
     // TEMP Debug
     // printf("force: %.4f, %.4f, %.4f; moment: %.4f, %.4f, %.4f\n", force_bf.x, force_bf.y, force_bf.z, moment_bf.x, moment_bf.y, moment_bf.z);
@@ -255,15 +274,13 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
 void Z1_Lookup::update(const struct sitl_input &input)
 {
     Vector3f rot_accel;
-
     update_wind(input);
-    
-    calculate_forces(input, rot_accel, accel_body);
-    
-    update_dynamics(rot_accel);
-    update_external_payload(input);
 
-    // update lat/lon/altitude
+    
+    calculate_forces(input, rot_accel);
+    update_dynamics(rot_accel);
+
+    update_external_payload(input);
     update_position();
     time_advance();
 

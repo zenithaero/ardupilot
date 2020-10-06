@@ -159,6 +159,7 @@ public:
     friend class ModeQAcro;
     friend class ModeQAutotune;
     friend class ModeTakeoff;
+    friend class ModePreflight;
 
     Plane(void);
 
@@ -203,7 +204,7 @@ private:
     AP_SteerController steerController{ahrs};
 
     // Zenith controller
-    ZenithController zenithController{ahrs};
+    ZenithController zenith_controller{ahrs};
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     SITL::SITL sitl;
@@ -280,6 +281,7 @@ private:
     ModeQAcro mode_qacro;
     ModeQAutotune mode_qautotune;
     ModeTakeoff mode_takeoff;
+    ModePreflight mode_preflight;
 
     // This is the state of the flight control system
     // There are multiple states defined such as MANUAL, FBW-A, AUTO
@@ -775,6 +777,7 @@ private:
 
     // time that rudder arming has been running
     uint32_t rudder_arm_timer;
+    uint32_t preflight_arm_timer;
 
     // support for quadcopter-plane
     QuadPlane quadplane{ahrs};
@@ -995,6 +998,7 @@ private:
     void init_rc_out_main();
     void init_rc_out_aux();
     void rudder_arm_disarm_check();
+    void preflight_mode_check();
     void read_radio();
     int16_t rudder_input(void);
     void control_failsafe();

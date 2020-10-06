@@ -168,6 +168,9 @@ void Plane::ahrs_update()
  */
 void Plane::update_speed_height(void)
 {
+    // ZenithController - disable ardupilot controller
+    return;
+
     if (auto_throttle_mode) {
 	    // Call TECS 50Hz update. Note that we call this regardless of
 	    // throttle suppressed, as this needs to be running for
@@ -527,6 +530,7 @@ void Plane::update_navigation()
     case Mode::Number::QRTL:
     case Mode::Number::QAUTOTUNE:
     case Mode::Number::QACRO:
+    case Mode::Number::PREFLIGHT:
         // nothing to do
         break;
     }
@@ -579,6 +583,9 @@ void Plane::update_alt()
     geofence_check(true);
 
     update_flight_stage();
+
+    // ZenithController - disable ardupilot controller
+    return;
 
     if (auto_throttle_mode && !throttle_suppressed) {        
 

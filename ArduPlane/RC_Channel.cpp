@@ -164,6 +164,18 @@ void RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const AuxSwit
         do_aux_function_q_assist_state(ch_flag);
         break;
 
+    case AUX_FUNC::RELAY:
+        plane.zenith_controller.ail_doublet.start();
+        break;
+
+    case AUX_FUNC::RELAY2:
+        plane.zenith_controller.elev_doublet.start();
+        break;
+
+    case AUX_FUNC::RELAY3:
+        plane.zenith_controller.rud_doublet.start();
+        break;
+
     default:
         RC_Channel::do_aux_function(ch_option, ch_flag);
         break;

@@ -122,14 +122,20 @@ void SRV_Channel::aux_servo_function_setup(void)
     case k_tiltMotorRight:
     case k_elevon_left:
     case k_elevon_right:
-    case k_vtail_left:
-    case k_vtail_right:
+    // case k_vtail_left:
+    // case k_vtail_right:
     case k_roll_out:
     case k_pitch_out:
     case k_yaw_out:
         set_angle(4500);
         break;
-    // TODO: find a better way
+    // Zenith angle course parameters
+    case k_vtail_left:
+        set_angle(3000);
+        break;
+    case k_vtail_right:
+        set_angle(3000);
+        break;
     case k_aileron:
         set_angle(2500);
         break;

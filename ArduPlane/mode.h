@@ -39,6 +39,7 @@ public:
         QRTL          = 21,
         QAUTOTUNE     = 22,
         QACRO         = 23,
+        PREFLIGHT     = 24,
     };
 
     // Constructor
@@ -481,6 +482,22 @@ protected:
 
     bool takeoff_started;
     Location start_loc;
+
+    bool _enter() override;
+};
+
+class ModePreflight: public Mode
+{
+public:
+    Number mode_number() const override { return Number::PREFLIGHT; }
+    const char *name() const override { return "PREFLIGHT"; }
+    const char *name4() const override { return "PFLT"; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+    
+protected:
+    uint64_t start_time_us;
 
     bool _enter() override;
 };

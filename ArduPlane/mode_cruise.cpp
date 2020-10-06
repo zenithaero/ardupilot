@@ -39,4 +39,3 @@ void ModeCruise::update()
     }
     plane.update_fbwb_speed_height();
 }
-

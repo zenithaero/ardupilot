@@ -47,6 +47,7 @@ void GCS_Plane::update_vehicle_sensor_status_flags(void)
     bool attitude_stabilized = false;
     switch (plane.control_mode->mode_number()) {
     case Mode::Number::MANUAL:
+    case Mode::Number::PREFLIGHT:
         break;
 
     case Mode::Number::ACRO:

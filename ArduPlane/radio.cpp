@@ -175,6 +175,39 @@ void Plane::rudder_arm_disarm_check()
 	}
 }
 
+/*
+  check for pilot input to arm preflight
+*/
+void Plane::preflight_mode_check()
+{
+    if (is_flying())
+        return;
+    
+    if (control_mode == &mode_manual) {
+        if (channel_pitch->get_control_in() > -4000 ||
+            channel_roll->get_control_in() < 4000) {
+            // Reset arming timer
+            preflight_arm_timer = millis();
+        }
+        if (millis() - preflight_arm_timer > 3000) {
+            // Enter preflight mode
+            preflight_arm_timer = millis();
+            set_mode(mode_preflight, ModeReason::RC_COMMAND);
+        }
+    } else if (control_mode == &mode_preflight) {
+        if (channel_pitch->get_control_in() > -4000 ||
+            channel_roll->get_control_in() > -4000) {
+            // Reset arming timer
+            preflight_arm_timer = millis();
+        }
+        if (millis() - preflight_arm_timer > 3000) {
+            // Enter preflight mode
+            preflight_arm_timer = millis();
+            set_mode(mode_manual, ModeReason::RC_COMMAND);
+        }
+    }
+}
+
 void Plane::read_radio()
 {
     if (!rc().read_input()) {
@@ -215,6 +248,7 @@ void Plane::read_radio()
     }
 
     rudder_arm_disarm_check();
+    preflight_mode_check();
 
     // potentially swap inputs for tailsitters
     quadplane.tailsitter_check_input();

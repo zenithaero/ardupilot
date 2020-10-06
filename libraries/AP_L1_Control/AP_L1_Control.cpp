@@ -1,6 +1,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include "AP_L1_Control.h"
-#include <Zenith/ArdupilotGains/ZenithGains.h>
+#include <Zenith/constants.h>
 #include <stdio.h>
 
 extern const AP_HAL::HAL& hal;
@@ -216,7 +216,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     _last_update_waypoint_us = now;
 
     // Calculate L1 gain required for specified damping
-    float K_L1 = 4.0f * ZenithGains::L1.damping * ZenithGains::L1.damping;
+    float K_L1 = 4.0f * ControllerData::xTrack.legacyDamping * ControllerData::xTrack.legacyDamping;
 
     // Get current position and velocity
     if (_ahrs.get_position(_current_loc) == false) {
@@ -242,7 +242,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     // Calculate time varying control parameters
     // Calculate the L1 length required for specified period
     // 0.3183099 = 1/1/pipi
-    _L1_dist = MAX(0.3183099f * ZenithGains::L1.damping / ZenithGains::L1.periodInv * groundSpeed, dist_min);
+    _L1_dist = MAX(0.3183099f * ControllerData::xTrack.legacyDamping / ControllerData::xTrack.legacyPeriodInv * groundSpeed, dist_min);
 
     // Calculate the NE position of WP B relative to WP A
     Vector2f AB = prev_WP.get_distance_NE(next_WP);
@@ -303,8 +303,8 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
         // compute integral error component to converge to a crosstrack of zero when traveling
         // straight but reset it when disabled or if it changes. That allows for much easier
         // tuning by having it re-converge each time it changes.
-        _L1_xtrack_i_gain = ZenithGains::L1.xTrackI;
-        _L1_xtrack_i_gain_prev = ZenithGains::L1.xTrackI;
+        _L1_xtrack_i_gain = ControllerData::xTrack.legacyI;
+        _L1_xtrack_i_gain_prev = ControllerData::xTrack.legacyI;
         if (_L1_xtrack_i_gain <= 0 || !is_equal(_L1_xtrack_i_gain.get(), _L1_xtrack_i_gain_prev)) {
             _L1_xtrack_i = 0;
             _L1_xtrack_i_gain_prev = _L1_xtrack_i_gain;
@@ -347,12 +347,12 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     radius = loiter_radius(fabsf(radius));
 
     // Calculate guidance gains used by PD loop (used during circle tracking)
-    float omega = (6.2832f * ZenithGains::L1.periodInv);
+    float omega = (6.2832f * ControllerData::xTrack.legacyPeriodInv);
     float Kx = omega * omega;
-    float Kv = 2.0f * ZenithGains::L1.damping * omega;
+    float Kv = 2.0f * ControllerData::xTrack.legacyDamping * omega;
 
     // Calculate L1 gain required for specified damping (used during waypoint capture)
-    float K_L1 = 4.0f * ZenithGains::L1.damping * ZenithGains::L1.damping;
+    float K_L1 = 4.0f * ControllerData::xTrack.legacyDamping * ControllerData::xTrack.legacyDamping;
 
     //Get current position and velocity
     if (_ahrs.get_position(_current_loc) == false) {
@@ -374,7 +374,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     // Calculate time varying control parameters
     // Calculate the L1 length required for specified period
     // 0.3183099 = 1/pi
-    _L1_dist = 0.3183099f * ZenithGains::L1.damping / ZenithGains::L1.periodInv * groundSpeed;
+    _L1_dist = 0.3183099f * ControllerData::xTrack.legacyDamping / ControllerData::xTrack.legacyPeriodInv * groundSpeed;
 
     //Calculate the NE position of the aircraft relative to WP A
     const Vector2f A_air = center_WP.get_distance_NE(_current_loc);
@@ -454,7 +454,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
 void AP_L1_Control::update_heading_hold(int32_t navigation_heading_cd)
 {
     // Calculate normalised frequency for tracking loop
-    const float omegaA = 4.4428f * ZenithGains::L1.periodInv; // sqrt(2)*pi/period
+    const float omegaA = 4.4428f * ControllerData::xTrack.legacyPeriodInv; // sqrt(2)*pi/period
     // Calculate additional damping gain
 
     int32_t Nu_cd;

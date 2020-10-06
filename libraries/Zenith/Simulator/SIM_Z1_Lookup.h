@@ -10,100 +10,10 @@
 #include <SITL/SIM_ICEngine.h>
 #include <Filter/LowPassFilter.h>
 #include <vector>
+#include "../Utils/Interp.h"
 
 namespace SITL {
 
-class Interp {
-    
-typedef struct {
-    const size_t idx;
-    const double frac;
-} lookupIdx_t;
-
-typedef enum {
-    CLIP,
-    INTERPOLATE
-} oorBehavior_e;
-
-private:
-    const std::vector<const std::vector<double>> lookups;
-    oorBehavior_e oorBehavior;
-    size_t lookupProd;
-    // std::vector<size_t> lookupLength;
-
-    lookupIdx_t findIndex(size_t lookupIdx, double value) const {
-        auto lookup = lookups[lookupIdx];
-        size_t k;
-        for (k = 0; (k < lookup.size() - 2) && (value > lookup[k + 1]); k++);
-        double frac = (value - lookup[k]) / (lookup[k + 1] - lookup[k]);
-        if (oorBehavior == CLIP)
-            frac = MAX(0.0, MIN(1.0, frac));
-        return (lookupIdx_t) {
-            .idx = k,
-            .frac = frac
-        };
-    }
-
-    double getValue(const double *table, const std::vector<size_t> &indices, size_t tableIdx) const {
-        assert(indices.size() > 0);
-        size_t idx = tableIdx;
-        for (size_t l = 0; l < lookups.size(); l++) {
-            idx = idx * lookups[l].size() + indices[l];
-        };
-        return table[idx];
-    }
-
-public:
-    Interp(const std::vector<const std::vector<double>> &lookups, oorBehavior_e oorBehavior = CLIP) 
-        : lookups(lookups), oorBehavior(oorBehavior) {
-            assert(lookups.size() > 0 && lookups.size() < 32);
-            lookupProd = 1;
-            for (auto lookup : lookups) {
-                // Lookup must be large enough for interpolation
-                assert(lookup.size() > 1);
-                // Assert that the lookup is monotically increasing
-                for (size_t k = 0; k < lookup.size() - 1; k++)
-                    assert(lookup[k] < lookup[k + 1]);
-                // Increment table size
-                lookupProd *= lookup.size();
-            }
-        };
-
-    std::vector<double> clamp(const std::vector<double> &vector) const {
-        std::vector<double> rtn;
-        for (size_t k = 0; k < lookups.size(); k++) {
-            double min = lookups[k][0];
-            double max = lookups[k][lookups.size() - 1];
-            rtn.push_back(MAX(min, MIN(max, vector[k])));
-        }
-        return rtn;
-    }
-    
-    double get(const double *table, const std::vector<double> &values, size_t tableIdx = 0) const {
-        assert(values.size() == lookups.size());
-        std::vector<lookupIdx_t> indices;
-        std::vector<size_t> indList;
-        for (size_t k = 0; k < lookups.size(); k++) {
-            auto val = values[k];
-            indices.push_back(findIndex(k, val));
-            indList.push_back(0);
-        }
-        // Now loop through all possible indices n-uplets
-        double value = 0.0;
-        // printf("preparing lookup. nPoints: %d\n", 1 << lookups.size());
-        for (size_t k = 0; k < 1 << lookups.size(); k++) {
-            double frac = 1;
-            for (size_t l = 0; l < lookups.size(); l++) {
-                size_t on = (k >> l) & 1;
-                indList[l] = indices[l].idx + on;
-                frac *= on ? indices[l].frac : 1 - indices[l].frac;
-            }
-            // Now get value at indList
-            value += frac * getValue(table, indList, tableIdx);
-        }
-        return value;
-    }
-};
 
 class Startup
 {
@@ -162,17 +72,13 @@ public:
     }
 
 protected:
-    Interp *aeroData;
+    Interp<double> *aeroData;
     const float hover_throttle = 0.7f;
     const float air_density = 1.225; // kg/m^3 at sea level, ISA conditions
     float angle_of_attack;
     float beta;
-
-    // TODO: move to matlab exported model
-    struct {
-        Matrix3f I, I_inv;
-        float staticThrustKg = 2.670f;
-    } coefficient;
+    Matrix3f I, I_inv;
+    std::vector<std::vector<float>> servo_map;
 
     float thrust_scale;
 
@@ -187,7 +93,7 @@ protected:
     FM getDampingFM(const std::vector<double> lookup, Vector3f pqr);
     Vector3f getForce(float inputAileron, float inputElevator, float inputRudder) const;
     Vector3f getTorque(float inputAileron, float inputElevator, float inputRudder, float inputThrust, const Vector3f &force) const;
-    void calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, Vector3f &body_accel);
+    void calculate_forces(const struct sitl_input &input, Vector3f &rot_accel);
 };
 
 } // namespace SITL

@@ -382,28 +382,44 @@ void Plane::stabilize()
 {
     Vector3f vel, pos;
     if (!ahrs.get_velocity_NED(vel))
-        printf("Velocity retrieval error");
+        printf("Velocity retrieval error\n");
     Vector3f gyro = ahrs.get_gyro();
     if (!ahrs.get_relative_position_NED_home(pos))
-        printf("Position retrieval error");
-    AP::logger().Write("AHRS", "TimeUS,gx,gy,gz,vn,ve,vd,n,e,d", "Qfffffffff",
+        printf("Position retrieval error\n");
+    auto acc = AP::ins().get_accel();
+    AP::logger().Write("AHRS", "TimeUS,gx,gy,gz,vn,ve,vd,n,e,d,ax,ay,az", "Qffffffffffff",
         AP_HAL::micros64(),
         gyro.x, gyro.y, gyro.z,
         vel.x, vel.y, vel.z,
-        pos.x, pos.y, pos.z);
+        pos.x, pos.y, pos.z,
+        acc.x, acc.y, acc.z);
 
+    control_mode = &mode_fbwa; // TEMP
     if (control_mode == &mode_manual) {
+        
         // reset steering controls
         steer_state.locked_course = false;
         steer_state.locked_course_err = 0;
         return;
     }
 
-    // Defer to zenithController
+    // ZenithController - compute throttle & pitch command
+    if (auto_throttle_mode  && !throttle_suppressed) {
+        float target_alt = relative_target_altitude_cm() / 100.f;
+        float target_airspeed = target_airspeed_cm / 100.f;
+        zenith_controller.update_spd_alt(target_airspeed, target_alt);
+
+        // Force computation & setting of pitch & thr
+        // nav_roll_cd = 0;
+        // calc_nav_pitch();
+        // calc_nav_roll();
+        // calc_throttle();
+    }
+
+    // ZenithController - update pitch & yaw
     // Warning: If disabled, uncomment servos.cpp ln 739-740 to re-enable rudder control
-    // TODO
-    // nav_pitch_cd = (int32_t)(degrees(-0.02389) * 100);
-    zenithController.stabilize(nav_pitch_cd / 100.f, nav_roll_cd / 100.f);
+    int16_t rudder_cd = rudder_input();
+    zenith_controller.stabilize(nav_pitch_cd / 100.f, nav_roll_cd / 100.f, rudder_cd / 100.f);
     return;
 
 
@@ -489,7 +505,9 @@ void Plane::calc_throttle()
         return;
     }
 
-    int32_t commanded_throttle = SpdHgt_Controller->get_throttle_demand();
+    // ZenithController - update throttle
+    // int32_t commanded_throttle = SpdHgt_Controller->get_throttle_demand();
+    int32_t commanded_throttle = (int32_t)(zenith_controller.get_throttle_command() * 100);
 
     // Received an external msg that guides throttle in the last 3 seconds?
     if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
@@ -525,6 +543,7 @@ void Plane::calc_nav_yaw_coordinated(float speed_scaler)
             disable_integrator = true;
         }
 
+        // ZenithController - update yaw
         commanded_rudder = yawController.get_servo_out(speed_scaler, disable_integrator);
 
         // add in rudder mixing from roll
@@ -601,7 +620,11 @@ void Plane::calc_nav_pitch()
 {
     // Calculate the Pitch of the plane
     // --------------------------------
-    int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
+
+    // ZenithController - update pitch command
+    // int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
+    int32_t commanded_pitch = (int32_t)(zenith_controller.get_pitch_command() * 100);
+
 
     // Received an external msg that guides roll in the last 3 seconds?
     if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
@@ -610,7 +633,8 @@ void Plane::calc_nav_pitch()
         commanded_pitch = plane.guided_state.forced_rpy_cd.y;
     }
 
-    nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
+    // nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
+    nav_pitch_cd = commanded_pitch;
 }
 
 
