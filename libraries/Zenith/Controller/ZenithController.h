@@ -7,16 +7,19 @@
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Math/AP_Math.h>
 #include <Filter/LowPassFilter.h>
-#include "../Utils/Interp.h"
+#include <Zenith/Utils/Interp.h>
 
 class LinearController {
 public:
-    template<size_t m, size_t n>
+    template<size_t n, size_t n_tas, size_t n_k>
     LinearController(
         AP_AHRS &ahrs,
-        const char *stateNames[],
-        const char *expectedNames[],
-        const float (&K)[m][n]);
+        const char* (&stateNames)[n],
+        const char* (&expectedNames)[n],
+        const float (&_K_tas)[n_tas],
+        const float (&_K_grid)[n_k]);
+
+    ~LinearController();
 
     /* Do not allow copies */
     LinearController(const LinearController &other) = delete;
@@ -26,10 +29,13 @@ protected:
 	AP_AHRS &ahrs;
     uint64_t t_prev;
     float dt;
+    // Gridded gain
+    LowPassFilter<float> tas_filter;
+    std::vector<float> K_grid;
+    Interp<float> *K_interp;
     std::vector<std::vector<float>> K;
-    Interp<float> *Kinterp;
 
-    void update_dt();
+    void update();
     void init_gains();
 };
 

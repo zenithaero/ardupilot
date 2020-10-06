@@ -40,14 +40,10 @@ bool DoubletHandler::udpate(float last_command) {
 	return active;
 }
 
+
 void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg, float rudder_deg) {
 	// Full stabilisation, or input (/state) based mode?
 	// Ignore ardupilot state machine?
-
-	// TEMP
-	if (t0 == 0)
-        t0 = AP_HAL::micros64();
-    float dt = (AP_HAL::micros64() - t0) / 1e6f;
 
 	// Compute speed scaler
 	float speed_scaler = 1;
@@ -57,7 +53,11 @@ void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg, float r
 		speed_scaler = ControllerData::constants.scalingSpeed / airspeed;
 		speed_scaler = CLAMP(speed_scaler, 0.2, 2);
     }
-	// printf("airspeed %.2f, scaler %.2f\n", airspeed, speed_scaler);
+
+	// TEMP
+	if (t0 == 0)
+        t0 = AP_HAL::micros64();
+    float dt = (AP_HAL::micros64() - t0) / 1e6f;
 
 	phi_cmd_deg = 0;
 	theta_cmd_deg = degrees(0.00557);
@@ -120,27 +120,53 @@ float ZenithController::get_rudder_command() {
 	return roll_yaw_controller.rud_command;
 }
 
-template<size_t m, size_t n>
+template<size_t n, size_t n_tas, size_t n_k>
 LinearController::LinearController(
 	AP_AHRS &_ahrs,
-	const char *stateNames[],
-	const char *expectedNames[],
-	const float (&_K)[m][n]) : ahrs(_ahrs) {
+	const char* (&stateNames)[n],
+	const char* (&expectedNames)[n],
+	const float (&_K_tas)[n_tas],
+	const float (&_K_grid)[n_k]) : ahrs(_ahrs) {
 	for (size_t j = 0; j < n; j++) {
 		if (strcmp(stateNames[j], expectedNames[j]) != 0) {
 			printf("State mismatch: %s (expected %s)\n", stateNames[j], expectedNames[j]);
 			exit(1);
 		}
 	}
-	buildMat(_K, this->K);
+	this->K_grid = std::vector<float>(_K_grid, _K_grid + n_k);
+	std::vector<float> K_tas(_K_tas, _K_tas + n_tas);
+    std::vector<const std::vector<float>> interp = {K_tas};
+	K_interp = new Interp<float>(interp);
+	
+	// Initialize gain matrix
+	int j = n_k / n / n_tas;
+	for (size_t i = 0; i < n; i++)
+		K.push_back(std::vector<float>(j, 0));
 }
 
-void LinearController::update_dt() {
+LinearController::~LinearController() {
+	delete(K_interp);
+}
+
+void LinearController::update() {
+	// Update timestep
 	uint64_t t_now = AP_HAL::micros64();
 	dt = (float)(t_now - t_prev) / 1e6f;
 	if (t_prev == 0)
 		dt = 0.f;
 	t_prev = t_now;
+
+	// Update tas filter
+	float airspeed;
+    if (ahrs.airspeed_estimate(airspeed)) {
+		tas_filter.set_cutoff_frequency(1/5); // T = 5s
+		tas_filter.apply(airspeed);
+	}
+
+	// Update controller gains
+	std::vector<float> values = { tas_filter.get() };
+	std::vector<float> vec = K_interp->get_vec(K_grid, values);
+	reshape(vec, K);
 }
 
 const char* pitchFields[] = {"thetaErrDeg", "thetaErrInt", "<qDeg>"}; // , "<hDot>"},
@@ -150,6 +176,7 @@ PitchController::PitchController(AP_AHRS &_ahrs)
 		_ahrs,
 		ControllerData::pitch.stateNames,
 		pitchFields,
+		ControllerData::pitch.Ktas,
 		ControllerData::pitch.K
 	) {};
 
@@ -160,7 +187,7 @@ void PitchController::reset() {
 }
 
 void PitchController::update(float theta_cmd_deg, float speed_scaler) {
-	update_dt();
+	LinearController::update();
 
 	float theta_deg = ahrs.pitch_sensor / 100.f;
 	float theta_err_deg = theta_cmd_deg - theta_deg;
@@ -229,11 +256,12 @@ RollYawController::RollYawController(AP_AHRS &_ahrs)
 		_ahrs,
 		ControllerData::rollYaw.stateNames,
 		rollFields,
+		ControllerData::rollYaw.Ktas,
 		ControllerData::rollYaw.K
 	) {};
 
 void RollYawController::update(float phi_cmd_deg, float rudder_deg, float speed_scaler) {
-	update_dt();
+	LinearController::update();
 	float phi_deg = ahrs.roll_sensor / 100.f;
 	float phi_err_deg = phi_cmd_deg - phi_deg;
 	phi_err_deg = CLAMP(phi_err_deg, -ControllerData::rollYaw.maxCmdDeg, ControllerData::rollYaw.maxCmdDeg);
@@ -305,11 +333,12 @@ SpdAltController::SpdAltController(AP_AHRS &_ahrs)
 		_ahrs,
 		ControllerData::spdAlt.stateNames,
 		spdAltFields,
+		ControllerData::spdAlt.Ktas,
 		ControllerData::spdAlt.K
 	) {};
 
 void SpdAltController::update(float tas_cmd, float h_cmd) {
-	update_dt();
+	LinearController::update();
 
 	// Retreive measurements
 	float h;

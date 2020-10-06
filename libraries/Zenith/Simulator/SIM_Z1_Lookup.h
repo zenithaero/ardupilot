@@ -10,7 +10,7 @@
 #include <SITL/SIM_ICEngine.h>
 #include <Filter/LowPassFilter.h>
 #include <vector>
-#include "../Utils/Interp.h"
+#include <Zenith/Utils/Interp.h>
 
 namespace SITL {
 

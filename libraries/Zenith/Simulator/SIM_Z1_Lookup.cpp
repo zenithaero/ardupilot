@@ -9,18 +9,19 @@
 #include <vector>
 #include <stdio.h>
 #include <Zenith/constants.h>
+
 using namespace SITL;
 
 Startup startup;
-#define INTERP(name, lookup, tableIdx) ({                                     \
-    FM _fm;                                                                   \
-    _fm.force.x = aeroData->get(ModelAeroData::CX##name, lookup, tableIdx);  \
-    _fm.force.y = aeroData->get(ModelAeroData::CY##name, lookup, tableIdx);  \
-    _fm.force.z = aeroData->get(ModelAeroData::CZ##name, lookup, tableIdx);  \
-    _fm.moment.x = aeroData->get(ModelAeroData::Cl##name, lookup, tableIdx); \
-    _fm.moment.y = aeroData->get(ModelAeroData::Cm##name, lookup, tableIdx); \
-    _fm.moment.z = aeroData->get(ModelAeroData::Cn##name, lookup, tableIdx); \
-    _fm;                                                                      \
+#define INTERP(name, lookup, tableIdx) ({                                                                  \
+    FM _fm;                                                                                                \
+    _fm.force.x = aeroData->get(ModelAeroData::CX##name, DIM(ModelAeroData::CX##name), lookup, tableIdx);  \
+    _fm.force.y = aeroData->get(ModelAeroData::CY##name, DIM(ModelAeroData::CX##name), lookup, tableIdx);  \
+    _fm.force.z = aeroData->get(ModelAeroData::CZ##name, DIM(ModelAeroData::CX##name), lookup, tableIdx);  \
+    _fm.moment.x = aeroData->get(ModelAeroData::Cl##name, DIM(ModelAeroData::CX##name), lookup, tableIdx); \
+    _fm.moment.y = aeroData->get(ModelAeroData::Cm##name, DIM(ModelAeroData::CX##name), lookup, tableIdx); \
+    _fm.moment.z = aeroData->get(ModelAeroData::Cn##name, DIM(ModelAeroData::CX##name), lookup, tableIdx); \
+    _fm;                                                                                                   \
 })
 
 
@@ -31,7 +32,7 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     frame_height = 0.1f;
     num_motors = 1;
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
-    buildMat(ModelConfig::servoMap, servo_map);
+    build_mat(ModelConfig::servoMap, servo_map);
 
     // Compute inverse intertia
     I = Matrix3f(

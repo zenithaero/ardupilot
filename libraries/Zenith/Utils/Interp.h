@@ -16,18 +16,24 @@ typedef enum {
 } oorBehavior_e;
 
 public:
-    Interp(const std::vector<const std::vector<T>> &lookups, oorBehavior_e oorBehavior = CLIP);
+    Interp(const std::vector<const std::vector<T>> &lookups, oorBehavior_e _oor_behavior = CLIP);
 
     std::vector<T> clamp(const std::vector<T> &vector) const;
     
-    T get(const T *table, const std::vector<T> &values, size_t tableIdx = 0) const;
+    T get(const T *table, size_t table_length, const std::vector<T> &values, size_t vec_length = 1,  size_t vec_idx = 0) const;
+
+    std::vector<T> get_vec(const T *table, size_t table_length, const std::vector<T> &values) const;
+
+    std::vector<T> get_vec(const std::vector<T> &table, const std::vector<T> &values) const;
 
 private:
     const std::vector<const std::vector<T>> lookups;
-    oorBehavior_e oorBehavior;
-    size_t lookupProd;
+    oorBehavior_e oor_behavior;
+    size_t lookup_prod;
 
-    lookupIdx_t findIndex(size_t lookupIdx, T value) const;
+    lookupIdx_t find_index(size_t lookupIdx, T value) const;
 
-    T getValue(const T *table, const std::vector<size_t> &indices, size_t tableIdx) const;
+    T get_value(const T *table, size_t table_length, const std::vector<size_t> &indices, size_t vec_length = 1,  size_t vec_idx = 0) const;
 };
+
+#include "Interp.cpp" // Required for template classes
