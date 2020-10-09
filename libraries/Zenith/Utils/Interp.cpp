@@ -1,4 +1,5 @@
 // #include "Interp.h"
+#include <Zenith/constants.h>
 
 template <typename T>
 Interp<T>::Interp(const std::vector<const std::vector<T>> &lookups, oorBehavior_e _oor_behavior) 

@@ -1,4 +1,6 @@
 #pragma once
+#pragma GCC diagnostic push 
+#pragma GCC diagnostic ignored "-Wformat-security"
 
 #include <vector>
 
@@ -32,18 +34,16 @@
 
 #define CLAMP(value, min, max) MAX(min, MIN(max, value))
 
-bool soft_assert(bool assertion, const char* format, ...) {
-    va_list argptr;
-    va_start(argptr, format);
+template<typename... Args>
+bool soft_assert(bool assertion, const char* format, Args... args) {
     if (!assertion)
-        vprintf(format, argptr);
-    va_end(argptr);
+        printf(format, args...);
     return !assertion;
 }
 
-void hard_assert(bool assertion, const char* format, ...) {
-    va_list argptr;
-    if (soft_assert(assertion, format, argptr))
+template<typename... Args>
+void hard_assert(bool assertion, const char* format, Args... args) {
+    if (soft_assert(assertion, format, args...))
         exit(-1);
 }
 
@@ -104,3 +104,5 @@ void print_mat(std::vector<T> &mat, char *str) {
 		printf("\n");
 	}
 }
+
+#pragma GCC diagnostic pop 

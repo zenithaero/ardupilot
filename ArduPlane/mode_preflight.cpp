@@ -19,6 +19,8 @@ void ModePreflight::update()
     t = CLAMP(t, 0, N * T);
     float v = cosf(2 * M_PI * t / T);
 
+    printf("preflight update: %.2f\n", v);
+
     SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, v * ControllerData::rollYaw.maxAilDeg);
     SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, v * ControllerData::pitch.maxElevDeg);
     SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, v * ControllerData::rollYaw.maxRudDeg);
