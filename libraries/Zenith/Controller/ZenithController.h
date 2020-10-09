@@ -117,7 +117,7 @@ protected:
     float settle_time;
 
     // Vars
-    uint64_t t_start;
+    uint64_t t_start = 0;
     LowPassFilter<float> command_filter;
 };
 

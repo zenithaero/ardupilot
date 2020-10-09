@@ -25,6 +25,6 @@ The pixhawk 4 system is comprised of
 
 ![alt text](https://docs.px4.io/master/assets/hardware/power_module/holybro_pm07/pixhawk4_power_management_board.png "Power board wiring")
 
-The power module provides power to the pixhawk and the servos. It's connected to the pixhawk with a 6-pin power cable as well as a 10-pin PWM cable from the pixawk output **I/O PWM OUT** to the power module input **FMU PWM IN**\
+The power module provides power to the pixhawk and the servos. It's connected to the pixhawk with a 6-pin power cable as well as a 10-pin PWM cable from the pixawk output **I/O-PWM-OUT** to the power module input **FMU-PWM-IN**\
 Power comes to the power module from a 7 to 51v (2 to 12s LiPo) DC port (**1**)\
-ESCs & servos are connected to the power module at the **FMU PWM OUT** 3-pin rail (**2**). At least one ESC must provide 5V UBEC power to the power rail\
+ESCs & servos are connected to the power module at the **FMU-PWM-OUT** 3-pin rail (**2**). At least one ESC must provide 5V UBEC power to the power rail

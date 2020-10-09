@@ -1,4 +1,4 @@
-#include "Interp.h"
+// #include "Interp.h"
 
 template <typename T>
 Interp<T>::Interp(const std::vector<const std::vector<T>> &lookups, oorBehavior_e _oor_behavior) 
@@ -30,6 +30,7 @@ std::vector<T> Interp<T>::clamp(const std::vector<T> &vector) const {
 
 template <typename T>
 T Interp<T>::get(const T *table, size_t table_length, const std::vector<T> &values, size_t vec_length,  size_t vec_idx) const {
+    // printf("table length %lu lookup_prod %lu vec_length %lu values.size %lu lookups.size %lu vec_idx %lu vec_length %lu\n", table_length, lookup_prod, vec_length, values.size(), lookups.size(), vec_idx, vec_length);
     assert(table_length == lookup_prod * vec_length && values.size() == lookups.size() && vec_idx < vec_length);
     std::vector<lookupIdx_t> indices;
     std::vector<size_t> indList;
@@ -84,6 +85,7 @@ typename Interp<T>::lookupIdx_t Interp<T>::find_index(size_t lookup_idx, T value
 
 template <typename T>
 T Interp<T>::get_value(const T *table, size_t table_length, const std::vector<size_t> &indices, size_t vec_length,  size_t vec_idx) const {
+    // printf("table length %lu lookup_prod %lu vec_length %lu indices.size %lu lookups.size %lu vec_idx %lu vec_length %lu\n", table_length, lookup_prod, vec_length, indices.size(), lookups.size(), vec_idx, vec_length);
     assert(table_length == lookup_prod * vec_length && indices.size() == lookups.size() && vec_idx < vec_length);
     size_t idx = vec_idx;
     for (size_t l = 0; l < lookups.size(); l++)

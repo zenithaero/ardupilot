@@ -394,7 +394,7 @@ void Plane::stabilize()
         pos.x, pos.y, pos.z,
         acc.x, acc.y, acc.z);
 
-    control_mode = &mode_fbwa; // TEMP
+    // control_mode = &mode_fbwa; // TEMP
     if (control_mode == &mode_manual) {
         
         // reset steering controls

@@ -13,15 +13,15 @@
 using namespace SITL;
 
 Startup startup;
-#define INTERP(name, lookup, tableIdx) ({                                                                  \
-    FM _fm;                                                                                                \
-    _fm.force.x = aeroData->get(ModelAeroData::CX##name, DIM(ModelAeroData::CX##name), lookup, tableIdx);  \
-    _fm.force.y = aeroData->get(ModelAeroData::CY##name, DIM(ModelAeroData::CX##name), lookup, tableIdx);  \
-    _fm.force.z = aeroData->get(ModelAeroData::CZ##name, DIM(ModelAeroData::CX##name), lookup, tableIdx);  \
-    _fm.moment.x = aeroData->get(ModelAeroData::Cl##name, DIM(ModelAeroData::CX##name), lookup, tableIdx); \
-    _fm.moment.y = aeroData->get(ModelAeroData::Cm##name, DIM(ModelAeroData::CX##name), lookup, tableIdx); \
-    _fm.moment.z = aeroData->get(ModelAeroData::Cn##name, DIM(ModelAeroData::CX##name), lookup, tableIdx); \
-    _fm;                                                                                                   \
+#define INTERP(name, lookup, vec_length, vec_idx) ({                                                                  \
+    FM _fm;                                                                                                             \
+    _fm.force.x = aeroData->get(ModelAeroData::CX##name, DIM(ModelAeroData::CX##name), lookup, vec_length, vec_idx);  \
+    _fm.force.y = aeroData->get(ModelAeroData::CY##name, DIM(ModelAeroData::CX##name), lookup, vec_length, vec_idx);  \
+    _fm.force.z = aeroData->get(ModelAeroData::CZ##name, DIM(ModelAeroData::CX##name), lookup, vec_length, vec_idx);  \
+    _fm.moment.x = aeroData->get(ModelAeroData::Cl##name, DIM(ModelAeroData::CX##name), lookup, vec_length, vec_idx); \
+    _fm.moment.y = aeroData->get(ModelAeroData::Cm##name, DIM(ModelAeroData::CX##name), lookup, vec_length, vec_idx); \
+    _fm.moment.z = aeroData->get(ModelAeroData::Cn##name, DIM(ModelAeroData::CX##name), lookup, vec_length, vec_idx); \
+    _fm;                                                                                                                \
 })
 
 
@@ -33,6 +33,7 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     num_motors = 1;
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
     build_mat(ModelConfig::servoMap, servo_map);
+    build_mat(ModelConfig::motorMap, motor_map);
 
     // Compute inverse intertia
     I = Matrix3f(
@@ -85,18 +86,21 @@ Z1_Lookup::~Z1_Lookup() {
 FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
     // auto fm = INTERP(0, lookup);
     // printf("lookup: [%.4f, %.4f, %.4f]: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n", lookup[0], lookup[1], lookup[2], fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
-    return INTERP(0, lookup, 0);
+    return INTERP(0, lookup, 1, 0);
 }
 
-FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud) {
+FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud, float thr) {
     FM fm;
-    // Apply map
+    // Actuator map
     std::vector<float> vec = {ail, elev, rud, 0, 0};
     std::vector<float> act = matmul(servo_map, vec);
-    // Lookup map
-    for (size_t k = 0; k < act.size(); k++) {
-        fm += INTERP(dF, lookup, k) * act[k] * ModelConfig::servoMaxDeg[0][k];
-    }
+    for (size_t k = 0; k < act.size(); k++)
+        fm += INTERP(dF, lookup, act.size(), k) * act[k] * ModelConfig::servoMaxDeg[0][k];
+    // Motor map
+    vec = {thr, 0};
+    act = matmul(motor_map, vec);
+    for (size_t k = 0; k < act.size(); k++)
+        fm += INTERP(dP, lookup, act.size(), k) * act[k] * ModelConfig::motorMax[0][k];
     return fm;
 }
 
@@ -104,9 +108,9 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
     FM fm;
     float denom = 2 * airspeed;
     if (!is_zero(denom)) {
-        fm += INTERP(p, lookup, 0) * pqr.x * ModelConfig::b * (1 / denom);
-        fm += INTERP(q, lookup, 0) * pqr.y * ModelConfig::c * (1 / denom);
-        fm += INTERP(r, lookup, 0) * pqr.z * ModelConfig::b * (1 / denom);
+        fm += INTERP(p, lookup, 1, 0) * pqr.x * ModelConfig::b * (1 / denom);
+        fm += INTERP(q, lookup, 1, 0) * pqr.y * ModelConfig::c * (1 / denom);
+        fm += INTERP(r, lookup, 1, 0) * pqr.z * ModelConfig::b * (1 / denom);
     }
     return fm;
 }
@@ -119,7 +123,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     float rud  = filtered_servo_angle(input, 3);
     float thr = filtered_servo_range(input, 2);
 
-    printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 15, rud * 15, thr);
+    // printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 15, rud * 15, thr);
 
     // Dummy state
     // gyro = Vector3f(3.5f, -4.f, -2.8f);
@@ -133,41 +137,41 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // thr = 0.5f;
 
     // TEMP
-    thr = 0.02124;
-    ail = 0;
-    rud = 0;
-    elev = 0.86159 / 15;
+    // thr = 0.02124;
+    // ail = 0;
+    // rud = 0;
+    // elev = 0.86159 / 15;
 
-    if (t0 == 0)
-        t0 = time_now_us;
-    float dt = (time_now_us - t0) / 1e6f;
-    if (dt < 15) {
-        gyro = Vector3f(0, 0, 0);
-        dcm.from_euler(0.00000, -0.02408, 0.00000);
-        velocity_ef = Vector3f(0, 0, 0);
-        velocity_air_bf = Vector3f(0, 0, 0);
-        velocity_air_ef = Vector3f(0, 0, 0);
-        airspeed_pitot = 0.f;
-        airspeed = 0.f;
-    }
-    if (dt > 15 && dt < 45) {
-        gyro = Vector3f(0, 0, 0);
-        dcm.from_euler(0.00000, -0.02408, 0.00000);
-        Vector3f velocity_bf = {14.99565, -0.00000, -0.36111};
-        velocity_ef = dcm * velocity_bf;
-        position.z = -200;
+    // if (t0 == 0)
+    //     t0 = time_now_us;
+    // float dt = (time_now_us - t0) / 1e6f;
+    // if (dt < 15) {
+    //     gyro = Vector3f(0, 0, 0);
+    //     dcm.from_euler(0.00000, -0.02408, 0.00000);
+    //     velocity_ef = Vector3f(0, 0, 0);
+    //     velocity_air_bf = Vector3f(0, 0, 0);
+    //     velocity_air_ef = Vector3f(0, 0, 0);
+    //     airspeed_pitot = 0.f;
+    //     airspeed = 0.f;
+    // }
+    // if (dt > 15 && dt < 45) {
+    //     gyro = Vector3f(0, 0, 0);
+    //     dcm.from_euler(0.00000, -0.02408, 0.00000);
+    //     Vector3f velocity_bf = {14.99565, -0.00000, -0.36111};
+    //     velocity_ef = dcm * velocity_bf;
+    //     position.z = -200;
 
-        // update_position();
-        // AIS computations
-        velocity_air_bf = velocity_bf;
-        velocity_air_ef = velocity_ef;
-        airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
-        airspeed = velocity_air_ef.length();
-    }
-    if (dt > 45)
-        elev += 1.f / 15;
-    if (dt > 65)
-        exit(-1);
+    //     // update_position();
+    //     // AIS computations
+    //     velocity_air_bf = velocity_bf;
+    //     velocity_air_ef = velocity_ef;
+    //     airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+    //     airspeed = velocity_air_ef.length();
+    // }
+    // if (dt > 45)
+    //     elev += 1.f / 15;
+    // if (dt > 65)
+    //     exit(-1);
 
     // Force longitudinal
     // float roll, pitch, yaw;
@@ -217,7 +221,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // Get aero FM
     // printf("lookup (alpha %.2f, beta %.2f, airspeed %.2f)\n", angle_of_attack, beta, airspeed);
     FM aeroFM = getAeroFM(lookup);
-    FM actuatorFM = getActuatorFM(lookup, ail, elev, rud);
+    FM actuatorFM = getActuatorFM(lookup, ail, elev, rud, thr);
     FM dampingFM = getDampingFM(lookup, gyro);
     // printf("qbar: %.2f\n", qbar);
     // printf("aeroFM (%.3f, %.3f, %.3f; %.3f, %.3f, %.3f)\n", aeroFM.force.x, aeroFM.force.y, aeroFM.force.z, aeroFM.moment.x, aeroFM.moment.y, aeroFM.moment.z);
@@ -238,13 +242,16 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     Vector3f armMoment = fm.force % CGOffset;
     fm.moment += armMoment;
     
-    // Simple static thrust motor model
-    double coeff = ModelConfig::thrustStatic - qbar * ModelConfig::thrustGain;
-    double thrust = CLAMP(GRAVITY_MSS * thr * coeff, 0, INFINITY);
-    
-    // thrust *= MIN(1, MAX(0, 0.85 - 0.01 * airspeed));
-    fm.force += Vector3f(thrust, 0, 0);
+    // AVL static thrust motor model
+    // double coeff = ModelConfig::thrustStatic - qbar * ModelConfig::thrustGain;
+    // double thrust = CLAMP(GRAVITY_MSS * thr * coeff, 0, INFINITY);
+    // fm.force += Vector3f(thrust, 0, 0);
     // printf("Thrust force: %.2f\n", thrust);
+
+    // ASWING thrust boost (low velocity)
+    double thrust = ModelConfig::thrustStatic * 10 * (12 - airspeed ) / 12;
+    thrust = CLAMP(thrust, 0, INFINITY);
+    fm.force += Vector3f(thrust, 0, 0);
 
     // Try adding a bit of drag
     // auto drag = -velocity_air_bf * 0.3f;

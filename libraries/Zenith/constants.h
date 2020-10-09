@@ -4,21 +4,19 @@
 
 // Models definitions
 #define MODEL_XUAV_ASW 0
-#define MODEL_XUAV_AVL 1
-#define MODEL_Z1F_ASW 2
-#define MODEL_Z1F_AVL 3
+#define MODEL_Z1F_ASW 1
 
-#define ZENITH_MODEL MODEL_XUAV_AVL
+#define ZENITH_MODEL MODEL_XUAV_ASW
 
 // Assign aero data
-#if ZENITH_MODEL == MODEL_XUAV_AVL
+#if ZENITH_MODEL == MODEL_XUAV_ASW
 #include "Simulator/data/xuav_config.h"
 #include "Simulator/data/xuav_aeroData.h"
 #include "Controller/data/xuav_controllerData.h"
 #define ModelConfig xuav_config
 #define ModelAeroData xuav_aeroData
 #define ControllerData xuav_controllerData
-#elif ZENITH_MODEL == MODEL_Z1F_AVL
+#elif ZENITH_MODEL == MODEL_Z1F_ASW
 #include "Simulator/data/Z1f_config.h"
 #include "Simulator/data/Z1f_aeroData.h"
 #include "Controller/data/Z1f_controllerData.h"
@@ -69,4 +67,25 @@ void reshape(std::vector<T> &src, std::vector<std::vector<T>> &dest) {
     for (size_t i = 0; i < dest.size(); i++)
         for (size_t j = 0; j < dest[0].size(); j++)
             dest[i][j] = src[i * dest[0].size() + j];
+}
+
+template <typename T>
+void print_vec(std::vector<T> &vec, char *str) {
+    printf("%s: [", str);
+	for (size_t i = 0; i < vec.size(); i++)
+			printf("%.2f, ", vec[i]);
+    printf("]\n");
+}
+
+template <typename T>
+void print_mat(std::vector<T> &mat, char *str) {
+    printf("%s: \n", str);
+    printf("[");
+	for (size_t i = 0; i < mat.size(); i++) {
+		for (size_t j = 0; j < mat[0].size(); j++)
+			printf("%.2f, ", mat[i][j]);
+		if (i == mat.size() - 1)
+			printf("]");
+		printf("\n");
+	}
 }
