@@ -249,7 +249,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // printf("Thrust force: %.2f\n", thrust);
 
     // ASWING thrust boost (low velocity)
-    double thrust = ModelConfig::thrustStatic * 10 * (12 - airspeed ) / 12;
+    double thrust = ModelConfig::thrustStatic * 100 * (13 - airspeed ) / 13 * thr;
     thrust = CLAMP(thrust, 0, INFINITY);
     fm.force += Vector3f(thrust, 0, 0);
 

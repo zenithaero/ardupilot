@@ -3,14 +3,14 @@
 template <typename T>
 Interp<T>::Interp(const std::vector<const std::vector<T>> &lookups, oorBehavior_e _oor_behavior) 
     : lookups(lookups) {
-        assert(lookups.size() > 0 && lookups.size() < 32);
+        hard_assert(lookups.size() > 0, "There must be at least one lookup\n");
         lookup_prod = 1;
         for (auto lookup : lookups) {
             // Lookup must be large enough for interpolation
-            assert(lookup.size() > 1);
-            // Assert that the lookup is monotically increasing
+            hard_assert(lookup.size() > 1, "Lookup tables must have at least two elements\n");
+            // Assert that the lookup is monotonically increasing
             for (size_t k = 0; k < lookup.size() - 1; k++)
-                assert(lookup[k] < lookup[k + 1]);
+                hard_assert(lookup[k] < lookup[k + 1], "Lookup tables must be monotonically increasing\n");
             // Increment table size
             lookup_prod *= lookup.size();
         }
@@ -30,8 +30,12 @@ std::vector<T> Interp<T>::clamp(const std::vector<T> &vector) const {
 
 template <typename T>
 T Interp<T>::get(const T *table, size_t table_length, const std::vector<T> &values, size_t vec_length,  size_t vec_idx) const {
-    // printf("table length %lu lookup_prod %lu vec_length %lu values.size %lu lookups.size %lu vec_idx %lu vec_length %lu\n", table_length, lookup_prod, vec_length, values.size(), lookups.size(), vec_idx, vec_length);
-    assert(table_length == lookup_prod * vec_length && values.size() == lookups.size() && vec_idx < vec_length);
+    if (soft_assert(
+        table_length == lookup_prod * vec_length &&
+        values.size() == lookups.size() &&
+        vec_idx < vec_length, "Invalid input format\n"))
+        return (T)0.0;
+
     std::vector<lookupIdx_t> indices;
     std::vector<size_t> indList;
     for (size_t k = 0; k < lookups.size(); k++) {
@@ -85,8 +89,12 @@ typename Interp<T>::lookupIdx_t Interp<T>::find_index(size_t lookup_idx, T value
 
 template <typename T>
 T Interp<T>::get_value(const T *table, size_t table_length, const std::vector<size_t> &indices, size_t vec_length,  size_t vec_idx) const {
-    // printf("table length %lu lookup_prod %lu vec_length %lu indices.size %lu lookups.size %lu vec_idx %lu vec_length %lu\n", table_length, lookup_prod, vec_length, indices.size(), lookups.size(), vec_idx, vec_length);
-    assert(table_length == lookup_prod * vec_length && indices.size() == lookups.size() && vec_idx < vec_length);
+    if (soft_assert(
+        table_length == lookup_prod * vec_length &&
+        indices.size() == lookups.size() &&
+        vec_idx < vec_length, "Invalid input format\n"))
+        return (T)0.0;
+
     size_t idx = vec_idx;
     for (size_t l = 0; l < lookups.size(); l++)
         idx = idx * lookups[l].size() + indices[l];

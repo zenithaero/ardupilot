@@ -165,15 +165,24 @@ void RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const AuxSwit
         break;
 
     case AUX_FUNC::RELAY:
-        plane.zenith_controller.ail_doublet.start();
+        if (ch_flag == AuxSwitchPos::HIGH)
+            plane.zenith_controller.ail_doublet.start();
+        else
+            plane.zenith_controller.ail_doublet.clear();
         break;
 
     case AUX_FUNC::RELAY2:
-        plane.zenith_controller.elev_doublet.start();
+        if (ch_flag == AuxSwitchPos::HIGH)
+            plane.zenith_controller.elev_doublet.start();
+        else
+            plane.zenith_controller.elev_doublet.clear();
         break;
 
     case AUX_FUNC::RELAY3:
-        plane.zenith_controller.rud_doublet.start();
+        if (ch_flag == AuxSwitchPos::HIGH)
+            plane.zenith_controller.rud_doublet.start();
+        else
+            plane.zenith_controller.rud_doublet.clear();
         break;
 
     default:

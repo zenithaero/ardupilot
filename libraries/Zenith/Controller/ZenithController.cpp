@@ -19,8 +19,13 @@ ZenithController::ZenithController(AP_AHRS &_ahrs) : ahrs(_ahrs) {
 };
 
 void DoubletHandler::start() {
-	printf("STARTED DOUBLET HANDLER\n");
+	printf("Started doublet\n");
 	t_start = AP_HAL::micros64();
+}
+
+void DoubletHandler::clear() {
+	printf("Cleared doublet\n");
+	t_start = 0;
 }
 
 bool DoubletHandler::udpate(float last_command) {
@@ -127,12 +132,11 @@ LinearController::LinearController(
 	const char* (&expectedNames)[n],
 	const float (&_K_tas)[n_tas],
 	const float (&_K_grid)[n_k]) : ahrs(_ahrs) {
-	for (size_t j = 0; j < n; j++) {
-		if (strcmp(stateNames[j], expectedNames[j]) != 0) {
-			printf("State mismatch: %s (expected %s)\n", stateNames[j], expectedNames[j]);
-			exit(1);
-		}
-	}
+	// Control state names
+	for (size_t j = 0; j < n; j++)
+		hard_assert(strcmp(stateNames[j], expectedNames[j]) == 0,
+			"State mismatch: %s (expected %s)\n", stateNames[j], expectedNames[j]);
+
 	this->K_grid = std::vector<float>(_K_grid, _K_grid + n_k);
 	std::vector<float> K_tas(_K_tas, _K_tas + n_tas);
     std::vector<const std::vector<float>> interp = {K_tas};
@@ -140,7 +144,9 @@ LinearController::LinearController(
 	
 	// Initialize gain matrix
 	size_t m = n_k / n / n_tas;
-	assert(m * n * n_tas == n_k);
+	hard_assert(m * n * n_tas == n_k,
+		"The grid length (%lu) must equal m (%lu) * n (%lu) * n_tas (%lu)\n",
+		n_k, m, n, n_tas);
 	for (size_t i = 0; i < m; i++)
 		K.push_back(std::vector<float>(n, 0));
 }
@@ -231,8 +237,8 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 
 	// Compute the controller output
 	std::vector<float> res = matmul(K, vec);
-	if (res.size() != 1)
-		printf("Invalid output size: %lu\n", res.size());
+	if (soft_assert(res.size() != 1, "Invalid output size %lu\n", res.size()))
+		return;
 	
 	float elev = res[0] * speed_scaler;
 
@@ -240,12 +246,12 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	elev += ControllerData::pitch.FF;
 
 	// Clamp the elevator
-	float elev_clamped = CLAMP(elev, -ControllerData::pitch.maxElevDeg, ControllerData::pitch.maxElevDeg);
-	elev_saturation = sgn(elev - elev_clamped);
+	elev_command = CLAMP(elev, -ControllerData::pitch.maxElevDeg, ControllerData::pitch.maxElevDeg);
+	elev_saturation = sgn(elev - elev_command);
 
 	// Assign the output
-	// printf("theta_cmd_deg %.2f, theta_deg %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, elev_clamped);
-	int16_t elev_cd = (int16_t)(elev_clamped * 100);
+	// printf("theta_cmd_deg %.2f, theta_deg %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, elev_command);
+	int16_t elev_cd = (int16_t)(elev_command * 100);
 	// SRV_Channels::move_servo(SRV_Channel::k_elevator, elev_cd, -1500, 1500); // doesn't seem to work with mixing
 	SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elev_cd);
 	// SRV_Channels:set_scaled
@@ -306,9 +312,8 @@ void RollYawController::update(float phi_cmd_deg, float rudder_deg, float speed_
 
 	// Compute the controller output
 	std::vector<float> res = matmul(K, vec);
-
-	if (res.size() != 2)
-		printf("Invalid output size: %lu\n", res.size());
+	if (soft_assert(res.size() != 2, "Invalid output size %lu\n", res.size()))
+		return;
 	float ail = res[0] * speed_scaler;
 	float rud = res[1] * speed_scaler;
 
@@ -412,8 +417,8 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 
 	// Compute the controller output
 	std::vector<float> res = matmul(K, vec);
-	if (res.size() != 2)
-		printf("Invalid output size: %lu\n", res.size());
+	if (soft_assert(res.size() != 2, "Invalid output size %lu\n", res.size()))
+		return;
 	float thr = res[0];
 	float pitch = res[1];
 

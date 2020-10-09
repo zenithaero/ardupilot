@@ -106,7 +106,7 @@ public:
         : channel(_channel), deflection(_deflection), duration(_duration), settle_time(_settle_time) {};
 
     void start();
-    
+    void clear();
     bool udpate(float last_command);
     
 protected:

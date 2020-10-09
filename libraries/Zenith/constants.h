@@ -32,6 +32,21 @@
 
 #define CLAMP(value, min, max) MAX(min, MIN(max, value))
 
+bool soft_assert(bool assertion, const char* format, ...) {
+    va_list argptr;
+    va_start(argptr, format);
+    if (!assertion)
+        vprintf(format, argptr);
+    va_end(argptr);
+    return !assertion;
+}
+
+void hard_assert(bool assertion, const char* format, ...) {
+    va_list argptr;
+    if (soft_assert(assertion, format, argptr))
+        exit(-1);
+}
+
 template <typename T>
 int sgn(T val) {
     return (T(0) < val) - (val < T(0));

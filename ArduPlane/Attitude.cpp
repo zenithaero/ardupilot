@@ -380,12 +380,11 @@ void Plane::stabilize_acro(float speed_scaler)
  */
 void Plane::stabilize()
 {
+    // TODO: ZENITH DISABLE - Logging
     Vector3f vel, pos;
-    if (!ahrs.get_velocity_NED(vel))
-        printf("Velocity retrieval error\n");
+    if (!ahrs.get_velocity_NED(vel)) {};
     Vector3f gyro = ahrs.get_gyro();
-    if (!ahrs.get_relative_position_NED_home(pos))
-        printf("Position retrieval error\n");
+    if (!ahrs.get_relative_position_NED_home(pos)) {};
     auto acc = AP::ins().get_accel();
     AP::logger().Write("AHRS", "TimeUS,gx,gy,gz,vn,ve,vd,n,e,d,ax,ay,az", "Qffffffffffff",
         AP_HAL::micros64(),

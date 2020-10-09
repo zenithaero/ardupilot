@@ -111,3 +111,13 @@ SIM_GPS_NOISE 0 9
 
 # Disable servo filter
 SIM_SERVO_SPEED  0.032
+
+
+# Increase FBW climb rate to 5m/s
+FBWB_CLIMB_RATE 3
+ARSPD_FBW_MIN 12
+ARSPD_FBW_MAX 20
+
+# Assign relay switches
+RC6_OPTION       28.000000
+RC7_OPTION       34.000000
