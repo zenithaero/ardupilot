@@ -237,7 +237,7 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 
 	// Compute the controller output
 	std::vector<float> res = matmul(K, vec);
-	if (soft_assert(res.size() != 1, "Invalid output size %lu\n", res.size()))
+	if (soft_assert(res.size() == 1, "Invalid output size %lu\n", res.size()))
 		return;
 	
 	float elev = res[0] * speed_scaler;
@@ -312,7 +312,7 @@ void RollYawController::update(float phi_cmd_deg, float rudder_deg, float speed_
 
 	// Compute the controller output
 	std::vector<float> res = matmul(K, vec);
-	if (soft_assert(res.size() != 2, "Invalid output size %lu\n", res.size()))
+	if (soft_assert(res.size() == 2, "Invalid output size %lu\n", res.size()))
 		return;
 	float ail = res[0] * speed_scaler;
 	float rud = res[1] * speed_scaler;
@@ -417,7 +417,7 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 
 	// Compute the controller output
 	std::vector<float> res = matmul(K, vec);
-	if (soft_assert(res.size() != 2, "Invalid output size %lu\n", res.size()))
+	if (soft_assert(res.size() == 2, "Invalid output size %lu\n", res.size()))
 		return;
 	float thr = res[0];
 	float pitch = res[1];

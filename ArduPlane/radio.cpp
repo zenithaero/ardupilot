@@ -184,7 +184,7 @@ void Plane::preflight_mode_check()
         return;
     
     if (control_mode == &mode_manual) {
-        if (channel_pitch->get_control_in() > -4000 ||
+        if (channel_pitch->get_control_in() < 4000 ||
             channel_roll->get_control_in() < 4000) {
             // Reset arming timer
             preflight_arm_timer = millis();
@@ -195,7 +195,7 @@ void Plane::preflight_mode_check()
             set_mode(mode_preflight, ModeReason::RC_COMMAND);
         }
     } else if (control_mode == &mode_preflight) {
-        if (channel_pitch->get_control_in() > -4000 ||
+        if (channel_pitch->get_control_in() < 4000 ||
             channel_roll->get_control_in() > -4000) {
             // Reset arming timer
             preflight_arm_timer = millis();
