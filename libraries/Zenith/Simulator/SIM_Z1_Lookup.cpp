@@ -51,7 +51,7 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     std::vector<double> as(ModelAeroData::As, ModelAeroData::As + DIM(ModelAeroData::As));
     std::vector<double> bs(ModelAeroData::Bs, ModelAeroData::Bs + DIM(ModelAeroData::Bs));
     std::vector<double> vs(ModelAeroData::Vs, ModelAeroData::Vs + DIM(ModelAeroData::Vs));
-    std::vector<const std::vector<double>> interp = {as, bs, vs};
+    std::vector<std::vector<double>> interp = {as, bs, vs};
     aeroData = new Interp<double>(interp);
 
     // // TEST Lookup
@@ -123,7 +123,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     float rud  = filtered_servo_angle(input, 3);
     float thr = filtered_servo_range(input, 2);
 
-    // printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 15, rud * 15, thr);
+    printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 25, rud * 25, thr); // TODO: hook to controllerdata
 
     // Dummy state
     // gyro = Vector3f(3.5f, -4.f, -2.8f);

@@ -14,7 +14,7 @@ namespace xuav_controllerData {
 		const float enable = 1.000000;
 		const float FF = 2.326100;
 		const float maxCmdDeg = 30.000000;
-		const float maxElevDeg = 15.000000;
+		const float maxElevDeg = 25.000000;
 		const float maxIntCmdDeg = 10.000000;
 		const char *stateNames[3] = {"thetaErrDeg", "thetaErrInt", "<qDeg>"};
 		const float Ktas[2] = {12.000000, 20.000000};
@@ -27,7 +27,7 @@ namespace xuav_controllerData {
 		const float rudFF = 0.024510;
 		const float maxCmdDeg = 30.000000;
 		const float maxAilDeg = 25.000000;
-		const float maxRudDeg = 15.000000;
+		const float maxRudDeg = 25.000000;
 		const float maxIntCmdDeg = 10.000000;
 		const char *stateNames[4] = {"phiErrDeg", "phiErrInt", "<pDeg>", "rDegHP"};
 		const float Ktas[2] = {12.000000, 20.000000};

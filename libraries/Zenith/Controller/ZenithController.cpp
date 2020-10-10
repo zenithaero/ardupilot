@@ -139,7 +139,7 @@ LinearController::LinearController(
 
 	this->K_grid = std::vector<float>(_K_grid, _K_grid + n_k);
 	std::vector<float> K_tas(_K_tas, _K_tas + n_tas);
-    std::vector<const std::vector<float>> interp = {K_tas};
+    std::vector<std::vector<float>> interp = {K_tas};
 	K_interp = new Interp<float>(interp);
 	
 	// Initialize gain matrix

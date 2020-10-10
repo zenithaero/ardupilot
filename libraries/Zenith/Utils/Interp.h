@@ -16,7 +16,7 @@ typedef enum {
 } oorBehavior_e;
 
 public:
-    Interp(const std::vector<const std::vector<T>> &lookups, oorBehavior_e _oor_behavior = CLIP);
+    Interp(const std::vector<std::vector<T>> &_lookups, oorBehavior_e _oor_behavior = CLIP);
 
     std::vector<T> clamp(const std::vector<T> &vector) const;
     
@@ -27,7 +27,7 @@ public:
     std::vector<T> get_vec(const std::vector<T> &table, const std::vector<T> &values) const;
 
 private:
-    const std::vector<const std::vector<T>> lookups;
+    const std::vector<std::vector<T>> lookups;
     oorBehavior_e oor_behavior;
     size_t lookup_prod;
 

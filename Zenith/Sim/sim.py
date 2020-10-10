@@ -85,6 +85,8 @@ if __name__ == "__main__":
         sim_args += ["--headless"]
     # Point to the right mavproxy
     sim_args += ["--mavproxy-path", MAVPROXY_PATH]
+    # Takeoff at specified location
+    sim_args += ["--location", "Malesherbes"]
     # Create mav args
     mav_arg_list = ["--logfile logs/flight.tlog"]
     # mav_arg_list += ["--logfile logs/flight.tlog"]

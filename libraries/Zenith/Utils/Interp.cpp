@@ -2,8 +2,8 @@
 #include <Zenith/constants.h>
 
 template <typename T>
-Interp<T>::Interp(const std::vector<const std::vector<T>> &lookups, oorBehavior_e _oor_behavior) 
-    : lookups(lookups) {
+Interp<T>::Interp(const std::vector<std::vector<T>> &_lookups, oorBehavior_e _oor_behavior) 
+    : lookups(_lookups) {
         hard_assert(lookups.size() > 0, "There must be at least one lookup\n");
         lookup_prod = 1;
         for (auto lookup : lookups) {

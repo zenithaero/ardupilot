@@ -394,7 +394,7 @@ void Plane::stabilize()
         acc.x, acc.y, acc.z);
 
     // control_mode = &mode_fbwa; // TEMP
-    if (control_mode == &mode_manual) {
+    if (control_mode == &mode_manual || control_mode == &mode_preflight) {
         
         // reset steering controls
         steer_state.locked_course = false;
