@@ -110,6 +110,7 @@ void Plane::calc_airspeed_errors()
     if (!failsafe.rc_failsafe && (control_mode == &mode_fbwb || control_mode == &mode_cruise)) {
         if (g2.flight_options & FlightOptions::CRUISE_TRIM_AIRSPEED) {
             target_airspeed_cm = aparm.airspeed_cruise_cm;
+            printf("airspeed command 0: %d\n", target_airspeed_cm);
         } else if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {
             float control_min = 0.0f;
             float control_mid = 0.0f;
@@ -127,14 +128,17 @@ void Plane::calc_airspeed_errors()
                 target_airspeed_cm = linear_interpolate(aparm.airspeed_min * 100, aparm.airspeed_cruise_cm,
                                                         control_in,
                                                         control_min, control_mid);
+                printf("airspeed command 1: %d\n", target_airspeed_cm);
             } else {
                 target_airspeed_cm = linear_interpolate(aparm.airspeed_cruise_cm, aparm.airspeed_max * 100,
                                                         control_in,
                                                         control_mid, control_max);
+                printf("airspeed command 2: %d\n", target_airspeed_cm);
             }
         } else {
             target_airspeed_cm = ((int32_t)(aparm.airspeed_max - aparm.airspeed_min) *
                                   get_throttle_input()) + ((int32_t)aparm.airspeed_min * 100);
+            printf("airspeed command 3: %d\n", target_airspeed_cm);
         }
 #if OFFBOARD_GUIDED == ENABLED
     } else if (control_mode == &mode_guided && !is_zero(guided_state.target_airspeed_cm)) {
@@ -151,6 +155,7 @@ void Plane::calc_airspeed_errors()
         } else {
             target_airspeed_cm = constrain_float(MAX(guided_state.target_airspeed_cm, target_airspeed_cm), aparm.airspeed_min *100, aparm.airspeed_max *100);
         }
+        printf("airspeed command 4: %d\n", target_airspeed_cm);
 
 #endif // OFFBOARD_GUIDED == ENABLED
     } else if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
@@ -167,9 +172,11 @@ void Plane::calc_airspeed_errors()
             // fallover to normal airspeed
             target_airspeed_cm = aparm.airspeed_cruise_cm;
         }
+        printf("airspeed command 5: %d\n", target_airspeed_cm);
     } else {
         // Normal airspeed target
         target_airspeed_cm = aparm.airspeed_cruise_cm;
+        printf("airspeed command 6: %d\n", target_airspeed_cm);
     }
     
     // Set target to current airspeed + ground speed undershoot,
@@ -181,6 +188,7 @@ void Plane::calc_airspeed_errors()
         int32_t min_gnd_target_airspeed = airspeed_measured*100 + groundspeed_undershoot;
         if (min_gnd_target_airspeed > target_airspeed_cm) {
             target_airspeed_cm = min_gnd_target_airspeed;
+            printf("airspeed command 7: %d\n", target_airspeed_cm);
         }
     }
 
@@ -194,6 +202,7 @@ void Plane::calc_airspeed_errors()
     // Bump up the target airspeed based on throttle nudging
     if (throttle_allows_nudging && airspeed_nudge_cm > 0) {
         target_airspeed_cm += airspeed_nudge_cm;
+        printf("airspeed command 8: %d\n", target_airspeed_cm);
     }
 
     // Apply airspeed limit

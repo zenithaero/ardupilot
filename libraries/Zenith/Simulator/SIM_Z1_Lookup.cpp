@@ -115,15 +115,30 @@ FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
     return fm;
 }
 
+float dynamic_pressure(float rho, float airspeed) {
+    return 1.0 / 2.0 * rho * pow(airspeed, 2);
+}
+
+void denormalize(FM &fm, float qbar) {
+    const float s = ModelConfig::S;
+    const float c = ModelConfig::c;
+    const float b = ModelConfig::b;
+    fm.force *= s * qbar;
+    fm.moment.x *= b * s * qbar;
+    fm.moment.y *= c * s * qbar;
+    fm.moment.z *= b * s * qbar;
+} 
+
 
 void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
 {
     float ail  = filtered_servo_angle(input, 0);
     float elev = filtered_servo_angle(input, 1);
     float rud  = filtered_servo_angle(input, 3);
-    float thr = filtered_servo_range(input, 2);
+    float thr = filtered_servo_range(input, 2) / 1.5; // TEMP
+    // printf("thr")
 
-    printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 25, rud * 25, thr); // TODO: hook to controllerdata
+    // printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 25, rud * 25, thr); // TODO: hook to controllerdata
 
     // Dummy state
     // gyro = Vector3f(3.5f, -4.f, -2.8f);
@@ -210,13 +225,10 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     std::vector<double> lookupClamped = aeroData->clamp(lookup);
 
     // Extract normalization coefficients
-    const float s = ModelConfig::S;
-    const float c = ModelConfig::c;
-    const float b = ModelConfig::b;
+
 
     // Calculate dynamic pressure
-    float rho = air_density;
-    double qbar = 1.0 / 2.0 * rho * pow(airspeed, 2);
+    double qbar = dynamic_pressure(air_density, airspeed);
 
     // Get aero FM
     // printf("lookup (alpha %.2f, beta %.2f, airspeed %.2f)\n", angle_of_attack, beta, airspeed);
@@ -234,13 +246,24 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // printf("values F(%.2f %.2f %.2f) M(%.2f %.2f %.2f)\n", fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
 
     // Denormalize forces & moments
-    fm.force *= s * qbar;
-    fm.moment.x *= b * s * qbar;
-    fm.moment.y *= c * s * qbar;
-    fm.moment.z *= b * s * qbar;
+    denormalize(fm, qbar);
     const Vector3f CGOffset(ModelConfig::CG[0][0], ModelConfig::CG[0][1], ModelConfig::CG[0][2]);
     Vector3f armMoment = fm.force % CGOffset;
     fm.moment += armMoment;
+
+    // Add low speed thrust model (for takeoff)
+    std::vector<float> vec = {thr, 0};
+    std::vector<float> act = matmul(motor_map, vec);
+    std::vector<double> lookup_0 = { lookup[0], lookup[1], 0.f };
+    lookup_0 = aeroData->clamp(lookup_0);
+    float qbar_0 = dynamic_pressure(air_density, lookup_0[2]);
+    FM fm_0;
+    for (size_t k = 0; k < act.size(); k++)
+        fm_0 += INTERP(dP, lookup, act.size(), k) * act[k] * ModelConfig::motorMax[0][k];
+    denormalize(fm_0, CLAMP(qbar_0 - qbar, 0, qbar_0));
+    fm += fm_0;
+
+
     
     // AVL static thrust motor model
     // double coeff = ModelConfig::thrustStatic - qbar * ModelConfig::thrustGain;
@@ -249,9 +272,9 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // printf("Thrust force: %.2f\n", thrust);
 
     // ASWING thrust boost (low velocity)
-    double thrust = ModelConfig::thrustStatic * 100 * (13 - airspeed ) / 13 * thr;
-    thrust = CLAMP(thrust, 0, INFINITY);
-    fm.force += Vector3f(thrust, 0, 0);
+    // double thrust = ModelConfig::thrustStatic * 100 * (13 - airspeed ) / 13 * thr;
+    // thrust = CLAMP(thrust, 0, INFINITY);
+    // fm.force += Vector3f(thrust, 0, 0);
 
     // Try adding a bit of drag
     // auto drag = -velocity_air_bf * 0.3f;
@@ -272,7 +295,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // add some ground friction
     if (on_ground()) {
         Vector3f vel_body = dcm.transposed() * velocity_ef;
-        accel_body.x -= vel_body.x * 0.3f;
+        accel_body.x -= vel_body.x * 0.1f;
     }
 }
     

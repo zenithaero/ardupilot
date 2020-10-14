@@ -377,7 +377,7 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 	h_err = CLAMP(h_err, -ControllerData::spdAlt.maxAltErr, ControllerData::spdAlt.maxAltErr);
 	tas_err = CLAMP(tas_err, -ControllerData::spdAlt.maxTasErr, ControllerData::spdAlt.maxTasErr);
 
-	// Handle integrator
+	// Handle integrators
 	if (dt > 0.1) {
 		h_err_i = 0;
 		tas_err_i = 0;
@@ -435,8 +435,7 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 	// Assign the output
 	pitch_command = pitch_clamped;
 	thr_command = thr_clamped;
-	// printf("hErr %.2f hErrI %.2f tasErr %.2f tassErrI %.2f hDot %.2f thetaDeg %.2f qDeg %.2f\n", h_err, h_err_i, tas_err, tas_err_i, h_dot, theta_deg, q_deg);
-	// printf("hCmd %.2f h %.2f tasCmd %.2f tas %.2f pitchCmd %.2f pitch %.2f thrCmd %.2f\n", h_cmd, h, tas_cmd, tas, pitch_command, theta_deg, thr_command);
+	printf("tas_cmd: %.2f, tas: %.2f, tas_err: %.2f, thr_cmd: %.2f\n", tas_cmd, tas, tas_err, thr_command);
 }
 
 
