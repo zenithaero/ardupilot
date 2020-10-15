@@ -34,6 +34,8 @@ protected:
     std::vector<float> K_grid;
     Interp<float> *K_interp;
     std::vector<std::vector<float>> K;
+    Interp<float> *tas_interp;
+    std::vector<float> tas_value = { 0.f };
 
     void update();
     void init_gains();
@@ -47,6 +49,7 @@ public:
 
     // Output
     float elev_command;
+    log_PitchCtrl log;
 
 private:
     LowPassFilter<float> ax_filter;
@@ -62,6 +65,7 @@ public:
     // Output
     float ail_command;
     float rud_command;
+    log_RollYawCtrl log;
 
 private:
     float r_deg_prev; // Previous yaw rate
@@ -80,6 +84,7 @@ public:
     // Output
     float pitch_command;
     float thr_command;
+    log_SpdAltCtrl log;
 
 private:
     float h_err_i; // Integrator state
@@ -129,25 +134,32 @@ public:
     ZenithController(const ZenithController &other) = delete;
     ZenithController &operator=(const ZenithController&) = delete;
 
+    void update();
     void stabilize(float theta_cmd_deg, float roll_cmd_deg, float rudder_deg);
     void update_spd_alt(float tas_cmd, float h_cmd);
-    float get_throttle_command(); 
-    float get_pitch_command(); 
-    float get_roll_command();
-    float get_elev_command();
-    float get_ail_command();
-    float get_rudder_command();
 
     // Doublets
     DoubletHandler ail_doublet;
     DoubletHandler elev_doublet;
     DoubletHandler rud_doublet;
 
+    // Controllers
+    PitchController pitch_controller;
+    RollYawController roll_yaw_controller;
+    SpdAltController spd_alt_controller;
+
+    // Log
+    log_AhrsCtrl log;
+
+    // Active
+    static const uint32_t AHRS_MASK = 0x1;
+    static const uint32_t PITCH_MASK = 0x2;
+    static const uint32_t ROLLYAW_MASK = 0x4;
+    static const uint32_t SPDALT_MASK = 0x8;
+    uint32_t active_logs = 0;
+
 protected:
 	AP_AHRS &ahrs;
-    PitchController pitch_controller{ahrs};
-    RollYawController roll_yaw_controller{ahrs};
-    SpdAltController spd_alt_controller{ahrs};
     // CrossTrackController xtrack_controller{ahrs};
 
     // TEMP

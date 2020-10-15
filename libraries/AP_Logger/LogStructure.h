@@ -758,34 +758,66 @@ struct PACKED log_PID {
     float   FF;
 };
 
-struct PACKED log_RollCtrl {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    float pCmd;
-    float pCmdCl;
-    float pMeas;
-    float pErrSc;
-    float sc;
-    float p;
-    float i;
-    float d;
-    float ff;
-    float out;
+struct PACKED log_AhrsCtrl {
+  LOG_PACKET_HEADER;
+  uint64_t time_us;
+  float phi;
+  float theta;
+  float psi;
+  float gx;
+  float gy; 
+  float gz;
+  float vn;
+  float ve;
+  float vd;
+  float pn;
+  float pe;
+  float pd;
+  // float ax;
+  // float ay;
+  // float az;
 };
 
+// Zenith controls logs
 struct PACKED log_PitchCtrl {
     LOG_PACKET_HEADER;
     uint64_t time_us;
-    float qCmd;
-    float qCmdCl;
-    float qMeas;
-    float qErrSc;
-    float sc;
-    float p;
-    float i;
-    float d;
-    float ff;
-    float out;
+    float theta_cmd_deg;
+    float theta_err_deg;
+    float theta_err_i;
+    float max_i;
+    float elev_ff;
+    float elev_cmd;
+};
+
+struct PACKED log_RollYawCtrl {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float phi_cmd_deg;
+    float phi_err_deg;
+    float phi_err_i;
+    float max_i;
+    float ail_ff;
+    float rud_ff;
+    float ail_cmd;
+    float rud_cmd;
+};
+
+struct PACKED log_SpdAltCtrl {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float h_cmd;
+    float tas_cmd;
+    float h_err;
+    float tas_err;
+    float h_err_i;
+    float tas_err_i;
+    float max_i_h;
+    float max_i_tas;
+    float pitch_ff;
+    float thr_ff;
+    float pitch_cmd;
+    float thr_cmd;
 };
 
 struct PACKED log_Current {
@@ -2557,10 +2589,14 @@ struct PACKED log_Arm_Disarm {
       "ARM", "QBIBB", "TimeUS,ArmState,ArmChecks,Forced,Method", "s----", "F----" }, \
     { LOG_ERROR_MSG, sizeof(log_Error), \
       "ERR",   "QBB",         "TimeUS,Subsys,ECode", "s--", "F--" }, \
-    { LOG_ROLL_CTRL_MSG, sizeof(log_RollCtrl), \
-      "RCTL", "Qffffffffff", "TimeUS,pCmd,pCmdCl,pMeas,pErrSc,sc,p,i,d,ff,out", "s----------", "F----------" }, \
+    { LOG_AHRS_CTRL_MSG, sizeof(log_AhrsCtrl), \
+      "AHRS", "Qffffffffffff", "TimeUS,phi,theta,psi,gx,gy,gz,vn,ve,vd,pn,pe,pd", "s------------", "F------------" }, \
     { LOG_PITCH_CTRL_MSG, sizeof(log_PitchCtrl), \
-      "PCTL", "Qffffffffff", "TimeUS,qCmd,qCmdCl,qMeas,qErrSc,sc,p,i,d,ff,out", "s----------", "F----------" } \
+      "PCTL", "Qffffff", "TimeUS,cmd,err,errI,maxI,elevFF,elevCmd", "s------", "F------" }, \
+    { LOG_ROLLYAW_CTRL_MSG, sizeof(log_RollYawCtrl), \
+      "RCTL", "Qffffffff", "TimeUS,cmd,err,errI,maxI,ailFF,rudFF,ailCmd,rudCmd", "s--------", "F--------" }, \
+    { LOG_SPDALT_CTRL_MSG, sizeof(log_SpdAltCtrl), \
+      "SCTL", "Qffffffffffff", "TimeUS,hCd,tCd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,thrFF,pCd,thrCd", "s------------", "F------------" } \
 
 // @LoggerMessage: SBPH
 // @Description: Swift Health Data
@@ -2719,9 +2755,11 @@ enum LogMessages : uint8_t {
     LOG_OA_DIJKSTRA_MSG,
     LOG_VISUALVEL_MSG,
 
-    // Z1 Logs
-    LOG_ROLL_CTRL_MSG,
+    // Zenith controls logs
+    LOG_AHRS_CTRL_MSG,
     LOG_PITCH_CTRL_MSG,
+    LOG_ROLLYAW_CTRL_MSG,
+    LOG_SPDALT_CTRL_MSG,
 
     _LOG_LAST_MSG_
 };

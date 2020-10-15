@@ -59,8 +59,14 @@ void Plane::Log_Write_Fast(void)
         Log_Write_Attitude();
     }
     // Log controls
-    logger.Write_CTRL(rollController.get_log());
-    logger.Write_CTRL(pitchController.get_log());
+    if (zenith_controller.active_logs & ZenithController::AHRS_MASK)
+        logger.Write_CTRL(zenith_controller.log);
+    if (zenith_controller.active_logs & ZenithController::PITCH_MASK)
+        logger.Write_CTRL(zenith_controller.pitch_controller.log);
+    if (zenith_controller.active_logs & ZenithController::ROLLYAW_MASK)
+        logger.Write_CTRL(zenith_controller.roll_yaw_controller.log);
+    if (zenith_controller.active_logs & ZenithController::SPDALT_MASK)
+        logger.Write_CTRL(zenith_controller.spd_alt_controller.log);
 }
 
 

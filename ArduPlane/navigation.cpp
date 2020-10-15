@@ -106,6 +106,11 @@ void Plane::calc_airspeed_errors()
     // may be using synthetic airspeed
     ahrs.airspeed_estimate(airspeed_measured);
 
+    // ZenithController - manual interpolated speed command
+    target_airspeed_cm = ((int32_t)(aparm.airspeed_max - aparm.airspeed_min) *
+        get_throttle_input()) + ((int32_t)aparm.airspeed_min * 100);
+    return;
+
     // FBW_B/cruise airspeed target
     if (!failsafe.rc_failsafe && (control_mode == &mode_fbwb || control_mode == &mode_cruise)) {
         if (g2.flight_options & FlightOptions::CRUISE_TRIM_AIRSPEED) {

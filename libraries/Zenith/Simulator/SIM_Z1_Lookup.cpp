@@ -135,7 +135,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     float ail  = filtered_servo_angle(input, 0);
     float elev = filtered_servo_angle(input, 1);
     float rud  = filtered_servo_angle(input, 3);
-    float thr = filtered_servo_range(input, 2) / 1.5; // TEMP
+    float thr = filtered_servo_range(input, 2); // TEMP
     // printf("thr")
 
     // printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 25, rud * 25, thr); // TODO: hook to controllerdata

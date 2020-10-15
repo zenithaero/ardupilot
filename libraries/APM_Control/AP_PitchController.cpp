@@ -130,10 +130,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	
 	// Calculate the pitch rate error (deg/sec) and scale
     float achieved_rate = ToDeg(omega_y);
-	_log.qMeas = achieved_rate;
 	float rate_error = (desired_rate - achieved_rate) * scaler;
-	_log.sc = scaler;
-	_log.qErrSc = rate_error;
 
 	// Multiply pitch rate error by _ki_rate and integrate
 	// Scaler is applied before integrator so that integrator state relates directly to elevator deflection
@@ -210,12 +207,6 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
         float roll_prop = (roll_wrapped - (aparm.roll_limit_cd+500)) / (float)(9000 - aparm.roll_limit_cd);
         _last_out *= (1 - roll_prop);
     }
-	// Log output
-	_log.p = _pid_info.P;
-	_log.i = _pid_info.I;
-	_log.d = _pid_info.D;
-	_log.ff = _pid_info.FF;
-	_log.out = _last_out;
 
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);
@@ -308,7 +299,6 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
 	// Calculate the desired pitch rate (deg/sec) from the angle error
 	float Omega = ZenithGains::pitch.Omega;
 	float desired_rate = angle_err * 0.01f * Omega;
-	_log.qCmd = desired_rate;
 	
 	// limit the maximum pitch rate demand. Don't apply when inverted
 	// as the rates will be tuned when upright, and it is common that
@@ -327,7 +317,6 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
 
 	// Apply the turn correction offset
 	desired_rate = desired_rate + rate_offset;
-	_log.qCmdCl = desired_rate;
 
     return _get_rate_out(desired_rate, scaler, disable_integrator, aspeed);
 }

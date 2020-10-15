@@ -380,19 +380,8 @@ void Plane::stabilize_acro(float speed_scaler)
  */
 void Plane::stabilize()
 {
-    // TODO: ZENITH DISABLE - Logging
-    Vector3f vel, pos;
-    if (!ahrs.get_velocity_NED(vel)) {};
-    Vector3f gyro = ahrs.get_gyro();
-    if (!ahrs.get_relative_position_NED_home(pos)) {};
-    auto acc = AP::ins().get_accel();
-    AP::logger().Write("AHRS", "TimeUS,gx,gy,gz,vn,ve,vd,n,e,d,ax,ay,az", "Qffffffffffff",
-        AP_HAL::micros64(),
-        gyro.x, gyro.y, gyro.z,
-        vel.x, vel.y, vel.z,
-        pos.x, pos.y, pos.z,
-        acc.x, acc.y, acc.z);
-
+    zenith_controller.update();
+    
     // control_mode = &mode_fbwa; // TEMP
     if (control_mode == &mode_manual || control_mode == &mode_preflight) {
         
@@ -506,7 +495,7 @@ void Plane::calc_throttle()
 
     // ZenithController - update throttle
     // int32_t commanded_throttle = SpdHgt_Controller->get_throttle_demand();
-    int32_t commanded_throttle = (int32_t)(zenith_controller.get_throttle_command() * 100);
+    int32_t commanded_throttle = (int32_t)(zenith_controller.spd_alt_controller.thr_command * 100);
 
     // Received an external msg that guides throttle in the last 3 seconds?
     if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
@@ -622,7 +611,7 @@ void Plane::calc_nav_pitch()
 
     // ZenithController - update pitch command
     // int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
-    int32_t commanded_pitch = (int32_t)(zenith_controller.get_pitch_command() * 100);
+    int32_t commanded_pitch = (int32_t)(zenith_controller.spd_alt_controller.pitch_command * 100);
 
 
     // Received an external msg that guides roll in the last 3 seconds?

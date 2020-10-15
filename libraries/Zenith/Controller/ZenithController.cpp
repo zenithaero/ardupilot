@@ -11,7 +11,11 @@
 
 extern const AP_HAL::HAL& hal;
 
-ZenithController::ZenithController(AP_AHRS &_ahrs) : ahrs(_ahrs) {
+ZenithController::ZenithController(AP_AHRS &_ahrs) :
+	ahrs(_ahrs),
+	pitch_controller(_ahrs),
+	roll_yaw_controller(_ahrs),
+	spd_alt_controller(_ahrs)  {
 	// Init doublet handlers (channel, deflection, duration, settle_time)
 	ail_doublet = DoubletHandler(SRV_Channel::k_aileron, 2, 1, 5); 
 	elev_doublet = DoubletHandler(SRV_Channel::k_elevator, 2, 1, 5);
@@ -43,6 +47,41 @@ bool DoubletHandler::udpate(float last_command) {
 		SRV_Channels::set_output_scaled(channel, (int16_t)(command * 100));
 	}
 	return active;
+}
+
+void ZenithController::update() {
+	// Reset active bitmask
+	active_logs = 0;
+
+	// Log ahrs
+	Vector3f vel, pos;
+	bool valid_ahrs = true;
+    valid_ahrs &= ahrs.get_velocity_NED(vel);
+    Vector3f gyro = ahrs.get_gyro();
+    valid_ahrs &= ahrs.get_relative_position_NED_home(pos);
+    auto acc = AP::ins().get_accel();
+	if (valid_ahrs) {
+		log.phi = ahrs.roll_sensor;
+		log.theta = ahrs.pitch_sensor;
+		log.psi = ahrs.yaw_sensor;
+		log.gx = gyro.x;
+		log.gy = gyro.y;
+		log.gz = gyro.z;
+		log.vn = vel.x;
+		log.ve = vel.y;
+		log.vd = vel.z;
+		log.pn = pos.x;
+		log.pe = pos.y;
+		log.pd = pos.z;
+	}
+
+
+    // AP::logger().Write("AHRS", "TimeUS,gx,gy,gz,vn,ve,vd,n,e,d,ax,ay,az", "Qffffffffffff",
+    //     AP_HAL::micros64(),
+    //     gyro.x, gyro.y, gyro.z,
+    //     vel.x, vel.y, vel.z,
+    //     pos.x, pos.y, pos.z,
+    //     acc.x, acc.y, acc.z);
 }
 
 
@@ -81,13 +120,18 @@ void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg, float r
 	bool rud_doublet_active = rud_doublet.udpate(roll_yaw_controller.rud_command);
 
 	// Stabilize pitch, roll & yaw
-	if (!elev_doublet_active)
+	if (!elev_doublet_active) {
+		active_logs |= ZenithController::PITCH_MASK;
 		pitch_controller.update(theta_cmd_deg, speed_scaler);
-	if (!ail_doublet_active && !rud_doublet_active)
+	}
+	if (!ail_doublet_active && !rud_doublet_active) {
+		active_logs |= ZenithController::ROLLYAW_MASK;
 		roll_yaw_controller.update(phi_cmd_deg, rudder_deg, speed_scaler);
+	}
 }
 
 void ZenithController::update_spd_alt(float tas_cmd, float h_cmd) {
+	active_logs |= ZenithController::SPDALT_MASK;
 	// Step command
 
 	// TEMP
@@ -105,26 +149,6 @@ void ZenithController::update_spd_alt(float tas_cmd, float h_cmd) {
 	spd_alt_controller.update(tas_cmd, h_cmd);
 }
 
-float ZenithController::get_pitch_command() {
-	return spd_alt_controller.pitch_command;
-}
-
-float ZenithController::get_throttle_command() {
-	return spd_alt_controller.thr_command;
-}
-
-float ZenithController::get_elev_command() {
-	return pitch_controller.elev_command;
-}
-
-float ZenithController::get_ail_command() {
-	return roll_yaw_controller.ail_command;
-}
-
-float ZenithController::get_rudder_command() {
-	return roll_yaw_controller.rud_command;
-}
-
 template<size_t n, size_t n_tas, size_t n_k>
 LinearController::LinearController(
 	AP_AHRS &_ahrs,
@@ -137,9 +161,18 @@ LinearController::LinearController(
 		hard_assert(strcmp(stateNames[j], expectedNames[j]) == 0,
 			"State mismatch: %s (expected %s)\n", stateNames[j], expectedNames[j]);
 
+	// Create tas interpolation
+	std::vector<float> tas_lookup(
+		ControllerData::trim.tas,
+		ControllerData::trim.tas + DIM(ControllerData::trim.tas)
+	);
+    std::vector<std::vector<float>> interp = { tas_lookup };
+	tas_interp = new Interp<float>(interp);
+
+	// Create K interpolation
 	this->K_grid = std::vector<float>(_K_grid, _K_grid + n_k);
 	std::vector<float> K_tas(_K_tas, _K_tas + n_tas);
-    std::vector<std::vector<float>> interp = {K_tas};
+    interp = {K_tas};
 	K_interp = new Interp<float>(interp);
 	
 	// Initialize gain matrix
@@ -152,6 +185,7 @@ LinearController::LinearController(
 }
 
 LinearController::~LinearController() {
+	delete(tas_interp);
 	delete(K_interp);
 }
 
@@ -159,8 +193,6 @@ void LinearController::update() {
 	// Update timestep
 	uint64_t t_now = AP_HAL::micros64();
 	dt = (float)(t_now - t_prev) / 1e6f;
-	if (t_prev == 0)
-		dt = 0.f;
 	t_prev = t_now;
 
 	// Update tas filter
@@ -171,8 +203,8 @@ void LinearController::update() {
 	}
 
 	// Update controller gains
-	std::vector<float> values = { tas_filter.get() };
-	std::vector<float> vec = K_interp->get_vec(K_grid, values);
+	tas_value[0] = tas_filter.get();
+	std::vector<float> vec = K_interp->get_vec(K_grid, tas_value);
 	reshape(vec, K);
 }
 
@@ -243,18 +275,27 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	float elev = res[0] * speed_scaler;
 
 	// Add feedforward
-	elev += ControllerData::pitch.FF;
+	float elev_ff = tas_interp->get(ControllerData::trim.elevDeg, DIM(ControllerData::trim.elevDeg), tas_value);
+	elev += elev_ff;
 
 	// Clamp the elevator
 	elev_command = CLAMP(elev, -ControllerData::pitch.maxElevDeg, ControllerData::pitch.maxElevDeg);
 	elev_saturation = sgn(elev - elev_command);
 
 	// Assign the output
-	// printf("theta_cmd_deg %.2f, theta_deg %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, elev_command);
+	printf("theta_cmd %.2f, theta %.2f, theta_err %.2f, theta_err_i %.2f, max_i %.2f, elev_ff %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, theta_err_deg, theta_err_i, max_i, elev_ff, elev_command);
 	int16_t elev_cd = (int16_t)(elev_command * 100);
 	// SRV_Channels::move_servo(SRV_Channel::k_elevator, elev_cd, -1500, 1500); // doesn't seem to work with mixing
 	SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elev_cd);
 	// SRV_Channels:set_scaled
+
+	// Log values
+	log.theta_cmd_deg = theta_cmd_deg;
+	log.theta_err_deg = theta_err_deg;
+	log.theta_err_i = theta_err_i;
+	log.max_i = max_i;
+	log.elev_ff = elev_ff;
+	log.elev_cmd = elev_command;
 }
 
 const char* rollFields[] = {"phiErrDeg", "phiErrInt", "<pDeg>", "rDegHP"};
@@ -318,8 +359,10 @@ void RollYawController::update(float phi_cmd_deg, float rudder_deg, float speed_
 	float rud = res[1] * speed_scaler;
 
 	// Add feedforward
-	ail += ControllerData::rollYaw.ailFF;
-	rud += ControllerData::rollYaw.rudFF;
+	float ail_ff = tas_interp->get(ControllerData::trim.ailDeg, DIM(ControllerData::trim.ailDeg), tas_value);
+	ail += ail_ff;
+	float rud_ff = tas_interp->get(ControllerData::trim.rudDeg, DIM(ControllerData::trim.rudDeg), tas_value);
+	rud += rud_ff;
 
 	// Add manual rudder input
 	rud += rudder_deg;
@@ -338,6 +381,16 @@ void RollYawController::update(float phi_cmd_deg, float rudder_deg, float speed_
 	// SRV_Channels::move_servo(SRV_Channel::k_rudder,  -rud_cd, -1500, 1500); // DOESN'T SEEM TO WORK
 	SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, rud_cd);
 	// printf("phi_cmd %.2f, phi %.2f, ail %.2f, rud %.2f\n", phi_cmd_deg, phi_deg, ail_command, rud_command);
+
+	// Log values
+	log.phi_cmd_deg = phi_cmd_deg;
+	log.phi_err_deg = phi_err_deg;
+	log.phi_err_i = phi_err_i;
+	log.max_i = max_i;
+	log.ail_ff = ail_ff;
+	log.rud_ff = rud_ff;
+	log.ail_cmd = ail_command;
+	log.rud_cmd = rud_command;
 }
 
 const char* spdAltFields[] = {"hErr", "hErrInt", "tasErr", "tasErrInt", "hDotErr", "<thetaDeg>", "<qDeg>"};
@@ -363,11 +416,12 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 		vel.z = 0;
 	float h_dot = -vel.z;
 	float theta_deg = ahrs.pitch_sensor / 100.f;
-	theta_deg -= ControllerData::spdAlt.pitchFF; // TODO: replace with a lookup table
+	float theta_trim = tas_interp->get(ControllerData::trim.theta, DIM(ControllerData::trim.theta), tas_value);
+	float theta_trim_deg = degrees(theta_trim);
+	theta_deg -= theta_trim_deg;
 	float q_deg = ToDeg(ahrs.get_gyro().y);
 	float eas;
-	if (!ahrs.airspeed_estimate(eas))
-		printf("Estimated airspeed error\n"); // TODO
+	soft_assert(ahrs.airspeed_estimate(eas), "Estimated airspeed error\n");
 	float tas = eas * ahrs.get_EAS2TAS();
 
 	// Compute errors
@@ -387,9 +441,9 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 	float h_di = h_err * dt;
 	float tas_di = tas_err * dt;
 	// Anti-windup - Make sure the index is appropriate
-	if (sgn(h_di * K[2][2]) != sgn(pitch_saturation) || true)
+	if (sgn(h_di * K[1][2]) != sgn(pitch_saturation) || true)
 		h_err_i += h_di;
-	if (sgn(tas_di * K[1][4]) != sgn(thr_saturation) || true)
+	if (sgn(tas_di * K[0][4]) != sgn(thr_saturation) || true)
 		tas_err_i += tas_di;
 
 	// Clamp the integrator
@@ -423,8 +477,9 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 	float pitch = res[1];
 
 	// Add feedforward
-	thr += ControllerData::spdAlt.thrFF;
-	pitch += ControllerData::spdAlt.pitchFF;
+	float thr_ff = tas_interp->get(ControllerData::trim.thr, DIM(ControllerData::trim.thr), tas_value);
+	thr += thr_ff;
+	pitch += theta_trim_deg;
 
 	// Clamp the output
 	float thr_clamped = CLAMP(thr, 0, ControllerData::spdAlt.maxThr);
@@ -435,7 +490,22 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 	// Assign the output
 	pitch_command = pitch_clamped;
 	thr_command = thr_clamped;
-	printf("tas_cmd: %.2f, tas: %.2f, tas_err: %.2f, thr_cmd: %.2f\n", tas_cmd, tas, tas_err, thr_command);
+	printf("tas_cmd: %.2f, tas: %.2f, tas_err: %.2f, tas_err_i %.2f, tas_err_max_i: %.2f, thr_cmd: %.2f\n", tas_cmd, tas, tas_err, tas_err_i, max_i_tas, thr_command);
+	printf("h_cmd: %.2f, h: %.2f, h_err: %.2f, h_err_i %.2f, h_err_max_i: %.2f, pitch_cmd: %.2f\n", h_cmd, h, h_err, h_err_i, max_i_h, pitch_command);
+
+	// Log output
+	log.h_cmd = h_cmd;
+	log.tas_cmd = tas_cmd;
+	log.h_err = h_err;
+	log.tas_err = tas_err;
+	log.h_err_i = h_err_i;
+	log.tas_err_i = tas_err_i;
+	log.max_i_h = max_i_h;
+	log.max_i_tas = max_i_tas;
+	log.pitch_ff = theta_trim_deg;
+	log.thr_ff = thr_ff;
+	log.pitch_cmd = pitch_command;
+	log.thr_cmd = thr_command;
 }
 
 

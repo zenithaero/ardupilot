@@ -836,22 +836,36 @@ void AP_Logger::Write_PID(uint8_t msg_type, const PID_Info &info)
     WriteBlock(&pkt, sizeof(pkt));
 }
 
-void AP_Logger::Write_CTRL(log_RollCtrl &pkt)
-{
-    pkt.msgid = LOG_ROLL_CTRL_MSG;
-    pkt.head1 = HEAD_BYTE1;
-    pkt.head2 = HEAD_BYTE2;
-    pkt.time_us = AP_HAL::micros64();
-    WriteBlock(&pkt, sizeof(pkt));
+void AP_Logger::Write_CTRL(log_AhrsCtrl &ahrs) {
+    ahrs.msgid = LOG_AHRS_CTRL_MSG;
+    ahrs.head1 = HEAD_BYTE1;
+    ahrs.head2 = HEAD_BYTE2;
+    ahrs.time_us = AP_HAL::micros64();
+    WriteBlock(&ahrs, sizeof(ahrs));
 }
 
-void AP_Logger::Write_CTRL(log_PitchCtrl &pkt)
-{
-    pkt.msgid = LOG_PITCH_CTRL_MSG;
-    pkt.head1 = HEAD_BYTE1;
-    pkt.head2 = HEAD_BYTE2;
-    pkt.time_us = AP_HAL::micros64();
-    WriteBlock(&pkt, sizeof(pkt));
+void AP_Logger::Write_CTRL(log_PitchCtrl &pitch) {
+    pitch.msgid = LOG_PITCH_CTRL_MSG;
+    pitch.head1 = HEAD_BYTE1;
+    pitch.head2 = HEAD_BYTE2;
+    pitch.time_us = AP_HAL::micros64();
+    WriteBlock(&pitch, sizeof(pitch));
+}
+
+void AP_Logger::Write_CTRL(log_RollYawCtrl &rollyaw) {
+    rollyaw.msgid = LOG_ROLLYAW_CTRL_MSG;
+    rollyaw.head1 = HEAD_BYTE1;
+    rollyaw.head2 = HEAD_BYTE2;
+    rollyaw.time_us = AP_HAL::micros64();
+    WriteBlock(&rollyaw, sizeof(rollyaw));
+}
+
+void AP_Logger::Write_CTRL(log_SpdAltCtrl &spdalt) {
+    spdalt.msgid = LOG_SPDALT_CTRL_MSG;
+    spdalt.head1 = HEAD_BYTE1;
+    spdalt.head2 = HEAD_BYTE2;
+    spdalt.time_us = AP_HAL::micros64();
+    WriteBlock(&spdalt, sizeof(spdalt));
 }
 
 void AP_Logger::Write_Origin(uint8_t origin_type, const Location &loc)
