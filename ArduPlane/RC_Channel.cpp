@@ -185,6 +185,11 @@ void RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const AuxSwit
             plane.zenith_controller.rud_doublet.clear();
         break;
 
+    case AUX_FUNC::RELAY4:
+        if (ch_flag == AuxSwitchPos::HIGH)
+            plane.set_cruise_wp();
+        break;
+
     default:
         RC_Channel::do_aux_function(ch_option, ch_flag);
         break;

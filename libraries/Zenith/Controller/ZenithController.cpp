@@ -283,7 +283,7 @@ void PitchController::update(float theta_cmd_deg, float speed_scaler) {
 	elev_saturation = sgn(elev - elev_command);
 
 	// Assign the output
-	printf("theta_cmd %.2f, theta %.2f, theta_err %.2f, theta_err_i %.2f, max_i %.2f, elev_ff %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, theta_err_deg, theta_err_i, max_i, elev_ff, elev_command);
+	// printf("theta_cmd %.2f, theta %.2f, theta_err %.2f, theta_err_i %.2f, max_i %.2f, elev_ff %.2f, elev %.2f\n", theta_cmd_deg, theta_deg, theta_err_deg, theta_err_i, max_i, elev_ff, elev_command);
 	int16_t elev_cd = (int16_t)(elev_command * 100);
 	// SRV_Channels::move_servo(SRV_Channel::k_elevator, elev_cd, -1500, 1500); // doesn't seem to work with mixing
 	SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elev_cd);
@@ -490,8 +490,8 @@ void SpdAltController::update(float tas_cmd, float h_cmd) {
 	// Assign the output
 	pitch_command = pitch_clamped;
 	thr_command = thr_clamped;
-	printf("tas_cmd: %.2f, tas: %.2f, tas_err: %.2f, tas_err_i %.2f, tas_err_max_i: %.2f, thr_cmd: %.2f\n", tas_cmd, tas, tas_err, tas_err_i, max_i_tas, thr_command);
-	printf("h_cmd: %.2f, h: %.2f, h_err: %.2f, h_err_i %.2f, h_err_max_i: %.2f, pitch_cmd: %.2f\n", h_cmd, h, h_err, h_err_i, max_i_h, pitch_command);
+	// printf("tas_cmd: %.2f, tas: %.2f, tas_err: %.2f, tas_err_i %.2f, tas_err_max_i: %.2f, thr_cmd: %.2f\n", tas_cmd, tas, tas_err, tas_err_i, max_i_tas, thr_command);
+	// printf("h_cmd: %.2f, h: %.2f, h_err: %.2f, h_err_i %.2f, h_err_max_i: %.2f, pitch_cmd: %.2f\n", h_cmd, h, h_err, h_err_i, max_i_h, pitch_command);
 
 	// Log output
 	log.h_cmd = h_cmd;

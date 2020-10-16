@@ -317,6 +317,7 @@ void Plane::update_cruise()
         prev_WP_loc = current_loc;
     }
     if (cruise_state.locked_heading) {
+        // printf("locked heading\n");
         next_WP_loc = prev_WP_loc;
         // always look 1km ahead
         next_WP_loc.offset_bearing(cruise_state.locked_heading_cd*0.01f, prev_WP_loc.get_distance(current_loc) + 1000);
@@ -324,6 +325,29 @@ void Plane::update_cruise()
     }
 }
 
+void Plane::set_cruise_wp()
+{
+    // Waypoint parameters
+    double runway_wpt_a[2] = {48.298150, 2.364839};
+    double runway_wpt_b[2] = {48.300379, 2.365497};
+    // Compute bearing
+    Location loc_a = current_loc;
+    loc_a.lat = (int32_t)(runway_wpt_a[0] * 1e7);
+    loc_a.lng = (int32_t)(runway_wpt_a[1] * 1e7);
+    Location loc_b = current_loc;
+    loc_b.lat = (int32_t)(runway_wpt_b[0] * 1e7);
+    loc_b.lng = (int32_t)(runway_wpt_b[1] * 1e7);
+    float ab = loc_a.get_bearing(loc_b);
+    // printf("loc_a %d %d loc_b %d %d bearing %f rad\n", loc_a.lat, loc_a.lng, loc_b.lat, loc_b.lng, ab);
+    float bearing = radians(gps.ground_course());
+    float delta_bearing = wrap_PI(bearing - ab);
+    prev_WP_loc = loc_a;
+    if (fabsf(delta_bearing) > M_PI_2) {
+        ab = wrap_PI(ab + M_PI);
+        prev_WP_loc = loc_b;
+    }
+    cruise_state.locked_heading_cd = (int32_t)(degrees(ab) * 100);
+}
 
 /*
   handle speed and height control in FBWB or CRUISE mode. 

@@ -11,8 +11,6 @@ LIM_ROLL_CD     4500
 LAND_PITCH_CD   100
 LAND_FLARE_SEC  5
 ARSPD_USE       1
-ARSPD_FBW_MAX   30
-ARSPD_FBW_MIN   10
 KFF_RDDRMIX     0.5
 THR_MAX                        100
 RC1_MAX         2000
@@ -112,6 +110,9 @@ SIM_GPS_NOISE 0 9
 # Disable servo filter
 SIM_SERVO_SPEED  0.032
 
+# Update ground behavior to allow pitch rotation
+SIM_GND_BEHAV  2
+
 
 # Increase FBW climb rate to 5m/s
 FBWB_CLIMB_RATE 3
@@ -121,3 +122,5 @@ ARSPD_FBW_MAX 20
 # Assign relay switches
 RC6_OPTION       28.000000
 RC7_OPTION       34.000000
+# Override RC7 for landing waypoint in cruise
+RC7_OPTION       36.000000

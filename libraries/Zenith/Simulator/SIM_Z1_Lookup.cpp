@@ -138,7 +138,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     float thr = filtered_servo_range(input, 2); // TEMP
     // printf("thr")
 
-    // printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 25, rud * 25, thr); // TODO: hook to controllerdata
+    printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 25, rud * 25, thr); // TODO: hook to controllerdata
 
     // Dummy state
     // gyro = Vector3f(3.5f, -4.f, -2.8f);
@@ -295,7 +295,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // add some ground friction
     if (on_ground()) {
         Vector3f vel_body = dcm.transposed() * velocity_ef;
-        accel_body.x -= vel_body.x * 0.1f;
+        accel_body.x -= vel_body.x * 0.05f;
     }
 }
     

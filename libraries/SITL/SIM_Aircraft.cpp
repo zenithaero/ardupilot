@@ -618,7 +618,9 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
             if (velocity_ef.z > 0.0f) {
                 velocity_ef.z = 0.0f;
             }
-            gyro.zero();
+            gyro.x = 0;
+            gyro.y = MAX(gyro.y, 0);
+            gyro.z = 0;
             use_smoothing = true;
             break;
         }
