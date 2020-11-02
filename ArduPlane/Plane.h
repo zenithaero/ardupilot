@@ -407,6 +407,7 @@ private:
         bool locked_heading;
         int32_t locked_heading_cd;
         uint32_t lock_timer_ms;
+        bool landing;
     } cruise_state;
 
     struct {
@@ -988,7 +989,7 @@ private:
     void calc_gndspeed_undershoot();
     void update_loiter(uint16_t radius);
     void update_cruise();
-    void set_cruise_wp();
+    void set_cruise_land();
     void update_fbwb_speed_height(void);
     void setup_turn_angle(void);
     bool reached_loiter_target(void);

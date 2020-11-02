@@ -16,6 +16,9 @@ bool ModeCruise::_enter()
 
     plane.set_target_altitude_current();
 
+    // Reset landing
+    plane.cruise_state.landing = false;
+
     return true;
 }
 
@@ -26,7 +29,7 @@ void ModeCruise::update()
       roll when heading is locked. Heading becomes unlocked on
       any aileron or rudder input
     */
-    if (plane.channel_roll->get_control_in() != 0 || plane.channel_rudder->get_control_in() != 0) {
+    if (!plane.cruise_state.landing && (plane.channel_roll->get_control_in() != 0 || plane.channel_rudder->get_control_in() != 0)) {
         plane.cruise_state.locked_heading = false;
         plane.cruise_state.lock_timer_ms = 0;
     }
@@ -37,5 +40,11 @@ void ModeCruise::update()
     } else {
         plane.calc_nav_roll();
     }
-    plane.update_fbwb_speed_height();
+
+    if (plane.cruise_state.landing) {
+        plane.auto_throttle_mode = false;
+        plane.nav_pitch_cd = (int32_t)(plane.channel_pitch->norm_input() * ControllerData::pitch.maxCmdDeg * 100);
+        plane.calc_throttle();
+    } else
+        plane.update_fbwb_speed_height();
 }

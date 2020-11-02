@@ -85,19 +85,7 @@ void ZenithController::update() {
 }
 
 
-void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg, float rudder_deg) {
-	// Full stabilisation, or input (/state) based mode?
-	// Ignore ardupilot state machine?
-
-	// Compute speed scaler
-	float speed_scaler = 1;
-	float airspeed;
-    if (ahrs.airspeed_estimate(airspeed)) {
-		airspeed = MAX(1, airspeed);
-		speed_scaler = ControllerData::constants.scalingSpeed / airspeed;
-		speed_scaler = CLAMP(speed_scaler, 0.2, 2);
-    }
-
+void ZenithController::stabilize_pitch(float theta_cmd_deg) {
 	// TEMP
 	// if (t0 == 0)
     //     t0 = AP_HAL::micros64();
@@ -115,18 +103,23 @@ void ZenithController::stabilize(float theta_cmd_deg, float phi_cmd_deg, float r
 	// 	exit(-1);
 
 	// Execute doublets if needed
-	bool ail_doublet_active = ail_doublet.udpate(roll_yaw_controller.ail_command);
 	bool elev_doublet_active = elev_doublet.udpate(pitch_controller.elev_command);
-	bool rud_doublet_active = rud_doublet.udpate(roll_yaw_controller.rud_command);
 
 	// Stabilize pitch, roll & yaw
 	if (!elev_doublet_active) {
 		active_logs |= ZenithController::PITCH_MASK;
-		pitch_controller.update(theta_cmd_deg, speed_scaler);
+		pitch_controller.update(theta_cmd_deg);
 	}
+}
+
+void ZenithController::stabilize_rollyaw(float phi_cmd_deg, float rudder_deg) {
+	// Execute doublets if needed
+	bool ail_doublet_active = ail_doublet.udpate(roll_yaw_controller.ail_command);
+	bool rud_doublet_active = rud_doublet.udpate(roll_yaw_controller.rud_command);
+
 	if (!ail_doublet_active && !rud_doublet_active) {
 		active_logs |= ZenithController::ROLLYAW_MASK;
-		roll_yaw_controller.update(phi_cmd_deg, rudder_deg, speed_scaler);
+		roll_yaw_controller.update(phi_cmd_deg, rudder_deg);
 	}
 }
 
@@ -225,8 +218,17 @@ void PitchController::reset() {
 	theta_err_i = 0;
 }
 
-void PitchController::update(float theta_cmd_deg, float speed_scaler) {
+void PitchController::update(float theta_cmd_deg) {
 	LinearController::update();
+
+	// Compute speed scaler
+	float speed_scaler = 1;
+	float airspeed;
+    if (ahrs.airspeed_estimate(airspeed)) {
+		airspeed = MAX(1, airspeed);
+		speed_scaler = ControllerData::constants.scalingSpeed / airspeed;
+		speed_scaler = CLAMP(speed_scaler, 0.2, 2);
+    }
 
 	float theta_deg = ahrs.pitch_sensor / 100.f;
 	float theta_err_deg = theta_cmd_deg - theta_deg;
@@ -309,8 +311,18 @@ RollYawController::RollYawController(AP_AHRS &_ahrs)
 		ControllerData::rollYaw.K
 	) {};
 
-void RollYawController::update(float phi_cmd_deg, float rudder_deg, float speed_scaler) {
+void RollYawController::update(float phi_cmd_deg, float rudder_deg) {
 	LinearController::update();
+
+	// Compute speed scaler
+	float speed_scaler = 1;
+	float airspeed;
+    if (ahrs.airspeed_estimate(airspeed)) {
+		airspeed = MAX(1, airspeed);
+		speed_scaler = ControllerData::constants.scalingSpeed / airspeed;
+		speed_scaler = CLAMP(speed_scaler, 0.2, 2);
+    }
+
 	float phi_deg = ahrs.roll_sensor / 100.f;
 	float phi_err_deg = phi_cmd_deg - phi_deg;
 	phi_err_deg = CLAMP(phi_err_deg, -ControllerData::rollYaw.maxCmdDeg, ControllerData::rollYaw.maxCmdDeg);

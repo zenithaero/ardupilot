@@ -303,7 +303,8 @@ void Plane::update_cruise()
         rudder_input() == 0 &&
         gps.status() >= AP_GPS::GPS_OK_FIX_2D &&
         gps.ground_speed() >= 3 &&
-        cruise_state.lock_timer_ms == 0) {
+        cruise_state.lock_timer_ms == 0 &&
+        !cruise_state.landing) {
         // user wants to lock the heading - start the timer
         cruise_state.lock_timer_ms = millis();
     }
@@ -325,11 +326,13 @@ void Plane::update_cruise()
     }
 }
 
-void Plane::set_cruise_wp()
+void Plane::set_cruise_land()
 {
     // Waypoint parameters
-    double runway_wpt_a[2] = {48.298150, 2.364839};
-    double runway_wpt_b[2] = {48.300379, 2.365497};
+    // TODO: set in params?
+    // Malesherbes
+    double runway_wpt_a[2] = {48.299370, 2.362039};
+    double runway_wpt_b[2] = {48.297366, 2.362289};
     // Compute bearing
     Location loc_a = current_loc;
     loc_a.lat = (int32_t)(runway_wpt_a[0] * 1e7);
@@ -347,6 +350,7 @@ void Plane::set_cruise_wp()
         prev_WP_loc = loc_b;
     }
     cruise_state.locked_heading_cd = (int32_t)(degrees(ab) * 100);
+    cruise_state.landing = true;
 }
 
 /*

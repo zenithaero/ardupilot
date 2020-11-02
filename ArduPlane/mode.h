@@ -300,7 +300,6 @@ protected:
 class ModeCruise : public Mode
 {
 public:
-
     Number mode_number() const override { return Number::CRUISE; }
     const char *name() const override { return "CRUISE"; }
     const char *name4() const override { return "CRUS"; }

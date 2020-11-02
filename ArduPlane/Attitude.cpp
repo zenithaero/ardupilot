@@ -392,7 +392,7 @@ void Plane::stabilize()
     }
 
     // ZenithController - compute throttle & pitch command
-    if (auto_throttle_mode  && !throttle_suppressed) {
+    if (auto_throttle_mode && !throttle_suppressed) {
         float target_alt = relative_target_altitude_cm() / 100.f;
         float target_airspeed = target_airspeed_cm / 100.f;
         zenith_controller.update_spd_alt(target_airspeed, target_alt);
@@ -407,7 +407,9 @@ void Plane::stabilize()
     // ZenithController - update pitch & yaw
     // Warning: If disabled, uncomment servos.cpp ln 739-740 to re-enable rudder control
     int16_t rudder_cd = rudder_input();
-    zenith_controller.stabilize(nav_pitch_cd / 100.f, nav_roll_cd / 100.f, rudder_cd / 100.f);
+    zenith_controller.stabilize_pitch(nav_pitch_cd / 100.f);
+    zenith_controller.stabilize_rollyaw(nav_roll_cd / 100.f, rudder_cd / 100.f);
+
     return;
 
 
@@ -504,6 +506,9 @@ void Plane::calc_throttle()
         commanded_throttle = plane.guided_state.forced_throttle;
     }
 
+    // Override altitude controller in cruise landing mode
+    if (control_mode == &mode_cruise && cruise_state.landing)
+        commanded_throttle = get_throttle_input(true);
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, commanded_throttle);
 }
 

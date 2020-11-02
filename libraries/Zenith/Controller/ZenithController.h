@@ -44,7 +44,7 @@ protected:
 class PitchController: public LinearController {
 public:
     PitchController(AP_AHRS &ahrs);
-    void update(float theta_cmd_deg, float speed_scaler);
+    void update(float theta_cmd_deg);
     void reset();
 
     // Output
@@ -60,7 +60,7 @@ private:
 class RollYawController: public LinearController {
 public:
     RollYawController(AP_AHRS &ahrs);
-    void update(float phi_cmd_deg, float rudder_deg, float speed_scaler);
+    void update(float phi_cmd_deg, float rudder_deg);
 
     // Output
     float ail_command;
@@ -135,7 +135,8 @@ public:
     ZenithController &operator=(const ZenithController&) = delete;
 
     void update();
-    void stabilize(float theta_cmd_deg, float roll_cmd_deg, float rudder_deg);
+    void stabilize_pitch(float theta_cmd_deg);
+    void stabilize_rollyaw(float roll_cmd_deg, float rudder_deg);
     void update_spd_alt(float tas_cmd, float h_cmd);
 
     // Doublets

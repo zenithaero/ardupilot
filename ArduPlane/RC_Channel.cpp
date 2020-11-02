@@ -187,7 +187,7 @@ void RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const AuxSwit
 
     case AUX_FUNC::RELAY4:
         if (ch_flag == AuxSwitchPos::HIGH)
-            plane.set_cruise_wp();
+            plane.set_cruise_land();
         break;
 
     default:
