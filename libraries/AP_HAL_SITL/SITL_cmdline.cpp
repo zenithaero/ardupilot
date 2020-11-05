@@ -35,7 +35,7 @@
 #include <SITL/SIM_Webots.h>
 // #include <SITL/SIM_Z1_Matlab.h>
 // #include <SITL/SIM_Z1_Wrapper.h>
-#include <Zenith/Simulator/SIM_Z1_Lookup.h>
+#include <Zenith/Simulator/ZenithSim.h>
 #include <SITL/SIM_JSON.h>
 
 #include <signal.h>

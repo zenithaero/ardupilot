@@ -396,12 +396,6 @@ void Plane::stabilize()
         float target_alt = relative_target_altitude_cm() / 100.f;
         float target_airspeed = target_airspeed_cm / 100.f;
         zenith_controller.update_spd_alt(target_airspeed, target_alt);
-
-        // Force computation & setting of pitch & thr
-        // nav_roll_cd = 0;
-        // calc_nav_pitch();
-        // calc_nav_roll();
-        // calc_throttle();
     }
 
     // ZenithController - update pitch & yaw

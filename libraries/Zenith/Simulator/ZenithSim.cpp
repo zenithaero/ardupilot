@@ -4,7 +4,7 @@
  * @author Bertrand Bevillard <bertrand@zenithaero.com>
  */
 
-#include "SIM_Z1_Lookup.h"
+#include <Zenith/Simulator/ZenithSim.h>
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <vector>
 #include <stdio.h>
