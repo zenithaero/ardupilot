@@ -337,10 +337,11 @@ public:
 
     void navigate() override;
 
-    void set_cruise_land() override;
+    void set_cruise_land();
 
     bool get_target_heading_cd(int32_t &target_heading);
 
+    bool landing;
 protected:
 
     bool _enter() override;
@@ -348,7 +349,6 @@ protected:
     bool locked_heading;
     int32_t locked_heading_cd;
     uint32_t lock_timer_ms;
-    bool landing;
 };
 
 #if HAL_ADSB_ENABLED

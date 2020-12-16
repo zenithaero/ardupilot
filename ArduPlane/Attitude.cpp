@@ -506,7 +506,7 @@ void Plane::calc_throttle()
     }
 
     // Override altitude controller in cruise landing mode
-    if (control_mode == &mode_cruise && cruise_state.landing)
+    if (control_mode == &mode_cruise && mode_cruise.landing)
         commanded_throttle = get_throttle_input(true);
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, commanded_throttle);
 }

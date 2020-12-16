@@ -2102,7 +2102,7 @@ LOG_STRUCTURE_FROM_NAVEKF3 \
     { LOG_ROLLYAW_CTRL_MSG, sizeof(log_RollYawCtrl), \
       "RCTL", "Qffffffff", "TimeUS,cmd,err,errI,maxI,ailFF,rudFF,ailCmd,rudCmd", "s--------", "F--------" }, \
     { LOG_SPDALT_CTRL_MSG, sizeof(log_SpdAltCtrl), \
-      "SCTL", "Qffffffffffff", "TimeUS,hCd,tCd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,thrFF,pCd,thrCd", "s------------", "F------------" } \
+      "SCTL", "Qffffffffffff", "TimeUS,hCd,tCd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,thrFF,pCd,thrCd", "s------------", "F------------" }, \
     { LOG_WINCH_MSG, sizeof(log_Winch), \
       "WINC", "QBBBBBfffHfb", "TimeUS,Heal,ThEnd,Mov,Clut,Mode,DLen,Len,DRate,Tens,Vcc,Temp", "s-----mmn?vO", "F-----000000" }, \
     { LOG_PSC_MSG, sizeof(log_PSC), \

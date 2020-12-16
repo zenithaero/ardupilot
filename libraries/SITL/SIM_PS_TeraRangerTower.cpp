@@ -21,6 +21,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <stdio.h>
 #include <errno.h>
+#include <AP_HAL/utility/sparse-endian.h>
 
 using namespace SITL;
 
