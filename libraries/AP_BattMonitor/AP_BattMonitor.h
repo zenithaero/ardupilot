@@ -36,7 +36,9 @@ class AP_BattMonitor_SMBus;
 class AP_BattMonitor_SMBus_Solo;
 class AP_BattMonitor_SMBus_Generic;
 class AP_BattMonitor_SMBus_Maxell;
+class AP_BattMonitor_SMBus_Rotoye;
 class AP_BattMonitor_UAVCAN;
+class AP_BattMonitor_Generator;
 
 class AP_BattMonitor
 {
@@ -46,18 +48,42 @@ class AP_BattMonitor
     friend class AP_BattMonitor_SMBus_Solo;
     friend class AP_BattMonitor_SMBus_Generic;
     friend class AP_BattMonitor_SMBus_Maxell;
+    friend class AP_BattMonitor_SMBus_Rotoye;
     friend class AP_BattMonitor_UAVCAN;
     friend class AP_BattMonitor_Sum;
     friend class AP_BattMonitor_FuelFlow;
     friend class AP_BattMonitor_FuelLevel_PWM;
+    friend class AP_BattMonitor_Generator;
 
 public:
 
     // battery failsafes must be defined in levels of severity so that vehicles wont fall backwards
-    enum BatteryFailsafe {
-        BatteryFailsafe_None = 0,
-        BatteryFailsafe_Low,
-        BatteryFailsafe_Critical
+    enum class Failsafe : uint8_t {
+        None = 0,
+        Low,
+        Critical
+    };
+
+    // Battery monitor driver types
+    enum class Type {
+        NONE                       = 0,
+        ANALOG_VOLTAGE_ONLY        = 3,
+        ANALOG_VOLTAGE_AND_CURRENT = 4,
+        SOLO                       = 5,
+        BEBOP                      = 6,
+        SMBus_Generic              = 7,
+        UAVCAN_BatteryInfo         = 8,
+        BLHeliESC                  = 9,
+        Sum                        = 10,
+        FuelFlow                   = 11,
+        FuelLevel_PWM              = 12,
+        SUI3                       = 13,
+        SUI6                       = 14,
+        NeoDesign                  = 15,
+        MAXELL                     = 16,
+        GENERATOR_ELEC             = 17,
+        GENERATOR_FUEL             = 18,
+        Rotoye                     = 19,
     };
 
     FUNCTOR_TYPEDEF(battery_failsafe_handler_fn_t, void, const char *, const int8_t);
@@ -91,7 +117,7 @@ public:
         uint32_t    temperature_time;          // timestamp of the last received temperature message
         float       voltage_resting_estimate;  // voltage with sag removed based on current and resistance estimate in Volt
         float       resistance;                // resistance, in Ohms, calculated by comparing resting voltage vs in flight voltage
-        BatteryFailsafe failsafe;              // stage failsafe the battery is in
+        Failsafe failsafe;                     // stage failsafe the battery is in
         bool        healthy;                   // battery monitor is communicating correctly
         bool        is_powering_off;           // true when power button commands power off
         bool        powerOffNotified;          // only send powering off notification once
@@ -143,8 +169,16 @@ public:
     int8_t get_highest_failsafe_priority(void) const { return _highest_failsafe_priority; };
 
     /// get_type - returns battery monitor type
-    enum AP_BattMonitor_Params::BattMonitor_Type get_type() const { return get_type(AP_BATT_PRIMARY_INSTANCE); }
-    enum AP_BattMonitor_Params::BattMonitor_Type get_type(uint8_t instance) const { return _params[instance].type(); }
+    enum Type get_type() const { return get_type(AP_BATT_PRIMARY_INSTANCE); }
+    enum Type get_type(uint8_t instance) const {
+        return (Type)_params[instance]._type.get();
+    }
+
+    /// get_serial_number - returns battery serial number
+    int32_t get_serial_number() const { return get_serial_number(AP_BATT_PRIMARY_INSTANCE); }
+    int32_t get_serial_number(uint8_t instance) const {
+        return _params[instance]._serial_number;
+    }
 
     /// true when (voltage * current) > watt_max
     bool overpower_detected() const;
@@ -194,7 +228,7 @@ private:
     void convert_params(void);
 
     /// returns the failsafe state of the battery
-    BatteryFailsafe check_failsafe(const uint8_t instance);
+    Failsafe check_failsafe(const uint8_t instance);
     void check_failsafes(void); // checks all batteries failsafes
 
     battery_failsafe_handler_fn_t _battery_failsafe_handler_fn;

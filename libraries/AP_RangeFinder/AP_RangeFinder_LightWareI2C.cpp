@@ -259,7 +259,7 @@ bool AP_RangeFinder_LightWareI2C::sf20_init()
     // When it is supported the expected response would be "e:1".
 
     // Changes the number of lost signal confirmations: 1 [1..250].
-    if (!sf20_send_and_expect("#LC,1\r\n", "lc:1")) {
+    if (!sf20_send_and_expect("#LC,20\r\n", "lc:20")) {
         return false;
     }
 
@@ -345,8 +345,13 @@ bool AP_RangeFinder_LightWareI2C::legacy_get_reading(uint16_t &reading_cm)
 
     // read the high and low byte distance registers
     if (_dev->transfer(&read_reg, 1, (uint8_t *)&val, sizeof(val))) {
-        // combine results into distance
-        reading_cm = be16toh(val);
+        int16_t signed_val = int16_t(be16toh(val));
+        if (signed_val < 0) {
+            // some lidar firmwares will return 65436 for out of range
+            reading_cm = uint16_t(max_distance_cm() + LIGHTWARE_OUT_OF_RANGE_ADD_CM);
+        } else {
+            reading_cm = uint16_t(signed_val);
+        }
         return true;
     }
     return false;

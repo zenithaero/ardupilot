@@ -15,25 +15,8 @@ static void failsafe_check_static()
 void Sub::init_ardupilot()
 {
     BoardConfig.init();
-#if HAL_WITH_UAVCAN
-    BoardConfig_CAN.init();
-#endif
-
-#if AP_FEATURE_BOARD_DETECT
-    // Detection won't work until after BoardConfig.init()
-    switch (AP_BoardConfig::get_board_type()) {
-    case AP_BoardConfig::PX4_BOARD_PIXHAWK2:
-        AP_Param::set_by_name("GND_EXT_BUS", 0);
-        celsius.init(0);
-        break;
-    default:
-        AP_Param::set_by_name("GND_EXT_BUS", 1);
-        celsius.init(1);
-        break;
-    }
-#else
-    AP_Param::set_default_by_name("GND_EXT_BUS", 1);
-    celsius.init(1);
+#if HAL_MAX_CAN_PROTOCOL_DRIVERS
+    can_mgr.init();
 #endif
 
     // init cargo gripper
@@ -52,6 +35,24 @@ void Sub::init_ardupilot()
     battery.init();
 
     barometer.init();
+
+#if AP_FEATURE_BOARD_DETECT
+    // Detection won't work until after BoardConfig.init()
+    switch (AP_BoardConfig::get_board_type()) {
+    case AP_BoardConfig::PX4_BOARD_PIXHAWK2:
+        AP_Param::set_default_by_name("GND_EXT_BUS", 0);
+        break;
+    case AP_BoardConfig::PX4_BOARD_PIXHAWK:
+        AP_Param::set_by_name("GND_EXT_BUS", 1);
+        break;
+    default:
+        AP_Param::set_default_by_name("GND_EXT_BUS", 1);
+        break;
+    }
+#else
+    AP_Param::set_default_by_name("GND_EXT_BUS", 1);
+#endif
+    celsius.init(barometer.external_bus());
 
     // setup telem slots with serial ports
     gcs().setup_uarts();
@@ -100,7 +101,7 @@ void Sub::init_ardupilot()
     init_optflow();
 #endif
 
-#if MOUNT == ENABLED
+#if HAL_MOUNT_ENABLED
     // initialise camera mount
     camera_mount.init();
     // This step ncessary so the servo is properly initialized
@@ -165,6 +166,8 @@ void Sub::init_ardupilot()
     g2.scripting.init();
 #endif // ENABLE_SCRIPTING
 
+    g2.airspeed.init();
+
     // we don't want writes to the serial port to cause us to pause
     // mid-flight, so set the serial ports non-blocking once we are
     // ready to fly
@@ -174,11 +177,6 @@ void Sub::init_ardupilot()
     mainloop_failsafe_enable();
 
     ins.set_log_raw_bit(MASK_LOG_IMU_RAW);
-
-    // disable safety if requested
-    BoardConfig.init_safety();    
-    
-    hal.console->print("\nInit complete");
 
     // flag that initialisation has completed
     ap.initialised = true;
@@ -288,6 +286,7 @@ bool Sub::should_log(uint32_t mask)
 // dummy method to avoid linking AFS
 bool AP_AdvancedFailsafe::gcs_terminate(bool should_terminate, const char *reason) { return false; }
 AP_AdvancedFailsafe *AP::advancedfailsafe() { return nullptr; }
-
+#if HAL_ADSB_ENABLED
 // dummy method to avoid linking AP_Avoidance
 AP_Avoidance *AP::ap_avoidance() { return nullptr; }
+#endif

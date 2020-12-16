@@ -41,11 +41,20 @@ public:
 
     MAV_RESULT handle_command_int_packet(const mavlink_command_int_t &packet);
 
+   // User parameters for inputs into scripts 
+   AP_Float _user[4]; 
+
     struct terminal_s {
         int output_fd;
         off_t input_offset;
         bool session;
     } terminal;
+
+    enum class SCR_DIR {
+        ROMFS = 1 << 0,
+        SCRIPTS = 1 << 1,
+    };
+    uint16_t get_disabled_dir() { return uint16_t(_dir_disable.get());}
 
 private:
 
@@ -60,6 +69,7 @@ private:
     AP_Int32 _script_vm_exec_count;
     AP_Int32 _script_heap_size;
     AP_Int8 _debug_level;
+    AP_Int16 _dir_disable;
 
     bool _init_failed;  // true if memory allocation failed
 

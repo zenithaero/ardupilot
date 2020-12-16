@@ -89,7 +89,7 @@ void AP_RCTelemetry::run_wfq_scheduler(void)
     update_avg_packet_rate();
 
     uint32_t now = AP_HAL::millis();
-    uint8_t max_delay_idx = 0;
+    int8_t max_delay_idx = -1;
     
     float max_delay = 0;
     float delay = 0;
@@ -125,6 +125,10 @@ void AP_RCTelemetry::run_wfq_scheduler(void)
             }
         }
     }
+
+    if (max_delay_idx < 0) {  // nothing was ready
+        return;
+    }
     now = AP_HAL::millis();
 #ifdef TELEM_DEBUG
     _scheduler.packet_rate[max_delay_idx] = (_scheduler.packet_rate[max_delay_idx] + 1000 / (now - _scheduler.packet_timer[max_delay_idx])) / 2;
@@ -143,7 +147,7 @@ void AP_RCTelemetry::queue_message(MAV_SEVERITY severity, const char *text)
     mavlink_statustext_t statustext{};
 
     statustext.severity = severity;
-    strncpy(statustext.text, text, sizeof(statustext.text));
+    strncpy_noterm(statustext.text, text, sizeof(statustext.text));
 
     // The force push will ensure comm links do not block other comm links forever if they fail.
     // If we push to a full buffer then we overwrite the oldest entry, effectively removing the
@@ -212,11 +216,10 @@ void AP_RCTelemetry::check_ekf_status(void)
     bool get_variance;
     float velVar, posVar, hgtVar, tasVar;
     Vector3f magVar;
-    Vector2f offset;
     {
         AP_AHRS &_ahrs = AP::ahrs();
         WITH_SEMAPHORE(_ahrs.get_semaphore());
-        get_variance = _ahrs.get_variances(velVar, posVar, hgtVar, magVar, tasVar, offset);
+        get_variance = _ahrs.get_variances(velVar, posVar, hgtVar, magVar, tasVar);
     }
     if (get_variance) {
         uint32_t now = AP_HAL::millis();

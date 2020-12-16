@@ -1,8 +1,8 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_AHRS/AP_AHRS.h>
-#if AP_AHRS_NAVEKF_AVAILABLE
-
 #include "SoloGimbal.h"
+
+#if HAL_SOLO_GIMBAL_ENABLED
 
 #include <stdio.h>
 #include <GCS_MAVLink/GCS.h>
@@ -222,7 +222,7 @@ void SoloGimbal::readVehicleDeltaAngle(uint8_t ins_index, Vector3f &dAng) {
 
     if (ins_index < ins.get_gyro_count()) {
         if (!ins.get_delta_angle(ins_index,dAng)) {
-            dAng = ins.get_gyro(ins_index) / ins.get_sample_rate();
+            dAng = ins.get_gyro(ins_index) / ins.get_loop_rate_hz();
         }
     }
 }
@@ -230,6 +230,7 @@ void SoloGimbal::readVehicleDeltaAngle(uint8_t ins_index, Vector3f &dAng) {
 void SoloGimbal::update_fast() {
     const AP_InertialSensor &ins = AP::ins();
 
+#if INS_MAX_INSTANCES > 1
     if (ins.use_gyro(0) && ins.use_gyro(1)) {
         // dual gyro mode - average first two gyros
         Vector3f dAng;
@@ -237,7 +238,9 @@ void SoloGimbal::update_fast() {
         _vehicle_delta_angles += dAng*0.5f;
         readVehicleDeltaAngle(1, dAng);
         _vehicle_delta_angles += dAng*0.5f;
-    } else {
+    } else
+#endif
+    {
         // single gyro mode - one of the first two gyros are unhealthy or don't exist
         // just read primary gyro
         Vector3f dAng;
@@ -529,4 +532,4 @@ void SoloGimbal::joint_rates_to_gimbal_ang_vel(const Vector3f& joint_rates, Vect
     ang_vel.z = sin_theta*joint_rates.x+cos_theta*cos_phi*joint_rates.z;
 }
 
-#endif // AP_AHRS_NAVEKF_AVAILABLE
+#endif // HAL_SOLO_GIMBAL_ENABLED

@@ -27,6 +27,7 @@ char keyword_write[]               = "write";
 char keyword_attr_enum[]    = "'enum";
 char keyword_attr_literal[] = "'literal";
 char keyword_attr_null[]    = "'Null";
+char keyword_attr_reference[]  = "'Ref";
 
 // type keywords
 char keyword_boolean[]  = "boolean";
@@ -139,6 +140,7 @@ struct range_check {
 enum type_flags {
   TYPE_FLAGS_NULLABLE = (1U << 1),
   TYPE_FLAGS_ENUM     = (1U << 2),
+  TYPE_FLAGS_REFERNCE = (1U << 3),
 };
 
 struct type {
@@ -171,9 +173,12 @@ void trace(const int trace, const char *message, ...) {
     va_start(args, message);
     vfprintf(stderr, fmt, args);
     va_end(args);
+    free(fmt);
+    fmt = NULL;
   }
 }
 
+void error(const int code, const char *message, ...) __attribute__ ((noreturn));
 void error(const int code, const char *message, ...) {
   char * fmt = malloc(strlen(message)+1024);
   if (fmt == NULL) {
@@ -190,7 +195,8 @@ void error(const int code, const char *message, ...) {
   va_start(args, message);
   vfprintf(stderr, fmt, args);
   va_end(args);
-
+  free(fmt);
+  fmt = NULL;
   exit(code);
 }
 
@@ -202,7 +208,7 @@ char * next_token(void) {
   trace(TRACE_TOKENS, "Token %d:%d %s", state.line_num, state.token_num, state.token);
   if ((state.token!= NULL) && (strcmp(state.token, keyword_comment) == 0)) {
     trace(TRACE_TOKENS, "Detected comment %d", state.line_num);
-    while (next_token()) {} // burn all the symbols
+    state.token = NULL; // burn the line
   }
   return state.token;
 }
@@ -211,12 +217,27 @@ char * start_line(void) {
   while (fgets(state.line, sizeof(state.line)/sizeof(state.line[0]), description) != NULL) {//state.line = readline(NULL))) {
       state.line_num++;
     
+      const size_t length = strlen(state.line);
+      if (length > 1 && state.line[length - 2] == '\r') {
+        trace(TRACE_TOKENS, "Discarding carriage return");
+        if (length == 2) { // empty line of just carriage return, loop again
+          continue;
+        }
+        state.line[length - 2] = '\0';
+      } else if (length > 0 && state.line[length - 1] == '\n') {
+        trace(TRACE_TOKENS, "Discarding newline");
+        if (length == 1) { // empty line of just carriage return, loop again
+          continue;
+        }
+        state.line[length - 1] = '\0';
+      }
+
       state.token = strtok(state.line, token_delimiters);
       state.token_num = 1;
-      trace(TRACE_TOKENS, "Token %d:%d %s", state.line_num, state.token_num, state.token);
+      trace(TRACE_TOKENS, "Start of line token %d:%d %s", state.line_num, state.token_num, state.token);
 
       if (state.token != NULL) {
-          break;
+        break;
       }
   }
 
@@ -466,6 +487,8 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
         error(ERROR_USERDATA, "%s is not nullable in this context", data_type);
       }
       type->flags |= TYPE_FLAGS_NULLABLE;
+    } else if (strcmp(attribute, keyword_attr_reference) == 0) {
+      type->flags |= TYPE_FLAGS_REFERNCE;
     } else {
       error(ERROR_USERDATA, "Unknown attribute: %s", attribute);
     }
@@ -514,7 +537,7 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
   }
 
   // sanity check that only supported types are nullable
-  if (type->flags & TYPE_FLAGS_NULLABLE) {
+  if (type->flags & (TYPE_FLAGS_NULLABLE | TYPE_FLAGS_REFERNCE)) {
     // a switch is a very verbose way to do this, but forces users to consider new types added
     switch (type->type) {
       case TYPE_FLOAT:
@@ -532,13 +555,17 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
       case TYPE_AP_OBJECT:
       case TYPE_LITERAL:
       case TYPE_NONE:
-        error(ERROR_USERDATA, "%s types cannot be nullable", data_type);
+        if (type->flags & TYPE_FLAGS_NULLABLE) {
+          error(ERROR_USERDATA, "%s types cannot be nullable", data_type);
+        } else {
+          error(ERROR_USERDATA, "%s types cannot be passed as reference", data_type);
+        }
         break;
     }
   }
 
   // add range checks, unless disabled or a nullable type
-  if (range_type != RANGE_CHECK_NONE && !(type->flags & TYPE_FLAGS_NULLABLE)) {
+  if (range_type != RANGE_CHECK_NONE && !(type->flags & (TYPE_FLAGS_NULLABLE | TYPE_FLAGS_REFERNCE))) {
     switch (type->type) {
       case TYPE_FLOAT:
       case TYPE_INT8_T:
@@ -639,8 +666,14 @@ void handle_method(char *parent_name, struct method **methods) {
     if ((method->return_type.type != TYPE_BOOLEAN) && (arg_type.flags & TYPE_FLAGS_NULLABLE)) {
       error(ERROR_USERDATA, "Nullable arguments are only available on a boolean method");
     }
+    if ((method->return_type.type == TYPE_BOOLEAN) && (arg_type.flags & TYPE_FLAGS_REFERNCE)) {
+      error(ERROR_USERDATA, "Use Nullable arguments on a boolean method, not 'Ref");
+    }
     if (arg_type.flags & TYPE_FLAGS_NULLABLE) {
       method->flags |= TYPE_FLAGS_NULLABLE;
+    }
+    if (arg_type.flags & TYPE_FLAGS_REFERNCE) {
+      method->flags |= TYPE_FLAGS_REFERNCE;
     }
     struct argument * arg = allocate(sizeof(struct argument));
     memcpy(&(arg->type), &arg_type, sizeof(struct type));
@@ -1005,7 +1038,7 @@ void emit_checker(const struct type t, int arg_number, int skipped, const char *
     error(ERROR_INTERNAL, "Can't handle more then %d arguments to a function", NULLABLE_ARG_COUNT_BASE);
   }
 
-  if (t.flags & TYPE_FLAGS_NULLABLE) {
+  if (t.flags & (TYPE_FLAGS_NULLABLE | TYPE_FLAGS_REFERNCE)) {
     arg_number = arg_number + NULLABLE_ARG_COUNT_BASE;
     switch (t.type) {
       case TYPE_BOOLEAN:
@@ -1291,6 +1324,57 @@ void emit_userdata_fields() {
   }
 }
 
+// emit refences functions for a call, return the number of arduments added
+int emit_references(const struct argument *arg, const char * tab) {
+  int arg_index = NULLABLE_ARG_COUNT_BASE + 2;
+  int return_count = 0;
+  while (arg != NULL) {
+    if (arg->type.flags & (TYPE_FLAGS_NULLABLE | TYPE_FLAGS_REFERNCE)) {
+      return_count++;
+      switch (arg->type.type) {
+        case TYPE_BOOLEAN:
+          fprintf(source, "%slua_pushboolean(L, data_%d);\n", tab, arg_index);
+          break;
+        case TYPE_FLOAT:
+          fprintf(source, "%slua_pushnumber(L, data_%d);\n", tab, arg_index);
+          break;
+        case TYPE_INT8_T:
+        case TYPE_INT16_T:
+        case TYPE_INT32_T:
+        case TYPE_UINT8_T:
+        case TYPE_UINT16_T:
+        case TYPE_ENUM:
+          fprintf(source, "%slua_pushinteger(L, data_%d);\n", tab, arg_index);
+          break;
+        case TYPE_UINT32_T:
+          fprintf(source, "%snew_uint32_t(L);\n", tab);
+          fprintf(source, "%s*static_cast<uint32_t *>(luaL_checkudata(L, -1, \"uint32_t\")) = data_%d;\n", tab, arg_index);
+          break;
+        case TYPE_STRING:
+          fprintf(source, "%slua_pushstring(L, data_%d);\n", tab, arg_index);
+          break;
+        case TYPE_USERDATA:
+          // userdatas must allocate a new container to return
+          fprintf(source, "%snew_%s(L);\n", tab, arg->type.data.ud.sanatized_name);
+          fprintf(source, "%s*check_%s(L, -1) = data_%d;\n", tab, arg->type.data.ud.sanatized_name, arg_index);
+          break;
+        case TYPE_NONE:
+          error(ERROR_INTERNAL, "Attempted to emit a nullable or reference  argument of type none");
+          break;
+        case TYPE_LITERAL:
+          error(ERROR_INTERNAL, "Attempted to make a nullable or reference literal");
+          break;
+        case TYPE_AP_OBJECT: // FIXME: collapse these to a single failure case
+          error(ERROR_INTERNAL, "Attempted to make a nullable or reference ap_object");
+          break;
+      }
+    }
+    arg_index++;
+    arg = arg->next;
+  }
+  return return_count;
+}
+
 void emit_userdata_method(const struct userdata *data, const struct method *method) {
   int arg_count = 1;
 
@@ -1311,7 +1395,7 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
   // sanity check number of args called with
   arg_count = 1;
   while (arg != NULL) {
-    if (!(arg->type.flags & TYPE_FLAGS_NULLABLE) && !(arg->type.type == TYPE_LITERAL)) {
+    if (!(arg->type.flags & (TYPE_FLAGS_NULLABLE | TYPE_FLAGS_REFERNCE)) && !(arg->type.type == TYPE_LITERAL)) {
       arg_count++;
     }
     arg = arg->next;
@@ -1346,7 +1430,7 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
       arg_count++;
     }
     if (//arg->type.type == TYPE_LITERAL ||
-        arg->type.flags & TYPE_FLAGS_NULLABLE) {
+        arg->type.flags & (TYPE_FLAGS_NULLABLE| TYPE_FLAGS_REFERNCE)) {
       skipped++;
     }
     arg = arg->next;
@@ -1360,49 +1444,80 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
     fprintf(source, "    AP::scheduler().get_semaphore().take_blocking();\n");
   }
 
+  int static_cast = TRUE;
+
   switch (method->return_type.type) {
-    case TYPE_BOOLEAN:
-      fprintf(source, "    const bool data = ud->%s(", method->name);
-      break;
-    case TYPE_FLOAT:
-      fprintf(source, "    const float data = ud->%s(", method->name);
-      break;
-    case TYPE_INT8_T:
-      fprintf(source, "    const int8_t data = ud->%s(", method->name);
-      break;
-    case TYPE_INT16_T:
-      fprintf(source, "    const int16_t data = ud->%s(", method->name);
-      break;
-    case TYPE_INT32_T:
-      fprintf(source, "    const int32_t data = ud->%s(", method->name);
-      break;
     case TYPE_STRING:
       fprintf(source, "    const char * data = ud->%s(", method->name);
-      break;
-    case TYPE_UINT8_T:
-      fprintf(source, "    const uint8_t data = ud->%s(", method->name);
-      break;
-    case TYPE_UINT16_T:
-      fprintf(source, "    const uint16_t data = ud->%s(", method->name);
-      break;
-    case TYPE_UINT32_T:
-      fprintf(source, "    const uint32_t data = ud->%s(", method->name);
+      static_cast = FALSE;
       break;
     case TYPE_ENUM:
       fprintf(source, "    const %s &data = ud->%s(", method->return_type.data.enum_name, method->name);
+      static_cast = FALSE;
       break;
     case TYPE_USERDATA:
       fprintf(source, "    const %s &data = ud->%s(", method->return_type.data.ud.name, method->name);
+      static_cast = FALSE;
       break;
     case TYPE_AP_OBJECT:
       fprintf(source, "    %s *data = ud->%s(", method->return_type.data.ud.name, method->name);
+      static_cast = FALSE;
       break;
     case TYPE_NONE:
       fprintf(source, "    ud->%s(", method->name);
+      static_cast = FALSE;
       break;
     case TYPE_LITERAL:
       error(ERROR_USERDATA, "Can't return a literal from a method");
       break;
+    case TYPE_BOOLEAN:
+    case TYPE_FLOAT:
+    case TYPE_INT8_T:
+    case TYPE_INT16_T:
+    case TYPE_INT32_T:
+    case TYPE_UINT8_T:
+    case TYPE_UINT16_T:
+    case TYPE_UINT32_T:
+      break;
+  }
+
+  if (static_cast) {
+    char *var_type_name;
+    switch (method->return_type.type) {
+      case TYPE_BOOLEAN:
+        var_type_name = "bool";
+        break;
+      case TYPE_FLOAT:
+        var_type_name = "float";
+        break;
+      case TYPE_INT8_T:
+        var_type_name = "int8_t";
+        break;
+      case TYPE_INT16_T:
+        var_type_name = "int16_t";
+        break;
+      case TYPE_INT32_T:
+        var_type_name = "int32_t";
+        break;
+      case TYPE_UINT8_T:
+        var_type_name = "uint8_t";
+        break;
+      case TYPE_UINT16_T:
+        var_type_name = "uint16_t";
+        break;
+      case TYPE_UINT32_T:
+        var_type_name = "uint32_t";
+        break;
+    case TYPE_STRING:
+    case TYPE_ENUM:
+    case TYPE_USERDATA:
+    case TYPE_AP_OBJECT:
+    case TYPE_NONE:
+    case TYPE_LITERAL:
+        error(ERROR_USERDATA, "Unexpected type");
+        break;
+    }
+    fprintf(source, "    const %s data = static_cast<%s>(ud->%s(", var_type_name, var_type_name, method->name);
   }
 
   if (arg_count != 2) {
@@ -1425,7 +1540,7 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
       case TYPE_ENUM:
       case TYPE_USERDATA:
       case TYPE_AP_OBJECT:
-        fprintf(source, "            data_%d", arg_count + ((arg->type.flags & TYPE_FLAGS_NULLABLE) ? NULLABLE_ARG_COUNT_BASE : 0));
+        fprintf(source, "            data_%d", arg_count + ((arg->type.flags & (TYPE_FLAGS_NULLABLE | TYPE_FLAGS_REFERNCE)) ? NULLABLE_ARG_COUNT_BASE : 0));
         break;
       case TYPE_LITERAL:
         fprintf(source, "            %s", arg->type.data.literal);
@@ -1442,7 +1557,11 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
             fprintf(source, ",\n");
     }
   }
-  fprintf(source, "%s);\n\n", "");
+  if (static_cast) {
+    fprintf(source, "%s));\n\n", "");
+  } else {
+    fprintf(source, "%s);\n\n", "");
+  }
 
   if (data->flags & UD_FLAG_SEMAPHORE) {
     fprintf(source, "    ud->get_semaphore().give();\n");
@@ -1452,62 +1571,24 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
     fprintf(source, "    AP::scheduler().get_semaphore().give();\n");
   }
 
-  int return_count = 1; // number of arguments to return
+  // we need to emit out refernce arguments, iterate the args again, creating and copying objects, while keeping a new count
+  int return_count = 1; 
+  if (method->flags & TYPE_FLAGS_REFERNCE) {
+    arg = method->arguments;
+    // number of arguments to return
+    return_count += emit_references(arg,"    ");
+  }
+
   switch (method->return_type.type) {
     case TYPE_BOOLEAN:
       if (method->flags & TYPE_FLAGS_NULLABLE) {
         fprintf(source, "    if (data) {\n");
         // we need to emit out nullable arguments, iterate the args again, creating and copying objects, while keeping a new count
-        return_count = 0;
         arg = method->arguments;
-        int arg_index = NULLABLE_ARG_COUNT_BASE + 2;
-        while (arg != NULL) {
-          if (arg->type.flags & TYPE_FLAGS_NULLABLE) {
-            return_count++;
-            switch (arg->type.type) {
-              case TYPE_BOOLEAN:
-                fprintf(source, "        lua_pushboolean(L, data_%d);\n", arg_index);
-                break;
-              case TYPE_FLOAT:
-                fprintf(source, "        lua_pushnumber(L, data_%d);\n", arg_index);
-                break;
-              case TYPE_INT8_T:
-              case TYPE_INT16_T:
-              case TYPE_INT32_T:
-              case TYPE_UINT8_T:
-              case TYPE_UINT16_T:
-              case TYPE_ENUM:
-                fprintf(source, "        lua_pushinteger(L, data_%d);\n", arg_index);
-                break;
-              case TYPE_UINT32_T:
-                fprintf(source, "        new_uint32_t(L);\n");
-                fprintf(source, "        *static_cast<uint32_t *>(luaL_checkudata(L, -1, \"uint32_t\")) = data_%d;\n", arg_index);
-                break;
-              case TYPE_STRING:
-                fprintf(source, "        lua_pushstring(L, data_%d);\n", arg_index);
-                break;
-              case TYPE_USERDATA:
-                // userdatas must allocate a new container to return
-                fprintf(source, "        new_%s(L);\n", arg->type.data.ud.sanatized_name);
-                fprintf(source, "        *check_%s(L, -1) = data_%d;\n", arg->type.data.ud.sanatized_name, arg_index);
-                break;
-              case TYPE_NONE:
-                error(ERROR_INTERNAL, "Attempted to emit a nullable argument of type none");
-                break;
-              case TYPE_LITERAL:
-                error(ERROR_INTERNAL, "Attempted to make a nullable literal");
-                break;
-              case TYPE_AP_OBJECT: // FIXME: collapse these to a single failure case
-                error(ERROR_INTERNAL, "Attempted to make a nullable ap_object");
-                break;
-            }
-          }
-
-          arg_index++;
-          arg = arg->next;
-        }
+        return_count = emit_references(arg,"        ");
+        fprintf(source, "        return %d;\n", return_count);
         fprintf(source, "    } else {\n");
-        fprintf(source, "        lua_pushnil(L);\n");
+        fprintf(source, "        return 0;\n");
         fprintf(source, "    }\n");
       } else {
         fprintf(source, "    lua_pushboolean(L, data);\n");
@@ -1547,11 +1628,13 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
     case TYPE_NONE:
     case TYPE_LITERAL:
       // no return value, so don't worry about pushing a value
-      return_count = 0;
+      return_count--;
       break;
   }
 
-  fprintf(source, "    return %d;\n", return_count);
+  if ((method->return_type.type != TYPE_BOOLEAN) || ((method->flags & TYPE_FLAGS_NULLABLE) == 0)) {
+      fprintf(source, "    return %d;\n", return_count);
+  }
 
   fprintf(source, "}\n\n");
 }

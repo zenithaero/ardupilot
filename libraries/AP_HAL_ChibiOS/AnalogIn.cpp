@@ -432,7 +432,7 @@ void AnalogIn::update_power_flags(void)
     if (palReadLine(HAL_GPIO_PIN_VDD_5V_PERIPH_OC) == 1) {
         flags |= MAV_POWER_STATUS_PERIPH_OVERCURRENT;
     }
-#elif defined(HAL_GPIO_PIN_VDD_5V_PERIPH_bOC)
+#elif defined(HAL_GPIO_PIN_VDD_5V_PERIPH_nOC)
     if (palReadLine(HAL_GPIO_PIN_VDD_5V_PERIPH_nOC) == 0) {
         flags |= MAV_POWER_STATUS_PERIPH_OVERCURRENT;
     }
@@ -473,6 +473,7 @@ void AnalogIn::update_power_flags(void)
         // the power status has changed while armed
         flags |= MAV_POWER_STATUS_CHANGED;
     }
+    _accumulated_power_flags |= flags;
     _power_flags = flags;
 }
 #endif // HAL_USE_ADC

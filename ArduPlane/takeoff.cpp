@@ -18,6 +18,7 @@ bool Plane::auto_takeoff_check(void)
     // reset all takeoff state if disarmed
     if (!hal.util->get_soft_armed()) {
         memset(&takeoff_state, 0, sizeof(takeoff_state));
+        auto_state.baro_takeoff_alt = barometer.get_altitude();
         return false;
     }
 
@@ -58,6 +59,9 @@ bool Plane::auto_takeoff_check(void)
             }
         }
     }
+
+    // let EKF know to start GSF yaw estimator before takeoff movement starts so that yaw angle is better estimated
+    plane.ahrs.setTakeoffExpected(true);
 
     // we've reached the acceleration threshold, so start the timer
     if (!takeoff_state.launchTimerStarted) {
@@ -269,7 +273,7 @@ return_zero:
 void Plane::complete_auto_takeoff(void)
 {
 #if GEOFENCE_ENABLED == ENABLED
-    if (g.fence_autoenable > 0) {
+    if (g.fence_autoenable != FenceAutoEnable::OFF) {
         if (! geofence_set_enabled(true)) {
             gcs().send_text(MAV_SEVERITY_NOTICE, "Enable fence failed (cannot autoenable");
         } else {

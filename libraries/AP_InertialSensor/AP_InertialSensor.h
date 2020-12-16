@@ -7,14 +7,24 @@
 #define AP_INERTIAL_SENSOR_ACCEL_VIBE_FILT_HZ           2.0f    // accel vibration filter hz
 #define AP_INERTIAL_SENSOR_ACCEL_PEAK_DETECT_TIMEOUT_MS 500     // peak-hold detector timeout
 
+#include <AP_HAL/AP_HAL.h>
+
 /**
    maximum number of INS instances available on this platform. If more
    than 1 then redundant sensors may be available
  */
+#ifndef INS_MAX_INSTANCES
 #define INS_MAX_INSTANCES 3
-#define INS_MAX_BACKENDS  6
+#endif
+#define INS_MAX_BACKENDS  2*INS_MAX_INSTANCES
 #define INS_MAX_NOTCHES 4
-#define INS_VIBRATION_CHECK_INSTANCES 2
+#ifndef INS_VIBRATION_CHECK_INSTANCES
+  #if HAL_MEM_CLASS >= HAL_MEM_CLASS_300
+    #define INS_VIBRATION_CHECK_INSTANCES INS_MAX_INSTANCES
+  #else
+    #define INS_VIBRATION_CHECK_INSTANCES 1
+  #endif
+#endif
 #define XYZ_AXIS_COUNT    3
 // The maximum we need to store is gyro-rate / loop-rate, worst case ArduCopter with BMI088 is 2000/400
 #define INS_MAX_GYRO_WINDOW_SAMPLES 8
@@ -97,6 +107,9 @@ public:
     ///
     void init_gyro(void);
 
+    // get startup messages to output to the GCS
+    bool get_output_banner(uint8_t instance_id, char* banner, uint8_t banner_len);
+
     /// Fetch the current gyro values
     ///
     /// @returns	vector of rotational rates in radians/sec
@@ -113,7 +126,7 @@ public:
     bool get_delta_angle(Vector3f &delta_angle) const { return get_delta_angle(_primary_gyro, delta_angle); }
 
     float get_delta_angle_dt(uint8_t i) const;
-    float get_delta_angle_dt() const { return get_delta_angle_dt(_primary_accel); }
+    float get_delta_angle_dt() const { return get_delta_angle_dt(_primary_gyro); }
 
     //get delta velocity if available
     bool get_delta_velocity(uint8_t i, Vector3f &delta_velocity) const;
@@ -206,8 +219,8 @@ public:
         _custom_rotation = custom_rotation;
     }
 
-    // return the selected sample rate
-    uint16_t get_sample_rate(void) const { return _sample_rate; }
+    // return the selected loop rate at which samples are made avilable
+    uint16_t get_loop_rate_hz(void) const { return _loop_rate; }
 
     // return the main loop delta_t in seconds
     float get_loop_delta_t(void) const { return _loop_delta_t; }
@@ -433,8 +446,8 @@ private:
     uint8_t _accel_count;
     uint8_t _backend_count;
 
-    // the selected sample rate
-    uint16_t _sample_rate;
+    // the selected loop rate at which samples are made available
+    uint16_t _loop_rate;
     float _loop_delta_t;
     float _loop_delta_t_max;
 
@@ -540,6 +553,9 @@ private:
 
     // control enable of fast sampling
     AP_Int8     _fast_sampling_mask;
+
+    // control enable of fast sampling
+    AP_Int8     _fast_sampling_rate;
 
     // control enable of detected sensors
     AP_Int8     _enable_mask;

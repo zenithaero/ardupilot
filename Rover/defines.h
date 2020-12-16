@@ -85,7 +85,8 @@ enum fs_crash_action {
 
 enum fs_ekf_action {
     FS_EKF_DISABLE = 0,
-    FS_EFK_HOLD = 1
+    FS_EKF_HOLD = 1,
+    FS_EKF_REPORT_ONLY = 2,
 };
 
 #define DISTANCE_HOME_MINCHANGE 0.5f  // minimum distance to adjust home location
@@ -104,6 +105,3 @@ enum frame_class {
     FRAME_BOAT = 2,
     FRAME_BALANCEBOT = 3,
 };
-
-#define AUX_SWITCH_PWM_TRIGGER_HIGH 1800   // pwm value above which the ch7 or ch8 option will be invoked
-#define AUX_SWITCH_PWM_TRIGGER_LOW  1200   // pwm value below which the ch7 or ch8 option will be disabled

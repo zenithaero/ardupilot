@@ -54,7 +54,7 @@ public:
         k_param_NavEKF2,
         k_param_g2, // 2nd block of parameters
         k_param_NavEKF3,
-        k_param_BoardConfig_CAN,
+        k_param_can_mgr,
         k_param_osd,
 
         // simulation
@@ -447,7 +447,7 @@ public:
     AP_Int16        gcs_pid_mask;
 
 #if MODE_THROW_ENABLED == ENABLED
-    AP_Int8         throw_motor_start;
+    AP_Enum<ModeThrow::PreThrowMotorState>         throw_motor_start;
 #endif
 
     AP_Int8         rtl_alt_type;
@@ -497,7 +497,7 @@ public:
 #if MODE_THROW_ENABLED == ENABLED
     // Throw mode parameters
     AP_Int8 throw_nextmode;
-    AP_Int8 throw_type;
+    AP_Enum<ModeThrow::ThrowType> throw_type;
 #endif
 
     // ground effect compensation enable/disable
@@ -549,7 +549,6 @@ public:
 
     // wheel encoder and winch
 #if WINCH_ENABLED == ENABLED
-    AP_WheelEncoder wheel_encoder;
     AP_Winch winch;
 #endif
 
@@ -614,6 +613,24 @@ public:
 #if MODE_ZIGZAG_ENABLED == ENABLED
     // we need a pointer to the mode for the G2 table
     void *mode_zigzag_ptr;
+#endif
+
+#if MODE_ACRO_ENABLED == ENABLED
+    AP_Int8 acro_options;
+#endif
+
+#if MODE_AUTO_ENABLED == ENABLED
+    AP_Int32 auto_options;
+#endif
+
+#if MODE_GUIDED_ENABLED == ENABLED
+    AP_Int32 guided_options;
+#endif
+
+    AP_Float fs_gcs_timeout;
+
+#if MODE_RTL_ENABLED == ENABLED
+    AP_Int32 rtl_options;
 #endif
 
 };

@@ -46,7 +46,7 @@ public:
         k_param_avoidance_adsb,
         k_param_landing,
         k_param_NavEKF3,
-        k_param_BoardConfig_CAN,
+        k_param_can_mgr,
         k_param_osd,
 
         // Misc
@@ -401,7 +401,7 @@ public:
     AP_Int16 fence_minalt;    // meters
     AP_Int16 fence_maxalt;    // meters
     AP_Int16 fence_retalt;    // meters
-    AP_Int8 fence_autoenable;
+    AP_Enum<FenceAutoEnable> fence_autoenable;
     AP_Int8 fence_ret_rally;
 #endif
 
@@ -525,7 +525,7 @@ public:
     // whether to enforce acceptance of packets only from sysid_my_gcs
     AP_Int8 sysid_enforce;
 
-#if SOARING_ENABLED == ENABLED
+#if HAL_SOARING_ENABLED
     // ArduSoar parameters
     SoaringController soaring_controller;
 #endif

@@ -292,7 +292,7 @@ public:
     /// gat a value by name, used by scripting
     ///
     /// @param  name            The full name of the variable to be found.
-    /// @param  value           A refernce to the variable
+    /// @param  value           A reference to the variable
     /// @return                 true if the variable is found
     static bool get(const char *name, float &value);
 
@@ -313,6 +313,9 @@ public:
     ///                         it does not exist.
     ///
     static AP_Param * find_by_index(uint16_t idx, enum ap_var_type *ptype, ParamToken *token);
+
+    // by-name equivalent of find_by_index()
+    static AP_Param* find_by_name(const char* name, enum ap_var_type *ptype, ParamToken *token);
 
     /// Find a variable by pointer
     ///
@@ -474,6 +477,9 @@ public:
 
     // return true if the parameter is read-only
     bool is_read_only(void) const;
+
+    // return the persistent top level key for the ParamToken key
+    static uint16_t get_persistent_key(uint16_t key) { return _var_info[key].key; }
     
     // count of parameters in tree
     static uint16_t count_parameters(void);
@@ -887,6 +893,23 @@ public:
         save(force);
     }
 
+    /// Combined set and save, but only does the save if the value is
+    /// different from the current ram value, thus saving us a
+    /// scan(). This should only be used where we have not set() the
+    /// value separately, as otherwise the value in EEPROM won't be
+    /// updated correctly.
+    void set_and_save_ifchanged(const T &v) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+        if (_value == v) {
+#pragma GCC diagnostic pop
+            return;
+        }
+        set(v);
+        save(true);
+    }
+
+
     /// Conversion to T returns a reference to the value.
     ///
     /// This allows the class to be used in many situations where the value would be legal.
@@ -980,3 +1003,15 @@ AP_PARAMDEF(int32_t, Int32, AP_PARAM_INT32);  // defines AP_Int32
 // _suffix is the suffix on the AP_* type name
 // _pt is the enum ap_var_type type
 #define AP_PARAMDEFV(_t, _suffix, _pt)   typedef AP_ParamV<_t, _pt> AP_ ## _suffix;
+
+/*
+  template class for enum types based on AP_Int8
+ */
+template<typename eclass>
+class AP_Enum : public AP_Int8
+{
+public:
+    operator const eclass () const {
+        return (eclass)_value;
+    }
+};

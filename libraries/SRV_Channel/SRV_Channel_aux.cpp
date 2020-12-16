@@ -124,6 +124,22 @@ void SRV_Channel::aux_servo_function_setup(void)
     case k_elevon_right:
     // case k_vtail_left:
     // case k_vtail_right:
+    case k_scripting1:
+    case k_scripting2:
+    case k_scripting3:
+    case k_scripting4:
+    case k_scripting5:
+    case k_scripting6:
+    case k_scripting7:
+    case k_scripting8:
+    case k_scripting9:
+    case k_scripting10:
+    case k_scripting11:
+    case k_scripting12:
+    case k_scripting13:
+    case k_scripting14:
+    case k_scripting15:
+    case k_scripting16:
     case k_roll_out:
     case k_pitch_out:
     case k_yaw_out:
@@ -149,6 +165,7 @@ void SRV_Channel::aux_servo_function_setup(void)
     case k_throttle:
     case k_throttleLeft:
     case k_throttleRight:
+    case k_airbrake:
         // fixed wing throttle
         set_range(100);
         break;
@@ -195,6 +212,19 @@ void SRV_Channels::enable_aux_servos()
         // see if it is a valid function
         if ((uint8_t)c.function.get() < SRV_Channel::k_nr_aux_servo_functions) {
             hal.rcout->enable_ch(c.ch_num);
+        }
+
+        // output some servo functions before we fiddle with the
+        // parameter values:
+        if (c.function.get() == SRV_Channel::k_min) {
+            c.set_output_pwm(c.servo_min);
+            c.output_ch();
+        } else if (c.function.get() == SRV_Channel::k_trim) {
+            c.set_output_pwm(c.servo_trim);
+            c.output_ch();
+        } else if (c.function.get() == SRV_Channel::k_max) {
+            c.set_output_pwm(c.servo_max);
+            c.output_ch();
         }
 
         /*
@@ -633,17 +663,6 @@ void SRV_Channels::set_output_to_trim(SRV_Channel::Aux_servo_function_t function
     }
 }
 
-// set output pwm to for first matching channel
-void SRV_Channels::set_output_pwm_first(SRV_Channel::Aux_servo_function_t function, uint16_t pwm)
-{
-    for (uint8_t i=0; i<NUM_SERVO_CHANNELS; i++) {
-        if (channels[i].function == function) {
-            channels[i].set_output_pwm(pwm);
-            break;
-        }
-    }
-}
-
 /*
   get the normalised output for a channel function from the pwm value
   of the first matching channel
@@ -656,6 +675,20 @@ float SRV_Channels::get_output_norm(SRV_Channel::Aux_servo_function_t function)
     }
     channels[chan].calc_pwm(functions[function].output_scaled);
     return channels[chan].get_output_norm();
+}
+
+// set normalised output (-1 to 1 with 0 at mid point of servo_min/servo_max) for the given function
+void SRV_Channels::set_output_norm(SRV_Channel::Aux_servo_function_t function, float value)
+{
+    if (!function_assigned(function)) {
+        return;
+    }
+    for (uint8_t i=0; i<NUM_SERVO_CHANNELS; i++) {
+        SRV_Channel &c = channels[i];
+        if (c.function == function) {
+            c.set_output_norm(value);
+        }
+    }
 }
 
 /*

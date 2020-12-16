@@ -103,6 +103,14 @@ void UARTDriver::begin(uint32_t baud, uint16_t rxSpace, uint16_t txSpace)
             _uart_path = strdup(args1);
             _uart_baudrate = baudrate;
             _uart_start_connection();
+        } else if (strcmp(devtype, "fifo") == 0) {
+            ::printf("Reading FIFO file @ %s\n", args1);
+            _fd = ::open(args1, O_RDONLY | O_NONBLOCK);
+            if (_fd >= 0) {
+                _connected = true;
+            } else {
+                ::printf("Failed Reading FIFO file @ %s\n", args1);       
+            }
         } else if (strcmp(devtype, "sim") == 0) {
             if (!_connected) {
                 ::printf("SIM connection %s:%s on port %u\n", args1, args2, _portNumber);
@@ -237,7 +245,6 @@ size_t UARTDriver::write(const uint8_t *buffer, size_t size)
 void UARTDriver::_tcp_start_connection(uint16_t port, bool wait_for_connection)
 {
     int one=1;
-    struct sockaddr_in sockaddr;
     int ret;
 
     if (_connected) {
@@ -260,17 +267,17 @@ void UARTDriver::_tcp_start_connection(uint16_t port, bool wait_for_connection)
     }
 
     if (_listen_fd == -1) {
-        memset(&sockaddr,0,sizeof(sockaddr));
+        memset(&_listen_sockaddr,0,sizeof(_listen_sockaddr));
 
 #ifdef HAVE_SOCK_SIN_LEN
-        sockaddr.sin_len = sizeof(sockaddr);
+        _listen_sockaddr.sin_len = sizeof(_listen_sockaddr);
 #endif
         if (port > 1000) {
-            sockaddr.sin_port = htons(port);
+            _listen_sockaddr.sin_port = htons(port);
         } else {
-            sockaddr.sin_port = htons(_sitlState->base_port() + port);
+            _listen_sockaddr.sin_port = htons(_sitlState->base_port() + port);
         }
-        sockaddr.sin_family = AF_INET;
+        _listen_sockaddr.sin_family = AF_INET;
 
         _listen_fd = socket(AF_INET, SOCK_STREAM, 0);
         if (_listen_fd == -1) {
@@ -290,13 +297,13 @@ void UARTDriver::_tcp_start_connection(uint16_t port, bool wait_for_connection)
         }
 
         fprintf(stderr, "bind port %u for %u\n",
-                (unsigned)ntohs(sockaddr.sin_port),
+                (unsigned)ntohs(_listen_sockaddr.sin_port),
                 (unsigned)_portNumber);
 
-        ret = bind(_listen_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+        ret = bind(_listen_fd, (struct sockaddr *)&_listen_sockaddr, sizeof(_listen_sockaddr));
         if (ret == -1) {
             fprintf(stderr, "bind failed on port %u - %s\n",
-                    (unsigned)ntohs(sockaddr.sin_port),
+                    (unsigned)ntohs(_listen_sockaddr.sin_port),
                     strerror(errno));
             exit(1);
         }
@@ -308,7 +315,7 @@ void UARTDriver::_tcp_start_connection(uint16_t port, bool wait_for_connection)
         }
 
         fprintf(stderr, "Serial port %u on TCP port %u\n", _portNumber,
-                (unsigned)ntohs(sockaddr.sin_port));
+                (unsigned)ntohs(_listen_sockaddr.sin_port));
         fflush(stdout);
     }
 
@@ -324,7 +331,7 @@ void UARTDriver::_tcp_start_connection(uint16_t port, bool wait_for_connection)
         setsockopt(_fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
         fcntl(_fd, F_SETFD, FD_CLOEXEC);
         _connected = true;
-        fprintf(stdout, "Connection on serial port %u\n", (unsigned)ntohs(sockaddr.sin_port));
+        fprintf(stdout, "Connection on serial port %u\n", (unsigned)ntohs(_listen_sockaddr.sin_port));
     }
 }
 
@@ -516,6 +523,11 @@ void UARTDriver::_uart_start_connection(void)
     if (!_connected) {
         _fd = ::open(_uart_path, O_RDWR | O_CLOEXEC);
         if (_fd == -1) {
+            static uint32_t last_error_print_ms;
+            if (AP_HAL::millis() - last_error_print_ms > 5000) {
+                ::printf("Failed to open (%s): %s\n", _uart_path, strerror(errno));
+                last_error_print_ms = AP_HAL::millis();
+            }
             return;
         }
         // use much smaller buffer sizes on real UARTs
@@ -581,6 +593,7 @@ bool UARTDriver::_select_check(int fd)
     if (fd == -1) {
         return false;
     }
+#if !APM_BUILD_TYPE(APM_BUILD_Replay)
     fd_set fds;
     struct timeval tv;
 
@@ -594,6 +607,7 @@ bool UARTDriver::_select_check(int fd)
     if (select(fd+1, &fds, nullptr, nullptr, &tv) == 1) {
         return true;
     }
+#endif
     return false;
 }
 
@@ -636,6 +650,7 @@ void UARTDriver::_timer_tick(void)
     }
     ssize_t nwritten;
     uint32_t max_bytes = 10000;
+#if !defined(HAL_BUILD_AP_PERIPH)
     SITL::SITL *_sitl = AP::sitl();
     if (_sitl && _sitl->telem_baudlimit_enable) {
         // limit byte rate to configured baudrate
@@ -647,7 +662,7 @@ void UARTDriver::_timer_tick(void)
         }
         last_tick_us = now;
     }
-
+#endif
     if (_packetise) {
         uint16_t n = _writebuffer.available();
         n = MIN(n, max_bytes);

@@ -26,7 +26,7 @@
  */
 const AP_Scheduler::Task Sub::scheduler_tasks[] = {
     SCHED_TASK(fifty_hz_loop,         50,     75),
-    SCHED_TASK(update_GPS,            50,    200),
+    SCHED_TASK_CLASS(AP_GPS, &sub.gps, update, 50, 200),
 #if OPTFLOW == ENABLED
     SCHED_TASK_CLASS(OpticalFlow,          &sub.optflow,             update,         200, 160),
 #endif
@@ -43,11 +43,11 @@ const AP_Scheduler::Task Sub::scheduler_tasks[] = {
 #if AC_FENCE == ENABLED
     SCHED_TASK_CLASS(AC_Fence,            &sub.fence,        update,              10, 100),
 #endif
-#if MOUNT == ENABLED
+#if HAL_MOUNT_ENABLED
     SCHED_TASK_CLASS(AP_Mount,            &sub.camera_mount, update,              50,  75),
 #endif
 #if CAMERA == ENABLED
-    SCHED_TASK_CLASS(AP_Camera,           &sub.camera,       update_trigger,      50,  75),
+    SCHED_TASK_CLASS(AP_Camera,           &sub.camera,       update,              50,  75),
 #endif
     SCHED_TASK(ten_hz_logging_loop,   10,    350),
     SCHED_TASK(twentyfive_hz_logging, 25,    110),
@@ -78,6 +78,7 @@ const AP_Scheduler::Task Sub::scheduler_tasks[] = {
 #ifdef USERHOOK_SUPERSLOWLOOP
     SCHED_TASK(userhook_SuperSlowLoop, 1,   75),
 #endif
+    SCHED_TASK(read_airspeed,          10,    100),
 };
 
 void Sub::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
@@ -126,7 +127,7 @@ void Sub::fast_loop()
     // check if we've reached the surface or bottom
     update_surface_and_bottom_detector();
 
-#if MOUNT == ENABLED
+#if HAL_MOUNT_ENABLED
     // camera mount's fast update
     camera_mount.update_fast();
 #endif
@@ -286,30 +287,6 @@ void Sub::one_hz_loop()
     set_likely_flying(hal.util->get_soft_armed());
 }
 
-// called at 50hz
-void Sub::update_GPS()
-{
-    static uint32_t last_gps_reading[GPS_MAX_INSTANCES];   // time of last gps message
-    bool gps_updated = false;
-
-    gps.update();
-
-    // log after every gps message
-    for (uint8_t i=0; i<gps.num_sensors(); i++) {
-        if (gps.last_message_time_ms(i) != last_gps_reading[i]) {
-            last_gps_reading[i] = gps.last_message_time_ms(i);
-            gps_updated = true;
-            break;
-        }
-    }
-
-    if (gps_updated) {
-#if CAMERA == ENABLED
-        camera.update();
-#endif
-    }
-}
-
 void Sub::read_AHRS()
 {
     // Perform IMU calculations and get attitude info
@@ -346,6 +323,30 @@ bool Sub::control_check_barometer()
         return false;
     }
 #endif
+    return true;
+}
+
+// vehicle specific waypoint info helpers
+bool Sub::get_wp_distance_m(float &distance) const
+{
+    // see GCS_MAVLINK_Sub::send_nav_controller_output()
+    distance = sub.wp_nav.get_wp_distance_to_destination() * 0.01;
+    return true;
+}
+
+// vehicle specific waypoint info helpers
+bool Sub::get_wp_bearing_deg(float &bearing) const
+{
+    // see GCS_MAVLINK_Sub::send_nav_controller_output()
+    bearing = sub.wp_nav.get_wp_bearing_to_destination() * 0.01;
+    return true;
+}
+
+// vehicle specific waypoint info helpers
+bool Sub::get_wp_crosstrack_error_m(float &xtrack_error) const
+{
+    // no crosstrack error reported, see GCS_MAVLINK_Sub::send_nav_controller_output()
+    xtrack_error = 0;
     return true;
 }
 

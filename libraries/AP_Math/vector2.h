@@ -29,6 +29,10 @@
 ****************************************/
 #pragma once
 
+#ifndef MATH_CHECK_INDEXES
+#define MATH_CHECK_INDEXES 0
+#endif
+
 #include <cmath>
 #include <AP_Common/AP_Common.h>
 
@@ -151,6 +155,9 @@ struct Vector2
 
     // adjust position by a given bearing (in degrees) and distance
     void offset_bearing(float bearing, float distance);
+
+    // rotate vector by angle in radians
+    void rotate(float angle_rad);
 
     // given a position p1 and a velocity v1 produce a vector
     // perpendicular to v1 maximising distance from p1

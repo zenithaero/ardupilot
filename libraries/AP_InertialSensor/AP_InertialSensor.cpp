@@ -40,6 +40,8 @@
 
 extern const AP_HAL::HAL& hal;
 
+
+
 #if APM_BUILD_TYPE(APM_BUILD_ArduCopter)
 #define DEFAULT_GYRO_FILTER  20
 #define DEFAULT_ACCEL_FILTER 20
@@ -54,7 +56,11 @@ extern const AP_HAL::HAL& hal;
 #define DEFAULT_STILL_THRESH 0.1f
 #endif
 
-#define SAMPLE_UNIT 1
+#if defined(STM32H7) || defined(STM32F7)
+#define MPU_FIFO_FASTSAMPLE_DEFAULT 1
+#else
+#define MPU_FIFO_FASTSAMPLE_DEFAULT 0
+#endif
 
 #define GYRO_INIT_MAX_DIFF_DPS 0.1f
 
@@ -119,7 +125,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Units: rad/s
     // @User: Advanced
     // @Calibration: 1
+
+#if INS_MAX_INSTANCES > 1
     AP_GROUPINFO("GYR2OFFS",    7, AP_InertialSensor, _gyro_offset[1],   0),
+#endif
 
     // @Param: GYR3OFFS_X
     // @DisplayName: Gyro3 offsets of X axis
@@ -141,7 +150,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Units: rad/s
     // @User: Advanced
     // @Calibration: 1
+
+#if INS_MAX_INSTANCES > 2
     AP_GROUPINFO("GYR3OFFS",   10, AP_InertialSensor, _gyro_offset[2],   0),
+#endif
 
     // @Param: ACCSCAL_X
     // @DisplayName: Accelerometer scaling of X axis
@@ -210,7 +222,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Range: 0.8 1.2
     // @User: Advanced
     // @Calibration: 1
+
+#if INS_MAX_INSTANCES > 1
     AP_GROUPINFO("ACC2SCAL",    14, AP_InertialSensor, _accel_scale[1],   0),
+#endif
 
     // @Param: ACC2OFFS_X
     // @DisplayName: Accelerometer2 offsets of X axis
@@ -235,7 +250,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Range: -3.5 3.5
     // @User: Advanced
     // @Calibration: 1
+
+#if INS_MAX_INSTANCES > 1
     AP_GROUPINFO("ACC2OFFS",    15, AP_InertialSensor, _accel_offset[1],  0),
+#endif
 
     // @Param: ACC3SCAL_X
     // @DisplayName: Accelerometer3 scaling of X axis
@@ -257,7 +275,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Range: 0.8 1.2
     // @User: Advanced
     // @Calibration: 1
+
+#if INS_MAX_INSTANCES > 2
     AP_GROUPINFO("ACC3SCAL",    16, AP_InertialSensor, _accel_scale[2],   0),
+#endif
 
     // @Param: ACC3OFFS_X
     // @DisplayName: Accelerometer3 offsets of X axis
@@ -282,7 +303,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Range: -3.5 3.5
     // @User: Advanced
     // @Calibration: 1
+
+#if INS_MAX_INSTANCES > 2
     AP_GROUPINFO("ACC3OFFS",    17, AP_InertialSensor, _accel_offset[2],  0),
+#endif
 
     // @Param: GYRO_FILTER
     // @DisplayName: Gyro filter cutoff frequency
@@ -312,14 +336,20 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Description: Use second IMU for attitude, velocity and position estimates
     // @Values: 0:Disabled,1:Enabled
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 1
     AP_GROUPINFO("USE2", 21, AP_InertialSensor, _use[1],  1),
+#endif
 
     // @Param: USE3
     // @DisplayName: Use third IMU for attitude, velocity and position estimates
     // @Description: Use third IMU for attitude, velocity and position estimates
     // @Values: 0:Disabled,1:Enabled
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 2
     AP_GROUPINFO("USE3", 22, AP_InertialSensor, _use[2],  1),
+#endif
 
     // @Param: STILL_THRESH
     // @DisplayName: Stillness threshold for detecting if we are moving
@@ -397,7 +427,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Range: -5 5
     // @Increment: 0.01
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 1
     AP_GROUPINFO("POS2", 28, AP_InertialSensor, _accel_pos[1], 0.0f),
+#endif
 
     // @Param: POS3_X
     // @DisplayName: IMU accelerometer X position
@@ -421,7 +454,10 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Range: -5 5
     // @Increment: 0.01
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 2
     AP_GROUPINFO("POS3", 29, AP_InertialSensor, _accel_pos[2], 0.0f),
+#endif
 
     // @Param: GYR_ID
     // @DisplayName: Gyro ID
@@ -435,14 +471,20 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Description: Gyro2 sensor ID, taking into account its type, bus and instance
     // @ReadOnly: True
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 1
     AP_GROUPINFO("GYR2_ID", 31, AP_InertialSensor, _gyro_id[1], 0),
+#endif
 
     // @Param: GYR3_ID
     // @DisplayName: Gyro3 ID
     // @Description: Gyro3 sensor ID, taking into account its type, bus and instance
     // @ReadOnly: True
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 2
     AP_GROUPINFO("GYR3_ID", 32, AP_InertialSensor, _gyro_id[2], 0),
+#endif
 
     // @Param: ACC_ID
     // @DisplayName: Accelerometer ID
@@ -456,14 +498,20 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Description: Accelerometer2 sensor ID, taking into account its type, bus and instance
     // @ReadOnly: True
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 1
     AP_GROUPINFO("ACC2_ID", 34, AP_InertialSensor, _accel_id[1], 0),
+#endif
 
     // @Param: ACC3_ID
     // @DisplayName: Accelerometer3 ID
     // @Description: Accelerometer3 sensor ID, taking into account its type, bus and instance
     // @ReadOnly: True
     // @User: Advanced
+
+#if INS_MAX_INSTANCES > 2
     AP_GROUPINFO("ACC3_ID", 35, AP_InertialSensor, _accel_id[2], 0),
+#endif
 
     // @Param: FAST_SAMPLE
     // @DisplayName: Fast sampling mask
@@ -492,6 +540,14 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Group: HNTCH_
     // @Path: ../Filter/HarmonicNotchFilter.cpp
     AP_SUBGROUPINFO(_harmonic_notch_filter, "HNTCH_",  41, AP_InertialSensor, HarmonicNotchFilterParams),
+
+    // @Param: GYRO_RATE
+    // @DisplayName: Gyro rate for IMUs with Fast Sampling enabled
+    // @Description: Gyro rate for IMUs with fast sampling enabled. The gyro rate is the sample rate at which the IMU filters operate and needs to be at least double the maximum filter frequency. If the sensor does not support the selected rate the next highest supported rate will be used. For IMUs which do not support fast sampling this setting is ignored and the default gyro rate of 1Khz is used.
+    // @User: Advanced
+    // @Values: 0:1kHz,1:2kHz,2:4kHz,3:8kHz
+    // @RebootRequired: True
+    AP_GROUPINFO("GYRO_RATE",  42, AP_InertialSensor, _fast_sampling_rate, MPU_FIFO_FASTSAMPLE_DEFAULT),
 
     /*
       NOTE: parameter indexes have gaps above. When adding new
@@ -681,11 +737,11 @@ bool AP_InertialSensor::set_gyro_window_size(uint16_t size) {
 }
 
 void
-AP_InertialSensor::init(uint16_t sample_rate)
+AP_InertialSensor::init(uint16_t loop_rate)
 {
     // remember the sample rate
-    _sample_rate = sample_rate;
-    _loop_delta_t = 1.0f / sample_rate;
+    _loop_rate = loop_rate;
+    _loop_delta_t = 1.0f / loop_rate;
 
     // we don't allow deltat values greater than 10x the normal loop
     // time to be exposed outside of INS. Large deltat values can
@@ -709,7 +765,7 @@ AP_InertialSensor::init(uint16_t sample_rate)
         init_gyro();
     }
 
-    _sample_period_usec = 1000*1000UL / _sample_rate;
+    _sample_period_usec = 1000*1000UL / _loop_rate;
 
     // establish the baseline time between samples
     _delta_time = 0;
@@ -726,17 +782,8 @@ AP_InertialSensor::init(uint16_t sample_rate)
     _calculated_harmonic_notch_freq_hz[0] = _harmonic_notch_filter.center_freq_hz();
     _num_calculated_harmonic_notch_frequencies = 1;
 
-    uint8_t harmonics = _harmonic_notch_filter.harmonics();
-    // allocate INS_MAX_NOTCHES as harmonics if using DynamicHarmonic
-    if (_harmonic_notch_filter.hasOption(HarmonicNotchFilterParams::Options::DynamicHarmonic)) {
-        harmonics = 0;
-        for (uint8_t h = 0; h < INS_MAX_NOTCHES; h++) {
-            harmonics = (harmonics << 1) + 1;
-        }
-    }
-
     for (uint8_t i=0; i<get_gyro_count(); i++) {
-        _gyro_harmonic_notch_filter[i].allocate_filters(harmonics, _harmonic_notch_filter.hasOption(HarmonicNotchFilterParams::Options::DoubleNotch));
+        _gyro_harmonic_notch_filter[i].allocate_filters(_harmonic_notch_filter.harmonics(), _harmonic_notch_filter.hasOption(HarmonicNotchFilterParams::Options::DoubleNotch));
         // initialise default settings, these will be subsequently changed in AP_InertialSensor_Backend::update_gyro()
         _gyro_harmonic_notch_filter[i].init(_gyro_raw_sample_rates[i], _calculated_harmonic_notch_freq_hz[0],
              _harmonic_notch_filter.bandwidth_hz(), _harmonic_notch_filter.attenuation_dB());
@@ -807,8 +854,9 @@ AP_InertialSensor::detect_backends(void)
     // IMUs defined by IMU lines in hwdef.dat
     HAL_INS_PROBE_LIST;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    ADD_BACKEND(AP_InertialSensor_SITL::detect(*this, INS_SITL_SENSOR_A));
-    ADD_BACKEND(AP_InertialSensor_SITL::detect(*this, INS_SITL_SENSOR_B));
+    for (uint8_t i=0; i<AP::sitl()->imu_count; i++) {
+        ADD_BACKEND(AP_InertialSensor_SITL::detect(*this, i==1?INS_SITL_SENSOR_B:INS_SITL_SENSOR_A));
+    }
 #elif HAL_INS_DEFAULT == HAL_INS_HIL
     ADD_BACKEND(AP_InertialSensor_HIL::detect(*this));
 #elif AP_FEATURE_BOARD_DETECT
@@ -979,6 +1027,16 @@ AP_InertialSensor::init_gyro()
     _save_gyro_calibration();
 }
 
+// output GCS startup messages
+bool AP_InertialSensor::get_output_banner(uint8_t backend_id, char* banner, uint8_t banner_len)
+{
+    if (backend_id >= INS_MAX_BACKENDS || _backends[backend_id] == nullptr) {
+        return false;
+    }
+
+    return _backends[backend_id]->get_output_banner(banner, banner_len);
+}
+
 // accelerometer clipping reporting
 uint32_t AP_InertialSensor::get_accel_clip_count(uint8_t instance) const
 {
@@ -1055,7 +1113,7 @@ bool AP_InertialSensor::calibrate_trim(float &trim_roll, float &trim_pitch)
 
     _calibrating = true;
 
-    const uint8_t update_dt_milliseconds = (uint8_t)(1000.0f/get_sample_rate()+0.5f);
+    const uint8_t update_dt_milliseconds = (uint8_t)(1000.0f/get_loop_rate_hz()+0.5f);
 
     // wait 100ms for ins filter to rise
     for (uint8_t k=0; k<100/update_dt_milliseconds; k++) {

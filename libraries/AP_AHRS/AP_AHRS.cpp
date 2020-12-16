@@ -62,7 +62,7 @@ const AP_Param::GroupInfo AP_AHRS::var_info[] = {
 
     // @Param: WIND_MAX
     // @DisplayName: Maximum wind
-    // @Description: This sets the maximum allowable difference between ground speed and airspeed. This allows the plane to cope with a failing airspeed sensor. A value of zero means to use the airspeed as is.
+    // @Description: This sets the maximum allowable difference between ground speed and airspeed. This allows the plane to cope with a failing airspeed sensor. A value of zero means to use the airspeed as is. See ARSPD_OPTIONS and ARSPD_MAX_WIND to disable airspeed sensors.
     // @Range: 0 127
     // @Units: m/s
     // @Increment: 1
@@ -178,26 +178,6 @@ Vector3f AP_AHRS::get_gyro_latest(void) const
 {
     const uint8_t primary_gyro = get_primary_gyro_index();
     return AP::ins().get_gyro(primary_gyro) + get_gyro_drift();
-}
-
-// return airspeed estimate if available
-bool AP_AHRS::airspeed_estimate(float &airspeed_ret) const
-{
-    if (airspeed_sensor_enabled()) {
-        airspeed_ret = _airspeed->get_airspeed();
-        if (_wind_max > 0 && AP::gps().status() >= AP_GPS::GPS_OK_FIX_2D) {
-            // constrain the airspeed by the ground speed
-            // and AHRS_WIND_MAX
-            const float gnd_speed = AP::gps().ground_speed();
-            float true_airspeed = airspeed_ret * get_EAS2TAS();
-            true_airspeed = constrain_float(true_airspeed,
-                                            gnd_speed - _wind_max,
-                                            gnd_speed + _wind_max);
-            airspeed_ret = true_airspeed / get_EAS2TAS();
-        }
-        return true;
-    }
-    return false;
 }
 
 // set_trim

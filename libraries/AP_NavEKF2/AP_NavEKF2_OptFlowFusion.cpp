@@ -2,10 +2,6 @@
 
 #include "AP_NavEKF2.h"
 #include "AP_NavEKF2_core.h"
-#include <AP_AHRS/AP_AHRS.h>
-#include <AP_Vehicle/AP_Vehicle.h>
-
-#include <stdio.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -30,8 +26,6 @@ void NavEKF2_core::SelectFlowFusion()
         optFlowFusionDelayed = false;
     }
 
-    // start performance timer
-    hal.util->perf_begin(_perf_FuseOptFlow);
     // Perform Data Checks
     // Check if the optical flow data is still valid
     flowDataValid = ((imuSampleTime_ms - flowValidMeaTime_ms) < 1000);
@@ -65,9 +59,6 @@ void NavEKF2_core::SelectFlowFusion()
         // reset flag to indicate that no new flow data is available for fusion
         flowDataToFuse = false;
     }
-
-    // stop the performance timer
-    hal.util->perf_end(_perf_FuseOptFlow);
 }
 
 /*
@@ -77,9 +68,6 @@ Equations generated using https://github.com/PX4/ecl/tree/master/EKF/matlab/scri
 */
 void NavEKF2_core::EstimateTerrainOffset()
 {
-    // start performance timer
-    hal.util->perf_begin(_perf_TerrainOffset);
-
     // horizontal velocity squared
     float velHorizSq = sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y);
 
@@ -268,9 +256,6 @@ void NavEKF2_core::EstimateTerrainOffset()
             }
         }
     }
-
-    // stop the performance timer
-    hal.util->perf_end(_perf_TerrainOffset);
 }
 
 /*
@@ -324,7 +309,7 @@ void NavEKF2_core::FuseOptFlow()
         // correct range for flow sensor offset body frame position offset
         // the corrected value is the predicted range from the sensor focal point to the
         // centre of the image on the ground assuming flat terrain
-        Vector3f posOffsetBody = (*ofDataDelayed.body_offset) - accelPosOffset;
+        Vector3f posOffsetBody = ofDataDelayed.body_offset - accelPosOffset;
         if (!posOffsetBody.is_zero()) {
             Vector3f posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
             range -= posOffsetEarth.z / prevTnb.c.z;

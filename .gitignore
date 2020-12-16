@@ -42,6 +42,7 @@
 .built
 .context
 .cproject
+.pydevproject
 .depend
 .directory
 .metadata/
@@ -105,9 +106,14 @@ Parameters.html
 Parameters.md
 Parameters.rst
 Parameters.wiki
+ParameterMetaDataBackup.xml
+ParameterMetaData.xml
 apm.pdef.xml
 apm.pdef.json
 parameters.edn
+LogMessages.html
+LogMessages.rst
+LogMessages.xml
 # JetBrains IDE files
 .idea/*
 # CMake
@@ -139,3 +145,4 @@ modules/
 tests/
 curses_test
 dumpstack_*out
+build.tmp.binaries/

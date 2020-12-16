@@ -249,17 +249,23 @@ void AP_GyroFFT::init(uint32_t target_looptime_us)
         return;
     }
 
+    // count the number of active harmonics
+    for (uint8_t i = 0; i < HNF_MAX_HARMONICS; i++) {
+        if (_ins->get_gyro_harmonic_notch_harmonics() & (1<<i)) {
+            _harmonics++;
+        }
+    }
+    _harmonics = constrain_int16(_harmonics, 1, FrequencyPeak::MAX_TRACKED_PEAKS);
+
     // calculate harmonic multiplier. this assumes the harmonics configured on the 
     // harmonic notch reflect the multiples of the fundamental harmonic that should be tracked
     uint8_t first_harmonic = 0;
-    _harmonics = 1; // always search for 1
     if (_harmonic_fit > 0) {
         for (uint8_t i = 0; i < HNF_MAX_HARMONICS; i++) {
             if (_ins->get_gyro_harmonic_notch_harmonics() & (1<<i)) {
                 if (first_harmonic == 0) {
                     first_harmonic = i + 1;
                 } else {
-                    _harmonics++;
                     _harmonic_multiplier = float(i + 1) / first_harmonic;
                     break;
                 }
@@ -402,7 +408,7 @@ uint16_t AP_GyroFFT::run_cycle()
     FloatBuffer& gyro_buffer = (_sample_mode == 0 ?_ins->get_raw_gyro_window(_update_axis) : _downsampled_gyro_data[_update_axis]);
     // if we have many more samples than the window size then we are struggling to 
     // stay ahead of the gyro loop so drop samples so that this cycle will use all available samples
-    if (gyro_buffer.available() > _state->_window_size + uint16_t(_samples_per_frame >> 1)) { // half the frame size is a heuristic
+    if (gyro_buffer.available() > uint32_t(_state->_window_size + uint16_t(_samples_per_frame >> 1))) { // half the frame size is a heuristic
         gyro_buffer.advance(gyro_buffer.available() - _state->_window_size);
     }
     // let's go!
@@ -416,7 +422,11 @@ uint16_t AP_GyroFFT::run_cycle()
     calculate_noise(false, config);
 
     // record how we are doing
-    _output_cycle_micros = AP_HAL::micros() - now;
+    _thread_state._last_output_us[_update_axis] = AP_HAL::micros();
+    _output_cycle_micros = _thread_state._last_output_us[_update_axis] - now;
+
+    // move onto the next axis
+    _update_axis = (_update_axis + 1) % XYZ_AXIS_COUNT;
 
     // ready to receive another frame, because lock contention is so expensive we don't lock
     // around this flag but rather rely on the semaphore at the beginning of the loop to
@@ -484,8 +494,7 @@ void AP_GyroFFT::update_thread(void)
             hal.scheduler->delay_microseconds(delay);
         }
 #else
-        // on an F4 (Pixracer) we need to delay by at least 10us to not lock up logging, on an H7 1us is enough
-        hal.scheduler->delay_microseconds(MAX(delay, 10U));
+        hal.scheduler->delay_microseconds(MAX(delay, 1U));
 #endif
     }
 }
@@ -499,7 +508,7 @@ bool AP_GyroFFT::start_update_thread(void)
         return true;
     }
 
-    if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_GyroFFT::update_thread, void), "apm_fft", FFT_STACK_SIZE, AP_HAL::Scheduler::PRIORITY_IO, 1)) {
+    if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_GyroFFT::update_thread, void), "apm_fft", FFT_STACK_SIZE, AP_HAL::Scheduler::PRIORITY_IO, 0)) {
         AP_HAL::panic("Failed to start AP_GyroFFT update thread");
         return false;
     }
@@ -641,6 +650,30 @@ AP_GyroFFT::FrequencyPeak AP_GyroFFT::get_tracked_noise_peak() const
     return FrequencyPeak::CENTER;
 }
 
+// center frequency slewed from previous to current value at the output rate
+float AP_GyroFFT::get_slewed_noise_center_freq_hz(FrequencyPeak peak, uint8_t axis) const
+{
+    uint32_t now = AP_HAL::micros();
+    const float slew = MIN(1.0f, (now - _global_state._last_output_us[axis])
+        * (_fft_sampling_rate_hz / _samples_per_frame) / 1e6f);
+    return (_global_state._prev_center_freq_hz_filtered[peak][axis]
+        + (_global_state._center_freq_hz_filtered[peak][axis] - _global_state._prev_center_freq_hz_filtered[peak][axis]) * slew);
+}
+
+// weighted center frequency slewed from previous to current value at the output rate
+float AP_GyroFFT::get_slewed_weighted_freq_hz(FrequencyPeak peak) const
+{
+    const Vector3f& energy = get_center_freq_energy(peak);
+    const float freq_x = get_slewed_noise_center_freq_hz(peak, 0);
+    const float freq_y = get_slewed_noise_center_freq_hz(peak, 1);
+
+    if (!energy.is_nan() && !is_zero(energy.x) && !is_zero(energy.y)) {
+        return (freq_x * energy.x + freq_y * energy.y) / (energy.x + energy.y);
+    } else {
+        return (freq_x + freq_y) * 0.5f;
+    }
+}
+
 // return an average center frequency weighted by bin energy
 // called from main thread
 float AP_GyroFFT::get_weighted_noise_center_freq_hz() const
@@ -662,14 +695,14 @@ float AP_GyroFFT::get_weighted_noise_center_freq_hz() const
     const FrequencyPeak peak = get_tracked_noise_peak();
     // pitch was good or required, roll was not, use pitch only
     if (!_rpy_health.x || _harmonic_peak == FFT_HARMONIC_FIT_TRACK_PITCH) {
-        return get_noise_center_freq_hz(peak).y;
+        return get_slewed_noise_center_freq_hz(peak, 1);    // Y-axis
     }
     // roll was good or required, pitch was not, use roll only
     if (!_rpy_health.y || _harmonic_peak == FFT_HARMONIC_FIT_TRACK_ROLL) {
-        return get_noise_center_freq_hz(peak).x;
+        return get_slewed_noise_center_freq_hz(peak, 0);    // X-axis
     }
 
-    return calculate_weighted_freq_hz(get_center_freq_energy(peak), get_noise_center_freq_hz(peak));
+    return get_slewed_weighted_freq_hz(peak);
 }
 
 // return all the center frequencies weighted by bin energy
@@ -696,20 +729,20 @@ uint8_t AP_GyroFFT::get_weighted_noise_center_frequencies_hz(uint8_t num_freqs, 
     // pitch was good or required, roll was not, use pitch only
     if (!_rpy_health.x || _harmonic_peak == FFT_HARMONIC_FIT_TRACK_PITCH) {
         for (uint8_t i = 0; i < tracked_peaks; i++) {
-            freqs[i] = get_noise_center_freq_hz(FrequencyPeak(i)).y;
+            freqs[i] = get_slewed_noise_center_freq_hz(FrequencyPeak(i), 1);    // Y-axis
         }
         return tracked_peaks;
     }
     // roll was good or required, pitch was not, use roll only
     if (!_rpy_health.y || _harmonic_peak == FFT_HARMONIC_FIT_TRACK_ROLL) {
         for (uint8_t i = 0; i < tracked_peaks; i++) {
-            freqs[i] = get_noise_center_freq_hz(FrequencyPeak(i)).x;
+            freqs[i] = get_slewed_noise_center_freq_hz(FrequencyPeak(i), 0);    // X-axis
         }
         return tracked_peaks;
     }
 
     for (uint8_t i = 0; i < tracked_peaks; i++) {
-        freqs[i] = calculate_weighted_freq_hz(get_center_freq_energy(FrequencyPeak(i)), get_noise_center_freq_hz(FrequencyPeak(i)));
+        freqs[i] = get_slewed_weighted_freq_hz(FrequencyPeak(i));
     }
     return tracked_peaks;
 }
@@ -899,7 +932,6 @@ void AP_GyroFFT::calculate_noise(bool calibrating, const EngineConfig& config)
     _debug_snr = snr;
     _debug_max_bin = _state->_peak_data[FrequencyPeak::CENTER]._bin;
 #endif
-    _update_axis = (_update_axis + 1) % XYZ_AXIS_COUNT;
 }
 
 
@@ -1093,10 +1125,8 @@ void AP_GyroFFT::update_ref_energy(uint16_t max_bin)
         return;
     }
 
-    WITH_SEMAPHORE(_sem);
-
     // according to https://www.tcd.ie/Physics/research/groups/magnetism/files/lectures/py5021/MagneticSensors3.pdf sensor noise is not necessarily gaussian
-    // determine a PS noise reference at each of the possble center frequencies
+    // determine a PS noise reference at each of the possible center frequencies
     if (_noise_cycles == 0 && _noise_calibration_cycles[_update_axis] > 0) {
         for (uint16_t i = 1; i < _state->_bin_count; i++) {
             _ref_energy[_update_axis][i] += _state->_freq_bins[i];
@@ -1107,6 +1137,8 @@ void AP_GyroFFT::update_ref_energy(uint16_t max_bin)
                 // overall random noise is reduced by sqrt(N) when averaging periodigrams so adjust for that
                 _ref_energy[_update_axis][i] = (_ref_energy[_update_axis][i] / cycles) * sqrtf(cycles);
             }
+
+            WITH_SEMAPHORE(_sem);
             _thread_state._noise_needs_calibration &= ~(1 << _update_axis);
         }
     }

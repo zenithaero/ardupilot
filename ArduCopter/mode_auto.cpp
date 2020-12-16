@@ -43,8 +43,16 @@ bool ModeAuto::init(bool ignore_checks)
         // clear guided limits
         copter.mode_guided.limit_clear();
 
-        // start/resume the mission (based on MIS_RESTART parameter)
-        mission.start_or_resume();
+        // don't start the mission until we have an origin
+        Location loc;
+        if (copter.ahrs.get_origin(loc)) {
+            // start/resume the mission (based on MIS_RESTART parameter)
+            mission.start_or_resume();
+            waiting_for_origin = false;
+        } else {
+            waiting_for_origin = true;
+        }
+
         return true;
     } else {
         return false;
@@ -103,6 +111,11 @@ void ModeAuto::run()
         break;
     }
 }
+
+bool ModeAuto::allows_arming(bool from_gcs) const
+{
+    return (copter.g2.auto_options & (uint32_t)Options::AllowArming) != 0;
+};
 
 // auto_loiter_start - initialises loitering in auto mode
 //  returns success/failure because this can be called by exit_mission
@@ -369,7 +382,12 @@ void ModeAuto::payload_place_start()
 
     // call location specific place start function
     payload_place_start(stopping_point);
+}
 
+// returns true if pilot's yaw input should be used to adjust vehicle's heading
+bool ModeAuto::use_pilot_yaw(void) const
+{
+    return (copter.g2.auto_options.get() & uint32_t(Options::IgnorePilotYaw)) == 0;
 }
 
 // start_command - this function will be called when the ap_mission lib wishes to start a new command
@@ -592,7 +610,16 @@ bool ModeAuto::get_wp(Location& destination)
 // update mission
 void ModeAuto::run_autopilot()
 {
-    mission.update();
+    Location loc;
+    if (waiting_for_origin) {
+        if (copter.ahrs.get_origin(loc)) {
+            // start/resume the mission (based on MIS_RESTART parameter)
+            mission.start_or_resume();
+            waiting_for_origin = false;
+        }
+    } else {
+        mission.update();
+    }
 }
 
 /*******************************************************************************
@@ -710,10 +737,15 @@ bool ModeAuto::verify_command(const AP_Mission::Mission_Command& cmd)
     return cmd_complete;
 }
 
-// auto_takeoff_run - takeoff in auto mode
+// takeoff_run - takeoff in auto mode
 //      called by auto_run at 100hz or more
 void ModeAuto::takeoff_run()
 {
+    // if the user doesn't want to raise the throttle we can set it automatically
+    // note that this can defeat the disarm check on takeoff
+    if ((copter.g2.auto_options & (int32_t)Options::AllowTakeOffWithoutRaisingThrottle) != 0) {
+        copter.set_auto_armed(true);
+    }
     auto_takeoff_run();
 }
 
@@ -723,7 +755,7 @@ void ModeAuto::wp_run()
 {
     // process pilot's yaw input
     float target_yaw_rate = 0;
-    if (!copter.failsafe.radio) {
+    if (!copter.failsafe.radio && use_pilot_yaw()) {
         // get pilot's desired yaw rate
         target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
         if (!is_zero(target_yaw_rate)) {
@@ -770,7 +802,7 @@ void ModeAuto::spline_run()
 
     // process pilot's yaw input
     float target_yaw_rate = 0;
-    if (!copter.failsafe.radio) {
+    if (!copter.failsafe.radio && use_pilot_yaw()) {
         // get pilot's desired yaw rate
         target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
         if (!is_zero(target_yaw_rate)) {
@@ -831,7 +863,7 @@ void ModeAuto::circle_run()
 {
     // process pilot's yaw input
     float target_yaw_rate = 0;
-    if (!copter.failsafe.radio) {
+    if (!copter.failsafe.radio && use_pilot_yaw()) {
         // get pilot's desired yaw rate
         target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
         if (!is_zero(target_yaw_rate)) {
@@ -877,7 +909,7 @@ void ModeAuto::loiter_run()
 
     // accept pilot input of yaw
     float target_yaw_rate = 0;
-    if (!copter.failsafe.radio) {
+    if (!copter.failsafe.radio && use_pilot_yaw()) {
         target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
     }
 
@@ -991,9 +1023,10 @@ void ModeAuto::payload_place_run()
     case PayloadPlaceStateType_Releasing:
     case PayloadPlaceStateType_Released:
     case PayloadPlaceStateType_Ascending_Start:
+        return payload_place_run_loiter();
     case PayloadPlaceStateType_Ascending:
     case PayloadPlaceStateType_Done:
-        return payload_place_run_loiter();
+        return wp_run();
     }
 }
 
@@ -1023,13 +1056,6 @@ void ModeAuto::payload_place_run_loiter()
 {
     // loiter...
     land_run_horizontal_control();
-
-    // run loiter controller
-    loiter_nav->update();
-
-    // call attitude controller
-    const float target_yaw_rate = 0;
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), target_yaw_rate);
 
     // call position controller
     pos_control->update_z_controller();
@@ -1420,7 +1446,7 @@ void ModeAuto::do_roi(const AP_Mission::Mission_Command& cmd)
 // point the camera to a specified angle
 void ModeAuto::do_mount_control(const AP_Mission::Mission_Command& cmd)
 {
-#if MOUNT == ENABLED
+#if HAL_MOUNT_ENABLED
     if (!copter.camera_mount.has_pan_control()) {
         auto_yaw.set_fixed_yaw(cmd.content.mount_control.yaw,0.0f,0,0);
     }
@@ -1436,15 +1462,12 @@ void ModeAuto::do_winch(const AP_Mission::Mission_Command& cmd)
     switch (cmd.content.winch.action) {
         case WINCH_RELAXED:
             g2.winch.relax();
-            AP::logger().Write_Event(LogEvent::WINCH_RELAXED);
             break;
         case WINCH_RELATIVE_LENGTH_CONTROL:
-            g2.winch.release_length(cmd.content.winch.release_length, cmd.content.winch.release_rate);
-            AP::logger().Write_Event(LogEvent::WINCH_LENGTH_CONTROL);
+            g2.winch.release_length(cmd.content.winch.release_length);
             break;
         case WINCH_RATE_CONTROL:
             g2.winch.set_desired_rate(cmd.content.winch.release_rate);
-            AP::logger().Write_Event(LogEvent::WINCH_RATE_CONTROL);
             break;
         default:
             // do nothing
@@ -1563,7 +1586,7 @@ bool ModeAuto::verify_payload_place()
     const uint16_t placed_time = 500; // how long we have to be below a throttle threshold before considering placed
 
     const float current_throttle_level = motors->get_throttle();
-    const uint32_t now =  AP_HAL::millis();
+    const uint32_t now = AP_HAL::millis();
 
     // if we discover we've landed then immediately release the load:
     if (copter.ap.land_complete) {
@@ -1573,7 +1596,7 @@ bool ModeAuto::verify_payload_place()
         case PayloadPlaceStateType_Calibrating_Hover:
         case PayloadPlaceStateType_Descending_Start:
         case PayloadPlaceStateType_Descending:
-            gcs().send_text(MAV_SEVERITY_INFO, "NAV_PLACE: landed");
+            gcs().send_text(MAV_SEVERITY_INFO, "PayloadPlace: landed");
             nav_payload_place.state = PayloadPlaceStateType_Releasing_Start;
             break;
         case PayloadPlaceStateType_Releasing_Start:

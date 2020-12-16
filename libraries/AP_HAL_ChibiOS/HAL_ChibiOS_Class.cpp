@@ -32,6 +32,7 @@
 #ifndef HAL_BOOTLOADER_BUILD
 #include <AP_Logger/AP_Logger.h>
 #endif
+#include <AP_Vehicle/AP_Vehicle_Type.h>
 
 #include <hwdef.h>
 
@@ -44,6 +45,7 @@ static HAL_UARTE_DRIVER;
 static HAL_UARTF_DRIVER;
 static HAL_UARTG_DRIVER;
 static HAL_UARTH_DRIVER;
+static HAL_UARTI_DRIVER;
 #else
 static Empty::UARTDriver uartADriver;
 static Empty::UARTDriver uartBDriver;
@@ -53,6 +55,7 @@ static Empty::UARTDriver uartEDriver;
 static Empty::UARTDriver uartFDriver;
 static Empty::UARTDriver uartGDriver;
 static Empty::UARTDriver uartHDriver;
+static Empty::UARTDriver uartIDriver;
 #endif
 
 #if HAL_USE_I2C == TRUE && defined(HAL_I2C_DEVICE_LIST)
@@ -103,6 +106,9 @@ static ChibiOS::Flash flashDriver;
 static Empty::Flash flashDriver;
 #endif
 
+#if HAL_NUM_CAN_IFACES > 0
+static ChibiOS::CANIface* canDrivers[HAL_NUM_CAN_IFACES];
+#endif
 
 #if HAL_WITH_IO_MCU
 HAL_UART_IO_DRIVER;
@@ -120,6 +126,7 @@ HAL_ChibiOS::HAL_ChibiOS() :
         &uartFDriver,
         &uartGDriver,
         &uartHDriver,
+        &uartIDriver,
         &i2cDeviceManager,
         &spiDeviceManager,
         &analogIn,
@@ -133,7 +140,11 @@ HAL_ChibiOS::HAL_ChibiOS() :
         &opticalFlowDriver,
         &flashDriver,
         &dspDriver,
+#if HAL_NUM_CAN_IFACES
+        (AP_HAL::CANIface**)canDrivers
+#else
         nullptr
+#endif
         )
 {}
 
@@ -220,11 +231,9 @@ static void main_loop()
         stm32_watchdog_init();
     }
 
-#ifndef HAL_NO_LOGGING
     if (hal.util->was_watchdog_reset()) {
         INTERNAL_ERROR(AP_InternalError::error_t::watchdog_reset);
     }
-#endif // HAL_NO_LOGGING
 #endif // IOMCU_FW
 
     schedulerInstance.watchdog_pat();
@@ -250,7 +259,7 @@ static void main_loop()
           time from the main loop, so we don't need to do it again
           here
          */
-#ifndef HAL_DISABLE_LOOP_DELAY
+#if !defined(HAL_DISABLE_LOOP_DELAY) && !APM_BUILD_TYPE(APM_BUILD_Replay)
         if (!schedulerInstance.check_called_boost()) {
             hal.scheduler->delay_microseconds(50);
         }

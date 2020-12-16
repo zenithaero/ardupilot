@@ -31,6 +31,7 @@ protected:
     MAV_RESULT handle_command_mount(const mavlink_command_long_t &packet) override;
     MAV_RESULT handle_command_int_packet(const mavlink_command_int_t &packet) override;
     MAV_RESULT handle_command_long_packet(const mavlink_command_long_t &packet) override;
+    MAV_RESULT handle_command_int_do_reposition(const mavlink_command_int_t &packet);
 
     void handle_mount_message(const mavlink_message_t &msg) override;
 
@@ -59,9 +60,13 @@ private:
     MAV_MODE base_mode() const override;
     MAV_STATE vehicle_system_status() const override;
 
+    float vfr_hud_airspeed() const override;
     int16_t vfr_hud_throttle() const override;
     float vfr_hud_alt() const override;
 
     void send_pid_tuning() override;
 
+    void send_winch_status() const override;
+
+    void send_wind() const;
 };

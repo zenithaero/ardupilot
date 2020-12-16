@@ -98,6 +98,11 @@
 #define AP_SERIALMANAGER_SLCAN_BUFSIZE_RX       128
 #define AP_SERIALMANAGER_SLCAN_BUFSIZE_TX       128
 
+// MSP protocol default buffer sizes
+#define AP_SERIALMANAGER_MSP_BUFSIZE_RX     128
+#define AP_SERIALMANAGER_MSP_BUFSIZE_TX     256
+#define AP_SERIALMANAGER_MSP_BAUD           115200
+
 class AP_SerialManager {
 public:
     AP_SerialManager();
@@ -137,6 +142,14 @@ public:
         SerialProtocol_RunCam = 26,
         SerialProtocol_Hott = 27,
         SerialProtocol_Scripting = 28,
+        SerialProtocol_CRSF = 29,
+        SerialProtocol_Generator = 30,
+        SerialProtocol_Winch = 31,
+        SerialProtocol_MSP = 32,
+        SerialProtocol_DJI_FPV = 33,
+        SerialProtocol_AirSpeed = 34,
+
+        SerialProtocol_NumProtocols                    // must be the last value
     };
 
     // get singleton instance
@@ -165,6 +178,9 @@ public:
     //  returns true if a channel is found, false if not
     bool get_mavlink_channel(enum SerialProtocol protocol, uint8_t instance, mavlink_channel_t &mav_chan) const;
 
+    // should_forward_mavlink_telemetry - returns true if this port should forward telemetry
+    bool should_forward_mavlink_telemetry(enum SerialProtocol protocol, uint8_t instance) const;
+
     // get_mavlink_protocol - provides the specific MAVLink protocol for a
     // given channel, or SerialProtocol_None if not found
     SerialProtocol get_mavlink_protocol(mavlink_channel_t mav_chan) const;
@@ -173,7 +189,8 @@ public:
     void set_blocking_writes_all(bool blocking);
 
     // get the passthru ports if enabled
-    bool get_passthru(AP_HAL::UARTDriver *&port1, AP_HAL::UARTDriver *&port2, uint8_t &timeout_s) const;
+    bool get_passthru(AP_HAL::UARTDriver *&port1, AP_HAL::UARTDriver *&port2, uint8_t &timeout_s,
+                      uint32_t &baud1, uint32_t &baud2) const;
 
     // disable passthru by settings SERIAL_PASS2 to -1
     void disable_passthru(void);

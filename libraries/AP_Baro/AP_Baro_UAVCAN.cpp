@@ -1,10 +1,10 @@
 #include <AP_HAL/AP_HAL.h>
 
-#if HAL_WITH_UAVCAN
+#if HAL_ENABLE_LIBUAVCAN_DRIVERS
 
 #include "AP_Baro_UAVCAN.h"
 
-#include <AP_BoardConfig/AP_BoardConfig_CAN.h>
+#include <AP_CANManager/AP_CANManager.h>
 #include <AP_UAVCAN/AP_UAVCAN.h>
 
 #include <uavcan/equipment/air_data/StaticPressure.hpp>
@@ -12,7 +12,7 @@
 
 extern const AP_HAL::HAL& hal;
 
-#define debug_baro_uavcan(level_debug, can_driver, fmt, args...) do { if ((level_debug) <= AP::can().get_debug_level_driver(can_driver)) { printf(fmt, ##args); }} while (0)
+#define LOG_TAG "Baro"
 
 //UAVCAN Frontend Registry Binder
 UC_REGISTRY_BINDER(PressureCb, uavcan::equipment::air_data::StaticPressure);
@@ -42,7 +42,6 @@ void AP_Baro_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     const int pressure_listener_res = pressure_listener->start(PressureCb(ap_uavcan, &handle_pressure));
     if (pressure_listener_res < 0) {
         AP_HAL::panic("UAVCAN Baro subscriber start problem\n\r");
-        return;
     }
 
     uavcan::Subscriber<uavcan::equipment::air_data::StaticTemperature, TemperatureCb> *temperature_listener;
@@ -51,7 +50,6 @@ void AP_Baro_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     const int temperature_listener_res = temperature_listener->start(TemperatureCb(ap_uavcan, &handle_temperature));
     if (temperature_listener_res < 0) {
         AP_HAL::panic("UAVCAN Baro subscriber start problem\n\r");
-        return;
     }
 }
 
@@ -64,23 +62,28 @@ AP_Baro_Backend* AP_Baro_UAVCAN::probe(AP_Baro &baro)
         if (_detected_modules[i].driver == nullptr && _detected_modules[i].ap_uavcan != nullptr) {
             backend = new AP_Baro_UAVCAN(baro);
             if (backend == nullptr) {
-                debug_baro_uavcan(2,
-                                  _detected_modules[i].ap_uavcan->get_driver_index(),
-                                  "Failed register UAVCAN Baro Node %d on Bus %d\n",
-                                  _detected_modules[i].node_id,
-                                  _detected_modules[i].ap_uavcan->get_driver_index());
+                AP::can().log_text(AP_CANManager::LOG_ERROR,
+                            LOG_TAG,
+                            "Failed register UAVCAN Baro Node %d on Bus %d\n",
+                            _detected_modules[i].node_id,
+                            _detected_modules[i].ap_uavcan->get_driver_index());
             } else {
                 _detected_modules[i].driver = backend;
                 backend->_pressure = 0;
                 backend->_pressure_count = 0;
                 backend->_ap_uavcan = _detected_modules[i].ap_uavcan;
                 backend->_node_id = _detected_modules[i].node_id;
-                backend->register_sensor();
-                debug_baro_uavcan(2,
-                                  _detected_modules[i].ap_uavcan->get_driver_index(),
-                                  "Registered UAVCAN Baro Node %d on Bus %d\n",
-                                  _detected_modules[i].node_id,
-                                  _detected_modules[i].ap_uavcan->get_driver_index());
+
+                backend->_instance = backend->_frontend.register_sensor();
+                backend->set_bus_id(backend->_instance, AP_HAL::Device::make_bus_id(AP_HAL::Device::BUS_TYPE_UAVCAN,
+                                                                                    _detected_modules[i].ap_uavcan->get_driver_index(),
+                                                                                    backend->_node_id, 0));
+
+                AP::can().log_text(AP_CANManager::LOG_INFO,
+                            LOG_TAG,
+                            "Registered UAVCAN Baro Node %d on Bus %d\n",
+                            _detected_modules[i].node_id,
+                            _detected_modules[i].ap_uavcan->get_driver_index());
             }
             break;
         }
@@ -189,5 +192,5 @@ void AP_Baro_UAVCAN::update(void)
     }
 }
 
-#endif // HAL_WITH_UAVCAN
+#endif // HAL_ENABLE_LIBUAVCAN_DRIVERS
 

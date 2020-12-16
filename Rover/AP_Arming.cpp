@@ -42,12 +42,9 @@ bool AP_Arming_Rover::gps_checks(bool display_failure)
     const AP_AHRS &ahrs = AP::ahrs();
 
     // always check if inertial nav has started and is ready
-    if (!ahrs.prearm_healthy()) {
-        const char *reason = ahrs.prearm_failure_reason();
-        if (reason == nullptr) {
-            reason = "AHRS not healthy";
-        }
-        check_failed(display_failure, "%s", reason);
+    char failure_msg[50] = {};
+    if (!ahrs.pre_arm_check(failure_msg, sizeof(failure_msg))) {
+        check_failed(display_failure, "AHRS: %s", failure_msg);
         return false;
     }
 
@@ -59,11 +56,8 @@ bool AP_Arming_Rover::gps_checks(bool display_failure)
 
     // ensure position esetimate is ok
     if (!rover.ekf_position_ok()) {
-        const char *reason = ahrs.prearm_failure_reason();
-        if (reason == nullptr) {
-            reason = "Need Position Estimate";
-        }
-        check_failed(display_failure, "%s", reason);
+        // vehicle level position estimate checks
+        check_failed(display_failure, "Need Position Estimate");
         return false;
     }
 
@@ -79,6 +73,11 @@ bool AP_Arming_Rover::pre_arm_checks(bool report)
     }
     if (SRV_Channels::get_emergency_stop()) {
         check_failed(report, "Motors Emergency Stopped");
+        return false;
+    }
+
+    if (rover.g2.sailboat.sail_enabled() && !rover.g2.windvane.enabled()) {
+        check_failed(report, "Sailing enabled with no WindVane");
         return false;
     }
 

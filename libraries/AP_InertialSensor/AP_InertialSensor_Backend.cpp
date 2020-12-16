@@ -278,9 +278,10 @@ void AP_InertialSensor_Backend::log_gyro_raw(uint8_t instance, const uint64_t sa
     }
     if (should_log_imu_raw()) {
         uint64_t now = AP_HAL::micros64();
-        struct log_GYRO pkt = {
-            LOG_PACKET_HEADER_INIT((uint8_t)(LOG_GYR1_MSG+instance)),
+        const struct log_GYR pkt{
+            LOG_PACKET_HEADER_INIT(LOG_GYR_MSG),
             time_us   : now,
+            instance  : instance,
             sample_us : sample_us?sample_us:now,
             GyrX      : gyro.x,
             GyrY      : gyro.y,
@@ -433,9 +434,10 @@ void AP_InertialSensor_Backend::log_accel_raw(uint8_t instance, const uint64_t s
     }
     if (should_log_imu_raw()) {
         uint64_t now = AP_HAL::micros64();
-        struct log_ACCEL pkt = {
-            LOG_PACKET_HEADER_INIT((uint8_t)(LOG_ACC1_MSG+instance)),
+        const struct log_ACC pkt {
+            LOG_PACKET_HEADER_INIT(LOG_ACC_MSG),
             time_us   : now,
+            instance  : instance,
             sample_us : sample_us?sample_us:now,
             AccX      : accel.x,
             AccY      : accel.y,
@@ -479,11 +481,11 @@ void AP_InertialSensor_Backend::_inc_gyro_error_count(uint8_t instance)
     _imu._gyro_error_count[instance]++;
 }
 
-// return the requested sample rate in Hz
-uint16_t AP_InertialSensor_Backend::get_sample_rate_hz(void) const
+// return the requested loop rate at which samples will be made available in Hz
+uint16_t AP_InertialSensor_Backend::get_loop_rate_hz(void) const
 {
     // enum can be directly cast to Hz
-    return (uint16_t)_imu._sample_rate;
+    return (uint16_t)_imu._loop_rate;
 }
 
 /*

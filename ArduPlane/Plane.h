@@ -108,7 +108,9 @@
 
 #include "RC_Channel.h"     // RC Channel Library
 #include "Parameters.h"
+#if HAL_ADSB_ENABLED
 #include "avoidance_adsb.h"
+#endif
 #include "AP_Arming.h"
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -160,6 +162,7 @@ public:
     friend class ModeQAutotune;
     friend class ModeTakeoff;
     friend class ModePreflight;
+    friend class ModeThermal;
 
     Plane(void);
 
@@ -180,6 +183,8 @@ private:
     RC_Channel *channel_pitch;
     RC_Channel *channel_throttle;
     RC_Channel *channel_rudder;
+    RC_Channel *channel_flap;
+    RC_Channel *channel_airbrake;
 
     AP_Logger logger;
 
@@ -254,7 +259,7 @@ private:
     // Rally Ponints
     AP_Rally rally;
 
-#if OSD_ENABLED == ENABLED
+#if OSD_ENABLED || OSD_PARAM_ENABLED
     AP_OSD osd;
 #endif
     
@@ -269,7 +274,9 @@ private:
     ModeAuto mode_auto;
     ModeRTL mode_rtl;
     ModeLoiter mode_loiter;
+#if HAL_ADSB_ENABLED
     ModeAvoidADSB mode_avoidADSB;
+#endif
     ModeGuided mode_guided;
     ModeInitializing mode_initializing;
     ModeManual mode_manual;
@@ -282,6 +289,9 @@ private:
     ModeQAutotune mode_qautotune;
     ModeTakeoff mode_takeoff;
     ModePreflight mode_preflight;
+#if HAL_SOARING_ENABLED
+    ModeThermal mode_thermal;
+#endif
 
     // This is the state of the flight control system
     // There are multiple states defined such as MANUAL, FBW-A, AUTO
@@ -401,14 +411,6 @@ private:
         float locked_roll_err;
         int32_t locked_pitch_cd;
     } acro_state;
-
-    // CRUISE controller state
-    struct CruiseState {
-        bool locked_heading;
-        int32_t locked_heading_cd;
-        uint32_t lock_timer_ms;
-        bool landing;
-    } cruise_state;
 
     struct {
         uint32_t last_tkoff_arm_time;
@@ -645,11 +647,12 @@ private:
             FUNCTOR_BIND_MEMBER(&Plane::adjusted_relative_altitude_cm, int32_t),
             FUNCTOR_BIND_MEMBER(&Plane::disarm_if_autoland_complete, void),
             FUNCTOR_BIND_MEMBER(&Plane::update_flight_stage, void)};
-
+#if HAL_ADSB_ENABLED
     AP_ADSB adsb;
 
-    // avoidance of adsb enabled vehicles (normally manned vheicles)
+    // avoidance of adsb enabled vehicles (normally manned vehicles)
     AP_Avoidance_Plane avoidance_adsb{adsb};
+#endif
 
     // Outback Challenge Failsafe Support
 #if ADVANCED_FAILSAFE == ENABLED
@@ -764,7 +767,7 @@ private:
     uint32_t last_home_update_ms;
 
     // Camera/Antenna mount tracking and stabilisation stuff
-#if MOUNT == ENABLED
+#if HAL_MOUNT_ENABLED
     AP_Mount camera_mount;
 #endif
 
@@ -792,7 +795,11 @@ private:
     float rudder_dt;
 
     // soaring mode-change timer
-    uint32_t soaring_mode_timer;
+    uint32_t soaring_mode_timer_ms;
+
+    // terrain disable for non AUTO modes, set with an RC Option switch
+    bool non_auto_terrain_disable;
+    bool terrain_disabled();
 
     // Attitude.cpp
     void adjust_nav_pitch_throttle(void);
@@ -899,7 +906,7 @@ private:
     bool verify_landing_vtol_approach(const AP_Mission::Mission_Command& cmd);
     void do_wait_delay(const AP_Mission::Mission_Command& cmd);
     void do_within_distance(const AP_Mission::Mission_Command& cmd);
-    void do_change_speed(const AP_Mission::Mission_Command& cmd);
+    bool do_change_speed(const AP_Mission::Mission_Command& cmd);
     void do_set_home(const AP_Mission::Mission_Command& cmd);
     bool start_command_callback(const AP_Mission::Mission_Command &cmd);
     bool verify_command_callback(const AP_Mission::Mission_Command& cmd);
@@ -950,6 +957,7 @@ private:
     void geofence_send_status(mavlink_channel_t chan);
     bool geofence_breached(void);
     void geofence_disable_and_send_error_msg(const char *errorMsg);
+    void disable_fence_for_landing(void);
 
     // ArduPlane.cpp
     void disarm_if_autoland_complete();
@@ -968,17 +976,15 @@ private:
     void afs_fs_check(void);
 #endif
     void one_second_loop(void);
+#if AP_AIRSPEED_AUTOCAL_ENABLE
     void airspeed_ratio_update(void);
+#endif 
     void compass_save(void);
     void update_logging1(void);
     void update_logging2(void);
     void update_control_mode(void);
     void update_flight_stage();
-    void update_navigation();
     void set_flight_stage(AP_Vehicle::FixedWing::FlightStage fs);
-#if OSD_ENABLED == ENABLED
-    void publish_osd_info();
-#endif
 
     // navigation.cpp
     void set_nav_controller(void);
@@ -989,7 +995,6 @@ private:
     void calc_gndspeed_undershoot();
     void update_loiter(uint16_t radius);
     void update_cruise();
-    void set_cruise_land();
     void update_fbwb_speed_height(void);
     void setup_turn_angle(void);
     bool reached_loiter_target(void);
@@ -1049,10 +1054,12 @@ private:
     void set_servos_flaps(void);
     void set_landing_gear(void);
     void dspoiler_update(void);
+    void airbrake_update(void);
     void servo_output_mixers(void);
     void servos_output(void);
     void servos_auto_trim(void);
     void servos_twin_engine_mix();
+    void force_flare();
     void throttle_voltage_comp(int8_t &min_throttle, int8_t &max_throttle);
     void throttle_watt_limiter(int8_t &min_throttle, int8_t &max_throttle);
     void throttle_slew_limit(SRV_Channel::Aux_servo_function_t func);
@@ -1077,9 +1084,14 @@ private:
 #endif
 
     // soaring.cpp
-#if SOARING_ENABLED == ENABLED
+#if HAL_SOARING_ENABLED
     void update_soaring();
 #endif
+
+    // vehicle specific waypoint info helpers
+    bool get_wp_distance_m(float &distance) const override;
+    bool get_wp_bearing_deg(float &bearing) const override;
+    bool get_wp_crosstrack_error_m(float &xtrack_error) const override;
 
     // reverse_thrust.cpp
     bool reversed_throttle;
@@ -1116,6 +1128,28 @@ private:
     bool ekf_over_threshold();
     void failsafe_ekf_event();
     void failsafe_ekf_off_event(void);
+    
+    enum class CrowMode {
+        NORMAL,
+        PROGRESSIVE,
+        CROW_DISABLED,
+    };
+
+    enum class ThrFailsafe {
+        Disabled    = 0,
+        Enabled     = 1,
+        EnabledNoFS = 2
+    };
+
+    CrowMode crow_mode = CrowMode::NORMAL;
+
+    enum class FlareMode {
+        FLARE_DISABLED = 0,
+        ENABLED_NO_PITCH_TARGET,
+        ENABLED_PITCH_TARGET
+    };
+
+    FlareMode flare_mode;
 
 public:
     void failsafe_check(void);

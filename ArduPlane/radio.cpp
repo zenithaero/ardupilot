@@ -40,6 +40,13 @@ void Plane::set_control_channels(void)
         SRV_Channels::set_angle(SRV_Channel::k_throttleRight, 100);
     }
 
+    // update flap and airbrake channel assignment
+    channel_flap     = rc().find_channel_for_option(RC_Channel::AUX_FUNC::FLAP);
+    channel_airbrake = rc().find_channel_for_option(RC_Channel::AUX_FUNC::AIRBRAKE);
+
+    // update manual forward throttle channel assignment
+    quadplane.rc_fwd_thr_ch = rc().find_channel_for_option(RC_Channel::AUX_FUNC::FWD_THR);
+
     if (!arming.is_armed() && arming.arming_required() == AP_Arming::Required::YES_MIN_PWM) {
         SRV_Channels::set_safety_limit(SRV_Channel::k_throttle, have_reverse_thrust()?SRV_Channel::Limit::TRIM:SRV_Channel::Limit::MIN);
     }
@@ -98,8 +105,6 @@ void Plane::init_rc_out_aux()
 {
     SRV_Channels::enable_aux_servos();
 
-    SRV_Channels::cork();
-    
     servos_output();
     
     // setup PWM values to send if the FMU firmware dies
@@ -281,7 +286,7 @@ int16_t Plane::rudder_input(void)
 
 void Plane::control_failsafe()
 {
-    if (millis() - failsafe.last_valid_rc_ms > 1000 || rc_failsafe_active()) {
+    if (rc_failsafe_active()) {
         // we do not have valid RC input. Set all primary channel
         // control inputs to the trim value and throttle to min
         channel_roll->set_radio_in(channel_roll->get_radio_trim());
@@ -293,6 +298,9 @@ void Plane::control_failsafe()
         channel_roll->set_control_in(0);
         channel_pitch->set_control_in(0);
         channel_rudder->set_control_in(0);
+
+        airspeed_nudge_cm = 0;
+        throttle_nudge = 0;
 
         switch (control_mode->mode_number()) {
             case Mode::Number::QSTABILIZE:
@@ -314,7 +322,7 @@ void Plane::control_failsafe()
         }
     }
 
-    if(g.throttle_fs_enabled == 0) {
+    if (ThrFailsafe(g.throttle_fs_enabled.get()) != ThrFailsafe::Enabled) {
         return;
     }
 
@@ -407,7 +415,7 @@ bool Plane::trim_radio()
  */
 bool Plane::rc_throttle_value_ok(void) const
 {
-    if (!g.throttle_fs_enabled) {
+    if (ThrFailsafe(g.throttle_fs_enabled.get()) == ThrFailsafe::Disabled) {
         return true;
     }
     if (channel_throttle->get_reverse()) {
