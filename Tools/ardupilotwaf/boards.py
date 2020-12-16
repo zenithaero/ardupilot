@@ -446,7 +446,7 @@ class sitl(Board):
 
         env.AP_LIBRARIES += [
             'AP_HAL_SITL',
-            'SITL',
+            # 'SITL',
             'Zenith/Simulator'
         ]
 
