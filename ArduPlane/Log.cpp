@@ -48,18 +48,13 @@ void Plane::Log_Write_Attitude(void)
 // do fast logging for plane
 void Plane::Log_Write_Fast(void)
 {
+    // ZenithController - write control logs
+    zenith_controller.write_logs(logger);
+    return; // Skip legacy function ------------
+
     if (should_log(MASK_LOG_ATTITUDE_FAST)) {
         Log_Write_Attitude();
     }
-    // Log controls
-    if (zenith_controller.active_logs & ZenithController::AHRS_MASK)
-        logger.Write_CTRL(zenith_controller.log);
-    if (zenith_controller.active_logs & ZenithController::PITCH_MASK)
-        logger.Write_CTRL(zenith_controller.pitch_controller.log);
-    if (zenith_controller.active_logs & ZenithController::ROLLYAW_MASK)
-        logger.Write_CTRL(zenith_controller.roll_yaw_controller.log);
-    if (zenith_controller.active_logs & ZenithController::SPDALT_MASK)
-        logger.Write_CTRL(zenith_controller.spd_alt_controller.log);
 }
 
 

@@ -385,30 +385,32 @@ void Plane::stabilize_acro(float speed_scaler)
  */
 void Plane::stabilize()
 {
-    zenith_controller.update();
-    
-    // control_mode = &mode_fbwa; // TEMP
-    if (control_mode == &mode_manual || control_mode == &mode_preflight) {
-        
-        // reset steering controls
+    // ZenithController - update pitch & yaw
+    bool update_attitude = control_mode != &mode_manual && control_mode != &mode_preflight;
+    float theta_cmd_deg = nav_pitch_cd / 100.f;
+    float roll_cmd_deg = nav_roll_cd / 100.f;
+    float rudder_cmd_deg = rudder_input();
+    bool update_spd_alt = auto_throttle_mode && !throttle_suppressed;
+    float h_cmd = relative_target_altitude_cm() / 100.f;
+    float tas_cmd = target_airspeed_cm / 100.f;
+
+    if (!update_attitude) {
+        // Reset steer state & return
         steer_state.locked_course = false;
         steer_state.locked_course_err = 0;
-        return;
     }
-
-    // ZenithController - compute throttle & pitch command
-    if (auto_throttle_mode && !throttle_suppressed) {
-        float target_alt = relative_target_altitude_cm() / 100.f;
-        float target_airspeed = target_airspeed_cm / 100.f;
-        zenith_controller.update_spd_alt(target_airspeed, target_alt);
-    }
-
-    // ZenithController - update pitch & yaw
+    
     // Warning: If disabled, uncomment servos.cpp ln 739-740 to re-enable rudder control
-    int16_t rudder_cd = rudder_input();
-    zenith_controller.stabilize_pitch(nav_pitch_cd / 100.f);
-    zenith_controller.stabilize_rollyaw(nav_roll_cd / 100.f, rudder_cd / 100.f);
-
+    zenith_controller.update(
+        update_spd_alt,
+        tas_cmd,
+        h_cmd,
+        update_attitude,
+        theta_cmd_deg,
+        roll_cmd_deg,
+        rudder_cmd_deg
+    );
+    // Skip legacy function ----------------
     return;
 
 
@@ -486,6 +488,15 @@ void Plane::stabilize()
 
 void Plane::calc_throttle()
 {
+    // ZenithController - update throttle
+    int32_t commanded_throttle = (int32_t)(zenith_controller.spd_alt_controller.thr_command * 100);
+    if (control_mode == &mode_cruise && mode_cruise.landing)
+        commanded_throttle = get_throttle_input(true);
+    SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, commanded_throttle);
+    
+    // Skip legacy function -------------
+    return;
+
     if (aparm.throttle_cruise <= 1) {
         // user has asked for zero throttle - this may be done by a
         // mission which wants to turn off the engine for a parachute
@@ -494,8 +505,6 @@ void Plane::calc_throttle()
         return;
     }
 
-    // ZenithController - update throttle
-    // int32_t commanded_throttle = SpdHgt_Controller->get_throttle_demand();
     int32_t commanded_throttle = (int32_t)(zenith_controller.spd_alt_controller.thr_command * 100);
 
     // Received an external msg that guides throttle in the last 3 seconds?
@@ -505,7 +514,7 @@ void Plane::calc_throttle()
         commanded_throttle = plane.guided_state.forced_throttle;
     }
 
-    // Override altitude controller in cruise landing mode
+    // Override speed controller in cruise landing mode
     if (control_mode == &mode_cruise && mode_cruise.landing)
         commanded_throttle = get_throttle_input(true);
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, commanded_throttle);
@@ -535,7 +544,6 @@ void Plane::calc_nav_yaw_coordinated(float speed_scaler)
             disable_integrator = true;
         }
 
-        // ZenithController - update yaw
         commanded_rudder = yawController.get_servo_out(speed_scaler, disable_integrator);
 
         // add in rudder mixing from roll
@@ -610,14 +618,12 @@ void Plane::calc_nav_yaw_ground(void)
  */
 void Plane::calc_nav_pitch()
 {
-    // Calculate the Pitch of the plane
-    // --------------------------------
+    // ZenithController - udpate pitch command
+    nav_pitch_cd = (int32_t)(zenith_controller.spd_alt_controller.pitch_command * 100);
+    return; // Skip legacy function ------------
 
-    // ZenithController - update pitch command
-    // int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
-    int32_t commanded_pitch = (int32_t)(zenith_controller.spd_alt_controller.pitch_command * 100);
-
-
+    
+    int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
     // Received an external msg that guides roll in the last 3 seconds?
     if (control_mode->is_guided_mode() &&
             plane.guided_state.last_forced_rpy_ms.y > 0 &&

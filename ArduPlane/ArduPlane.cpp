@@ -170,6 +170,7 @@ void Plane::ahrs_update()
 void Plane::update_speed_height(void)
 {
     // ZenithController - disable ardupilot controller
+    // Skip legacy function --------------------------
     return;
 
     if (auto_throttle_mode) {
@@ -484,6 +485,7 @@ void Plane::update_alt()
     update_flight_stage();
 
     // ZenithController - disable ardupilot controller
+    // Skip legacy function -------------------------
     return;
 
     if (auto_throttle_mode && !throttle_suppressed) {        
