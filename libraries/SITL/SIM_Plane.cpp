@@ -394,11 +394,8 @@ void Plane::update(const struct sitl_input &input)
     // update magnetic field
     update_mag_field_bf();
 
-    float r, p, y;
-    dcm.to_euler(&r, &p, &y);
 
     // Reset precentage if needed
-    
     uint8_t remaining = AP::battery().capacity_remaining_pct(AP_BATT_PRIMARY_INSTANCE);
     if (remaining < 80) {
         AP::battery().reset_remaining(1 << AP_BATT_PRIMARY_INSTANCE, 81.0f);

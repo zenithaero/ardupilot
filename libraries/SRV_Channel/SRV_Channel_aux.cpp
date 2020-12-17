@@ -153,13 +153,13 @@ void SRV_Channel::aux_servo_function_setup(void)
         set_angle(3000);
         break;
     case k_aileron:
-        set_angle(2500); // TODO: Zenith :: hook to param
+        set_angle(2500); // TODO Zenith :: hook to param
         break;
     case k_elevator:
-        set_angle(2500); // TODO: Zenith :: hook to param
+        set_angle(2500); // TODO Zenith :: hook to param
         break;
     case k_rudder:
-        set_angle(2500); // TODO: Zenith :: hook to param
+        set_angle(2500); // TODO Zenith :: hook to param
         break;
     // End
     case k_throttle:

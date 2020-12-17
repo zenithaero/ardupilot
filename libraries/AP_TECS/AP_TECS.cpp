@@ -3,7 +3,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Logger/AP_Logger.h>
-#include <Zenith/ArdupilotGains/ZenithGains.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -369,7 +368,6 @@ void AP_TECS::_update_speed(float load_factor)
     _TAS_dem = _EAS_dem * EAS2TAS;
     _TASmax   = aparm.airspeed_max * EAS2TAS;
     _TASmin   = aparm.airspeed_min * EAS2TAS;
-    printf("tas dem %.3f, tas min %.3f, tas max %.3f\n", _TAS_dem, _TASmin, _TASmax);
 
     if (aparm.stall_prevention) {
         // when stall prevention is active we raise the mimimum
@@ -437,7 +435,6 @@ void AP_TECS::_update_speed_demand(void)
     // Use 50% of maximum energy rate to allow margin for total energy contgroller
     const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
     const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
-    printf("velratemax %.3f, velratemin %.3f\n", velRateMax, velRateMin);
     const float TAS_dem_previous = _TAS_dem_adj;
 
     // assume fixed 10Hz call rate
@@ -461,7 +458,6 @@ void AP_TECS::_update_speed_demand(void)
     }
     // Constrain speed demand again to protect against bad values on initialisation.
     _TAS_dem_adj = constrain_float(_TAS_dem_adj, _TASmin, _TASmax);
-    printf("TAS_dem_adj: %.3f\n", _TAS_dem_adj);
 }
 
 void AP_TECS::_update_height_demand(void)
@@ -481,7 +477,6 @@ void AP_TECS::_update_height_demand(void)
     }
 
     // Limit height rate of change
-    _maxClimbRate = ZenithGains::tecs.hDotMax;
     if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * 0.1f))
     {
         _hgt_dem = _hgt_dem_prev + _maxClimbRate * 0.1f;
@@ -540,16 +535,6 @@ void AP_TECS::_update_height_demand(void)
     }
     _hgt_dem_adj_last = _hgt_dem_adj;
     _hgt_dem_adj = new_hgt_dem;
-
-    // Step
-    // if (_mode_enabled_millis == 0)
-    //     _mode_enabled_millis = AP_HAL::millis();
-    // if (AP_HAL::millis() - _mode_enabled_millis > 80e3) {
-    //     _hgt_dem_adj = 40; // 10m height step
-    // }
-
-
-    // printf("HGT_dem_adj: %.3f\n", _hgt_dem_adj);
 }
 
 void AP_TECS::_detect_underspeed(void)
@@ -587,7 +572,6 @@ void AP_TECS::_detect_underspeed(void)
 
 void AP_TECS::_update_energies(void)
 {
-
     // Calculate specific energy demands
     _SPE_dem = _hgt_dem_adj * GRAVITY_MSS;
     _SKE_dem = 0.5f * _TAS_dem_adj * _TAS_dem_adj;
@@ -604,11 +588,6 @@ void AP_TECS::_update_energies(void)
     _SPEdot = _climb_rate * GRAVITY_MSS;
     _SKEdot = _TAS_state * _vel_dot;
 
-//     AP::logger().Write("TCS2", "TimeUS,spec,skec,spedc,skedc,spe,ske,sped,sked", "Qffffffff",
-//     AP_HAL::micros64(),
-//    _SPE_dem, _SKE_dem, _SPEdot_dem, _SKEdot_dem, _SPE_est, _SKE_est, _SPEdot, _SKEdot);
-
-    // printf("TECS hCmd %.2f h %.2f pitchDem %.2f; tasCmd %.2f tas %.2f thrDem %.2f\n", _hgt_dem_adj, _height, _pitch_dem, _TAS_dem_adj, _TAS_state, _throttle_dem);
 }
 
 /*
@@ -616,18 +595,21 @@ void AP_TECS::_update_energies(void)
  */
 float AP_TECS::timeConstant(void) const
 {
-    // if (_flags.is_doing_auto_land) {
-    //     if (_landTimeConst < 0.1f) {
-    //         return 0.1f;
-    //     }
-    //     return _landTimeConst;
-    // }
-    // if (_timeConst < 0.1f) {
-    //     return 0.1f;
-    // }
-    return 1 / ZenithGains::tecs.TcInv;
+    if (_flags.is_doing_auto_land) {
+        if (_landTimeConst < 0.1f) {
+            return 0.1f;
+        }
+        return _landTimeConst;
+    }
+    if (_timeConst < 0.1f) {
+        return 0.1f;
+    }
+    return _timeConst;
 }
 
+/*
+  calculate throttle demand - airspeed enabled case
+ */
 void AP_TECS::_update_throttle_with_airspeed(void)
 {
     // Calculate limits to be applied to potential energy error to prevent over or underspeed occurring due to large height errors
@@ -681,11 +663,10 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         ff_throttle = nomThr + STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
 
         // Calculate PD + FF throttle
-        // float throttle_damp = _thrDamp;
-        // if (_flags.is_doing_auto_land && !is_zero(_land_throttle_damp)) {
-        //     throttle_damp = _land_throttle_damp;
-        // }
-        float throttle_damp = ZenithGains::tecs.totKd;
+        float throttle_damp = _thrDamp;
+        if (_flags.is_doing_auto_land && !is_zero(_land_throttle_damp)) {
+            throttle_damp = _land_throttle_damp;
+        }
         _throttle_dem = (_STE_error + STEdot_error * throttle_damp) * K_STE2Thr + ff_throttle;
 
         // Constrain throttle demand
@@ -700,6 +681,8 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         float integ_max = constrain_float((_THRmaxf - _throttle_dem + 0.1f),-maxAmp,maxAmp);
         float integ_min = constrain_float((_THRminf - _throttle_dem - 0.1f),-maxAmp,maxAmp);
 
+        // Calculate integrator state, constraining state
+        // Set integrator to a max throttle value during climbout
         _integTHR_state = _integTHR_state + (_STE_error * _get_i_gain()) * _DT * K_STE2Thr;
         if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
         {
@@ -735,12 +718,8 @@ void AP_TECS::_update_throttle_with_airspeed(void)
 
         // Sum the components.
         _throttle_dem = _throttle_dem + _integTHR_state;
-
-
-        // AP::logger().Write("TCS3", "TimeUS,stederr,steerr,thrdem,thrff,kste2thr", "Qfffff",
-        // AP_HAL::micros64(),
-        // STEdot_error, _STE_error, constrain_float(_throttle_dem, _THRminf, _THRmaxf), ff_throttle, K_STE2Thr);
     }
+
     // Constrain throttle demand
     _throttle_dem = constrain_float(_throttle_dem, _THRminf, _THRmaxf);
 }
@@ -757,7 +736,7 @@ float AP_TECS::_get_i_gain(void)
             i_gain = _integGain_land;
         }
     }
-    return ZenithGains::tecs.Ki;
+    return i_gain;
 }
 
 /*
@@ -830,6 +809,12 @@ void AP_TECS::_detect_bad_descent(void)
 
 void AP_TECS::_update_pitch(void)
 {
+    // Calculate Speed/Height Control Weighting
+    // This is used to determine how the pitch control prioritises speed and height control
+    // A weighting of 1 provides equal priority (this is the normal mode of operation)
+    // A SKE_weighting of 0 provides 100% priority to height control. This is used when no airspeed measurement is available
+    // A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected. In this instance, if airspeed
+    // rises above the demanded value, the pitch angle will be increased by the TECS controller.
     float SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
     if (!(_ahrs.airspeed_sensor_enabled()|| _use_synthetic_airspeed)) {
         SKE_weighting = 0.0f;
@@ -876,16 +861,31 @@ void AP_TECS::_update_pitch(void)
     }
     float integSEB_delta = integSEB_input * _DT;
 
+#if 0
+    if (_landing.is_flaring() && fabsf(_climb_rate) > 0.2f) {
+        ::printf("_hgt_rate_dem=%.1f _hgt_dem_adj=%.1f climb=%.1f _flare_counter=%u _pitch_dem=%.1f SEB_dem=%.2f SEBdot_dem=%.2f SEB_error=%.2f SEBdot_error=%.2f\n",
+                 _hgt_rate_dem, _hgt_dem_adj, _climb_rate, _flare_counter, degrees(_pitch_dem),
+                 SEB_dem, SEBdot_dem, SEB_error, SEBdot_error);
+    }
+#endif
+
+
+    // Apply max and min values for integrator state that will allow for no more than
+    // 5deg of saturation. This allows for some pitch variation due to gusts before the
+    // integrator is clipped. Otherwise the effectiveness of the integrator will be reduced in turbulence
+    // During climbout/takeoff, bias the demanded pitch angle so that zero speed error produces a pitch angle
+    // demand equal to the minimum value (which is )set by the mission plan during this mode). Otherwise the
+    // integrator has to catch up before the nose can be raised to reduce speed during climbout.
+    // During flare a different damping gain is used
     float gainInv = (_TAS_state * timeConstant() * GRAVITY_MSS);
     float temp = SEB_error + 0.5*SEBdot_dem * timeConstant();
 
-    // float pitch_damp = _ptchDamp;
-    // if (_landing.is_flaring()) {
-    //     pitch_damp = _landDamp;
-    // } else if (!is_zero(_land_pitch_damp) && _flags.is_doing_auto_land) {
-    //     pitch_damp = _land_pitch_damp;
-    // }
-    float pitch_damp = ZenithGains::tecs.balKd;
+    float pitch_damp = _ptchDamp;
+    if (_landing.is_flaring()) {
+        pitch_damp = _landDamp;
+    } else if (!is_zero(_land_pitch_damp) && _flags.is_doing_auto_land) {
+        pitch_damp = _land_pitch_damp;
+    }
     temp += SEBdot_error * pitch_damp;
 
     if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
@@ -897,8 +897,17 @@ void AP_TECS::_update_pitch(void)
 
     logging.SEB_delta = integSEB_delta;
     
+    // don't allow the integrator to rise by more than 20% of its full
+    // range in one step. This prevents single value glitches from
+    // causing massive integrator changes. See Issue#4066
     integSEB_delta = constrain_float(integSEB_delta, -integSEB_range*0.1f, integSEB_range*0.1f);
 
+    // prevent the constraint on pitch integrator _integSEB_state from
+    // itself injecting step changes in the variable. We only want the
+    // constraint to prevent large changes due to integSEB_delta, not
+    // to cause step changes due to a change in the constrain
+    // limits. Large steps in _integSEB_state can cause long term
+    // pitch changes
     integSEB_min = MIN(integSEB_min, _integSEB_state);
     integSEB_max = MAX(integSEB_max, _integSEB_state);
 
@@ -917,6 +926,8 @@ void AP_TECS::_update_pitch(void)
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
 
+    // Rate limit the pitch demand to comply with specified vertical
+    // acceleration limit
     float ptchRateIncr = _DT * _vertAccLim / _TAS_state;
 
     if ((_pitch_dem - _last_pitch_dem) > ptchRateIncr)
@@ -932,12 +943,7 @@ void AP_TECS::_update_pitch(void)
     _pitch_dem = constrain_float(_pitch_dem, _PITCHminf, _PITCHmaxf);
 
     _last_pitch_dem = _pitch_dem;
-
-    // AP::logger().Write("TCS4", "TimeUS,seberr,sebderr,pitchc,kdc,kic", "Qfffff",
-    // AP_HAL::micros64(),
-    // SEB_error, SEBdot_error, _pitch_dem, SEBdot_error * pitch_damp, _integSEB_state);
 }
-
 
 void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
 {
@@ -981,8 +987,6 @@ void AP_TECS::_update_STE_rate_lim(void)
 {
     // Calculate Specific Total Energy Rate Limits
     // This is a trivial calculation at the moment but will get bigger once we start adding altitude effects
-    _maxClimbRate = ZenithGains::tecs.hDotMax;
-    _minSinkRate =  ZenithGains::tecs.hDotMin;
     _STEdot_max = _maxClimbRate * GRAVITY_MSS;
     _STEdot_min = - _minSinkRate * GRAVITY_MSS;
 }
@@ -1010,7 +1014,6 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Convert inputs
     _hgt_dem = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
-    printf("TECS cmd: h: %.3f, ais: %.3f\n", _hgt_dem, _EAS_dem);
 
     // Update the speed estimate using a 2nd order complementary filter
     _update_speed(load_factor);
@@ -1022,8 +1025,6 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         _THRmaxf  = aparm.throttle_max * 0.01f;
     }
     _THRminf  = aparm.throttle_min * 0.01f;
-    _THRminf = ZenithGains::tecs.thrMin;
-    _THRmaxf = ZenithGains::tecs.thrMax;
 
     // min of 1% throttle range to prevent a numerical error
     _THRmaxf = MAX(_THRmaxf, _THRminf+0.01);

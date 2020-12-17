@@ -41,12 +41,12 @@ void ModeCruise::update()
         plane.calc_nav_roll();
     }
 
-    // if (plane.landing) {
-    //     plane.auto_throttle_mode = false;
-    //     plane.nav_pitch_cd = (int32_t)(plane.channel_pitch->norm_input() * ControllerData::pitch.maxCmdDeg * 100);
-    //     plane.calc_throttle();
-    // } else
-    //     plane.update_fbwb_speed_height();
+    if (landing) {
+        plane.auto_throttle_mode = false;
+        plane.nav_pitch_cd = (int32_t)(plane.channel_pitch->norm_input() * ControllerData::pitch.maxCmdDeg * 100);
+        plane.calc_throttle();
+    } else
+        plane.update_fbwb_speed_height();
 }
 
 /*

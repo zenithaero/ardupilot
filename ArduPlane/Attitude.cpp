@@ -99,7 +99,6 @@ void Plane::stabilize_roll(float speed_scaler)
     if (control_mode == &mode_stabilize && channel_roll->get_control_in() != 0) {
         disable_integrator = true;
     }
-    // nav_roll_cd = 1000;
     SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, rollController.get_servo_out(nav_roll_cd - ahrs.roll_sensor, 
                                                                                          speed_scaler, 
                                                                                          disable_integrator));
@@ -124,30 +123,15 @@ void Plane::stabilize_pitch(float speed_scaler)
     if (control_mode == &mode_stabilize && channel_pitch->get_control_in() != 0) {
         disable_integrator = true;
     }
-    // demanded_pitch = 0;
 
-    // if LANDING_FLARE RCx_OPTION switch is set and in FW mode, manual throttle,throttle idle then set pitch to LAND_PITCH_CD if flight option FORCE_FLARE_ATTITUDE is set
-    //    if (!quadplane.in_transition() && !control_mode->is_vtol_mode() && channel_throttle->in_trim_dz() && !auto_throttle_mode && flare_mode == FlareMode::ENABLED_PITCH_TARGET) {
-    //        demanded_pitch = landing.get_pitch_cd();
-    //    }
-        
-    // Test program. Get mode / Waypoint?
-    if (control_mode == &mode_cruise) {
-        // Perform pitch maneuver
-        // demanded_pitch = 1000;
-    }
-    
-    // Step
-    // if (AP_HAL::millis() > 120e3) {
-    //     printf("stepped!\n");
-    //     demanded_pitch = 116 + 500; // 5 deg pitch step
-    // }
-    
-    int32_t pitch = pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator);
-    // int32_t pitch = demanded_pitch;
-    // printf("pitchCmd %.2f sensed %.2f elev %.2f\n", demanded_pitch / 100.f, ahrs.pitch_sensor / 100.f, pitch / 100.f);
-    
-    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitch);
+   // if LANDING_FLARE RCx_OPTION switch is set and in FW mode, manual throttle,throttle idle then set pitch to LAND_PITCH_CD if flight option FORCE_FLARE_ATTITUDE is set
+   if (!quadplane.in_transition() && !control_mode->is_vtol_mode() && channel_throttle->in_trim_dz() && !auto_throttle_mode && flare_mode == FlareMode::ENABLED_PITCH_TARGET) {
+       demanded_pitch = landing.get_pitch_cd();
+   }
+
+    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, 
+                                                                                           speed_scaler, 
+                                                                                           disable_integrator));
 }
 
 /*
@@ -505,7 +489,7 @@ void Plane::calc_throttle()
         return;
     }
 
-    int32_t commanded_throttle = (int32_t)(zenith_controller.spd_alt_controller.thr_command * 100);
+    int32_t commanded_throttle = SpdHgt_Controller->get_throttle_demand();
 
     // Received an external msg that guides throttle in the last 3 seconds?
     if (control_mode->is_guided_mode() &&
@@ -514,9 +498,6 @@ void Plane::calc_throttle()
         commanded_throttle = plane.guided_state.forced_throttle;
     }
 
-    // Override speed controller in cruise landing mode
-    if (control_mode == &mode_cruise && mode_cruise.landing)
-        commanded_throttle = get_throttle_input(true);
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, commanded_throttle);
 }
 
@@ -624,6 +605,7 @@ void Plane::calc_nav_pitch()
 
     
     int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
+
     // Received an external msg that guides roll in the last 3 seconds?
     if (control_mode->is_guided_mode() &&
             plane.guided_state.last_forced_rpy_ms.y > 0 &&
@@ -631,8 +613,7 @@ void Plane::calc_nav_pitch()
         commanded_pitch = plane.guided_state.forced_rpy_cd.y;
     }
 
-    // nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
-    nav_pitch_cd = commanded_pitch;
+    nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
 }
 
 

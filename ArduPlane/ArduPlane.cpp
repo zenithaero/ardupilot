@@ -239,6 +239,7 @@ void Plane::update_logging2(void)
         logger.Write_Vibration();
 }
 
+
 /*
   check for AFS failsafe check
  */
