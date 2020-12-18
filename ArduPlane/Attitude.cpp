@@ -473,10 +473,10 @@ void Plane::stabilize()
 void Plane::calc_throttle()
 {
     // ZenithController - update throttle
-    int32_t commanded_throttle = (int32_t)(zenith_controller.spd_alt_controller.thr_command * 100);
+    int32_t thr = (int32_t)(zenith_controller.spd_alt_controller.thr_command * 100);
     if (control_mode == &mode_cruise && mode_cruise.landing)
-        commanded_throttle = get_throttle_input(true);
-    SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, commanded_throttle);
+        thr = get_throttle_input(true);
+    SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, thr);
     
     // Skip legacy function -------------
     return;

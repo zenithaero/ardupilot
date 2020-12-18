@@ -5,6 +5,7 @@
  */
 
 #include "SpdAltController.h"
+#include "ControllerCommon.cpp"
 
 const char* spdAltFields[] = {"hErr", "hErrInt", "tasErr", "tasErrInt", "hDotErr", "<thetaDeg>", "<qDeg>"};
 

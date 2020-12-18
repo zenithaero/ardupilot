@@ -5,6 +5,7 @@
  */
 
 #include "AttitudeController.h"
+#include "ControllerCommon.cpp"
 
 const char* pitchFields[] = {"thetaErrDeg", "thetaErrInt", "<qDeg>"}; // , "<hDot>"},
 
