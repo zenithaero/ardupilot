@@ -5,17 +5,17 @@
 class SpdAltController: public LinearController {
 public:
     SpdAltController(AP_AHRS &ahrs);
-    void update(float tas_cmd, float h_cmd);
+    void update(float tas_cmd, float h_cmd, const Accel &accel_max);
 
     // Output
     float pitch_command;
-    float thr_command;
+    float ax_command;
     log_SpdAltCtrl log;
 
 private:
     float h_err_i; // Integrator state
     float tas_err_i; // Integrator state
-    int thr_saturation; // Throttle saturation state [-1, 0, 1]
+    int ax_saturation; // Ax saturation state [-1, 0, 1]
     int pitch_saturation; // Pitch saturation state [-1, 0, 1]
 };
 

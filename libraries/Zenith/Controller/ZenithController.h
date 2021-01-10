@@ -3,6 +3,7 @@
 #include "ControllerCommon.h"
 #include "AttitudeController.h"
 #include "SpdAltController.h"
+#include "ActuatorAllocation.h"
 
 class ZenithController {
 public:
@@ -37,6 +38,9 @@ public:
     PitchController pitch_controller;
     RollYawController roll_yaw_controller;
     SpdAltController spd_alt_controller;
+
+    // Allocator
+    ActuatorAllocation actuator_allocation;
 
     // Log structures
     log_AhrsCtrl log;

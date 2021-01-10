@@ -13,7 +13,8 @@ ZenithController::ZenithController(AP_AHRS &_ahrs) :
 	ahrs(_ahrs),
 	pitch_controller(_ahrs),
 	roll_yaw_controller(_ahrs),
-	spd_alt_controller(_ahrs)  {
+	spd_alt_controller(_ahrs),
+	actuator_allocation(_ahrs) {
 	// Init doublet handlers (channel, deflection, duration, settle_time)
 	ail_doublet = DoubletHandler(SRV_Channel::k_aileron, 2, 1, 5); 
 	elev_doublet = DoubletHandler(SRV_Channel::k_elevator, 2, 1, 5);
@@ -68,6 +69,17 @@ void ZenithController::update(bool should_update_spd_alt,
 		stabilize_pitch(theta_cmd_deg);
 		stabilize_rollyaw(roll_cmd_deg, rudder_cmd_deg);
 	}
+
+	// Now run allocator
+	Accel accel_cmd(
+		Vector3f(spd_alt_controller.ax_command, 0.f, 0.f),
+		Vector3f(
+			roll_yaw_controller.rx_command,
+			pitch_controller.ry_command,
+			roll_yaw_controller.rz_command
+		)
+	);
+	actuator_allocation.allocate(accel_cmd, rudder_cmd_deg);
 }
 
 
@@ -89,23 +101,23 @@ void ZenithController::stabilize_pitch(float theta_cmd_deg) {
 	// 	exit(-1);
 
 	// Execute doublets if needed
-	bool elev_doublet_active = elev_doublet.udpate(pitch_controller.elev_command);
+	bool elev_doublet_active = elev_doublet.udpate(actuator_allocation.elev_cmd);
 
 	// Stabilize pitch, roll & yaw
 	if (!elev_doublet_active) {
 		active_logs |= ZenithController::PITCH_MASK;
-		pitch_controller.update(theta_cmd_deg);
+		pitch_controller.update(theta_cmd_deg, actuator_allocation.accel_max);
 	}
 }
 
 void ZenithController::stabilize_rollyaw(float phi_cmd_deg, float rudder_deg) {
 	// Execute doublets if needed
-	bool ail_doublet_active = ail_doublet.udpate(roll_yaw_controller.ail_command);
-	bool rud_doublet_active = rud_doublet.udpate(roll_yaw_controller.rud_command);
+	bool ail_doublet_active = ail_doublet.udpate(actuator_allocation.ail_cmd);
+	bool rud_doublet_active = rud_doublet.udpate(actuator_allocation.rud_cmd);
 
 	if (!ail_doublet_active && !rud_doublet_active) {
 		active_logs |= ZenithController::ROLLYAW_MASK;
-		roll_yaw_controller.update(phi_cmd_deg, rudder_deg);
+		roll_yaw_controller.update(phi_cmd_deg, actuator_allocation.accel_max);
 	}
 }
 
@@ -125,7 +137,7 @@ void ZenithController::update_spd_alt(float tas_cmd, float h_cmd) {
 	// if (dt > 160)
 	// 	exit(-1);
 
-	spd_alt_controller.update(tas_cmd, h_cmd);
+	spd_alt_controller.update(tas_cmd, h_cmd, actuator_allocation.accel_max);
 }
 
 void ZenithController::log_ahrs() {

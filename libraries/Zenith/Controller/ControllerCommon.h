@@ -12,6 +12,16 @@
 #include <Zenith/Utils/Interp.h>
 #include <Zenith/constants.h>
 
+class Accel {
+public:
+    Vector3f lin;
+    Vector3f rot;
+
+    Accel() {};
+
+    Accel(Vector3f _lin, Vector3f _rot): lin(_lin), rot(_rot) {};
+};
+
 class LinearController {
 public:
     template<size_t n, size_t n_tas, size_t n_k>

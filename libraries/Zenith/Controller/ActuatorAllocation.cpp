@@ -22,40 +22,32 @@ void AllocationTable::update() {
 	LinearController::update();
 }
 
-// float AllocationTable::tasFiltered() {
-// 	return tas_filter.get();
-// }
+ActuatorAllocation::ActuatorAllocation(AP_AHRS &_ahrs) : ahrs(_ahrs), table(ahrs) {}
 
-ActuatorAllocation::ActuatorAllocation(AP_AHRS &_ahrs) : ahrs(_ahrs), table(ahrs) {
-	
-}
+ActuatorAllocation::~ActuatorAllocation() {}
 
-ActuatorAllocation::~ActuatorAllocation() {
-}
-
-void ActuatorAllocation::allocate(Vector3f linAccel, Vector3f rotAccel) {
+void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 	// Update table
 	table.update();
 
 	// Compute qbar
-	float tas = table.tas_filter.get();
+	float tas = table.tas_value[0];
 	float qbar = tas * tas * 0.5 * 1.225;
 	float qbarInv = 1.f / MAX(qbar, 1e-3);
 
-
 	// Prepare the command vector
 	std::vector<float> vec = {
-		linAccel.x,
-		linAccel.y,
-		linAccel.z,
-		rotAccel.x,
-		rotAccel.y,
-		rotAccel.z
+		accel.lin.x,
+		accel.lin.y,
+		accel.lin.z,
+		accel.rot.x,
+		accel.rot.y,
+		accel.rot.z
 	};
 
 	// Compute the controller output
 	std::vector<float> res = matmul(table.K, vec);
-	const float n = DIM(ControllerData::alloc.max);
+	const size_t n = DIM(ControllerData::alloc.max);
 	if (soft_assert(res.size() == n, "Invalid output size %lu\n", res.size()))
 		return;
 
@@ -65,6 +57,7 @@ void ActuatorAllocation::allocate(Vector3f linAccel, Vector3f rotAccel) {
 	}
 
 	// Compute max accelerations to avoid exceeding values
+	float a_max[6];
 	for (size_t i = 0; i < vec.size(); i ++) {
 		float max_val = 0.f;
 		for (size_t j = 0; j < n; j++) {
@@ -73,19 +66,29 @@ void ActuatorAllocation::allocate(Vector3f linAccel, Vector3f rotAccel) {
 			float sub_max = alloc_max / kij;
 			max_val = MAX(max_val, sub_max);
 		}
-		max_accel[i] = max_val;
+		a_max[i] = max_val;
 	}
+	accel_max.lin = Vector3f(a_max[0], a_max[1], a_max[2]);
+	accel_max.rot = Vector3f(a_max[3], a_max[4], a_max[5]);
+
+	// Add feedforward
+	float thr_left_ff = table.tas_interp->get(ControllerData::trim.thrLeft, DIM(ControllerData::trim.thrLeft), table.tas_value);
+	float thr_right_ff = table.tas_interp->get(ControllerData::trim.thrRight, DIM(ControllerData::trim.thrRight), table.tas_value);
+	float thr_ail_ff = table.tas_interp->get(ControllerData::trim.ailDeg, DIM(ControllerData::trim.ailDeg), table.tas_value);
+	float thr_elev_ff = table.tas_interp->get(ControllerData::trim.elevDeg, DIM(ControllerData::trim.elevDeg), table.tas_value);
+	float thr_rud_ff = table.tas_interp->get(ControllerData::trim.rudDeg, DIM(ControllerData::trim.rudDeg), table.tas_value);
+
+	// Set commands
+	thr_left_cmd = res[0] + thr_left_ff;
+	thr_right_cmd = res[1] + thr_right_ff;
+	ail_cmd = res[2] + thr_ail_ff;
+	elev_cmd = res[3] + thr_elev_ff;
+	rud_cmd = res[4] + thr_rud_ff + rudder_cmd_deg;
 
 	// Res gives allocation. Deal the allocation back to the actuators
-	// TODO Zenith: Make generic
-	// 0 - throttle
-	// 1 - throttle
-	// 2 - ail
-	// 3 - elev
-	// 4 - rudder
-	SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, (int16_t)(res[0] * 100));
-	// SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, (int16_t)(res[1] * 100));
-	SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, (int16_t)(res[2] * 100));
-	SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, (int16_t)(res[3] * 100));
-	SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, (int16_t)(res[4] * 100));
+	SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, (int16_t)(thr_left_cmd * 100));
+	SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, (int16_t)(thr_right_cmd * 100));
+	SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, (int16_t)(ail_cmd * 100));
+	SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, (int16_t)(elev_cmd * 100));
+	SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, (int16_t)(rud_cmd * 100));
 }

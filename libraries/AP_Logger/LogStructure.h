@@ -568,8 +568,7 @@ struct PACKED log_PitchCtrl {
     float theta_err_deg;
     float theta_err_i;
     float max_i;
-    float elev_ff;
-    float elev_cmd;
+    float ry_cmd;
 };
 
 struct PACKED log_RollYawCtrl {
@@ -579,10 +578,8 @@ struct PACKED log_RollYawCtrl {
     float phi_err_deg;
     float phi_err_i;
     float max_i;
-    float ail_ff;
-    float rud_ff;
-    float ail_cmd;
-    float rud_cmd;
+    float rx_cmd;
+    float rz_cmd;
 };
 
 struct PACKED log_SpdAltCtrl {
@@ -597,9 +594,8 @@ struct PACKED log_SpdAltCtrl {
     float max_i_h;
     float max_i_tas;
     float pitch_ff;
-    float thr_ff;
     float pitch_cmd;
-    float thr_cmd;
+    float ax_cmd;
 };
 
 struct PACKED log_Current {
@@ -2098,11 +2094,11 @@ LOG_STRUCTURE_FROM_NAVEKF3 \
     { LOG_AHRS_CTRL_MSG, sizeof(log_AhrsCtrl), \
       "AHRS", "Qffffffffffff", "TimeUS,phi,theta,psi,gx,gy,gz,vn,ve,vd,pn,pe,pd", "s------------", "F------------" }, \
     { LOG_PITCH_CTRL_MSG, sizeof(log_PitchCtrl), \
-      "PCTL", "Qffffff", "TimeUS,cmd,err,errI,maxI,elevFF,elevCmd", "s------", "F------" }, \
+      "PCTL", "Qfffff", "TimeUS,cmd,err,errI,maxI,ryCmd", "s------", "F------" }, \
     { LOG_ROLLYAW_CTRL_MSG, sizeof(log_RollYawCtrl), \
-      "RCTL", "Qffffffff", "TimeUS,cmd,err,errI,maxI,ailFF,rudFF,ailCmd,rudCmd", "s--------", "F--------" }, \
+      "RCTL", "Qffffff", "TimeUS,cmd,err,errI,maxI,rxCmd,rzCmd", "s--------", "F--------" }, \
     { LOG_SPDALT_CTRL_MSG, sizeof(log_SpdAltCtrl), \
-      "SCTL", "Qffffffffffff", "TimeUS,hCd,tCd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,thrFF,pCd,thrCd", "s------------", "F------------" }, \
+      "SCTL", "Qfffffffffff", "TimeUS,hCmd,tCmd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,pCmd,axCmd", "s------------", "F------------" }, \
     { LOG_WINCH_MSG, sizeof(log_Winch), \
       "WINC", "QBBBBBfffHfb", "TimeUS,Heal,ThEnd,Mov,Clut,Mode,DLen,Len,DRate,Tens,Vcc,Temp", "s-----mmn?vO", "F-----000000" }, \
     { LOG_PSC_MSG, sizeof(log_PSC), \
