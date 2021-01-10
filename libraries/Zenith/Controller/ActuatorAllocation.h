@@ -25,6 +25,7 @@ public:
 protected:
 	AP_AHRS &ahrs;
     AllocationTable table;
+    std::vector<float> max_accel = std::vector<float>(6, 0.f);
 
     void allocate(Vector3f linAccel, Vector3f rotAccel);
 };
