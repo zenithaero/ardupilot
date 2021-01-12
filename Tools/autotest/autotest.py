@@ -758,7 +758,7 @@ if __name__ == "__main__":
                       action='store_true',
                       help='enable experimental tests')
     parser.add_option("--timeout",
-                      default=3600,
+                      default=5400,
                       type='int',
                       help='maximum runtime in seconds')
     parser.add_option("--frame",
@@ -1040,8 +1040,9 @@ if __name__ == "__main__":
         if not run_tests(steps_to_run):
             sys.exit(1)
     except KeyboardInterrupt:
+        print("KeyboardInterrupt caught; closing pexpect connections")
         util.pexpect_close_all()
-        sys.exit(1)
+        raise
     except Exception:
         # make sure we kill off any children
         util.pexpect_close_all()

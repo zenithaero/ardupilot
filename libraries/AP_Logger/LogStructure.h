@@ -120,6 +120,9 @@ const struct MultiplierStructure log_Multipliers[] = {
 #include <AP_DAL/LogStructure.h>
 #include <AP_NavEKF2/LogStructure.h>
 #include <AP_NavEKF3/LogStructure.h>
+#include <AP_BattMonitor/LogStructure.h>
+
+#include <AP_AHRS/LogStructure.h>
 
 // structure used to define logging format
 struct LogStructure {
@@ -374,28 +377,6 @@ struct PACKED log_Optflow {
     float body_y;
 };
 
-struct PACKED log_AHRS {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    int16_t roll;
-    int16_t pitch;
-    uint16_t yaw;
-    float alt;
-    int32_t lat;
-    int32_t lng;
-    float q1, q2, q3, q4;
-};
-
-struct PACKED log_POS {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    int32_t lat;
-    int32_t lng;
-    float alt;
-    float rel_home_alt;
-    float rel_origin_alt;
-};
-
 struct PACKED log_POWR {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -514,19 +495,6 @@ struct PACKED log_Camera {
     uint16_t yaw;
 };
 
-struct PACKED log_Attitude {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    int16_t  control_roll;
-    int16_t  roll;
-    int16_t  control_pitch;
-    int16_t  pitch;
-    uint16_t control_yaw;
-    uint16_t yaw;
-    uint16_t error_rp;
-    uint16_t error_yaw;
-};
-
 struct PACKED log_PID {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -538,7 +506,9 @@ struct PACKED log_PID {
     float   D;
     float   FF;
     float   Dmod;
+    uint8_t limit;
 };
+
 
 struct PACKED log_AhrsCtrl {
   LOG_PACKET_HEADER;
@@ -598,19 +568,6 @@ struct PACKED log_SpdAltCtrl {
     float ax_cmd;
 };
 
-struct PACKED log_Current {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    uint8_t  instance;
-    float    voltage;
-    float    voltage_resting;
-    float    current_amps;
-    float    current_total;
-    float    consumed_wh;
-    int16_t  temperature; // degrees C * 100
-    float    resistance;
-};
-
 struct PACKED log_WheelEncoder {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -631,14 +588,6 @@ struct PACKED log_ADSB {
     uint16_t hor_velocity;
     int16_t ver_velocity;
     uint16_t squawk;
-};
-
-struct PACKED log_Current_Cells {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    uint8_t  instance;
-    float    voltage;
-    uint16_t cell_voltages[12];
 };
 
 struct PACKED log_MAG {
@@ -770,6 +719,7 @@ struct PACKED log_Esc {
     int16_t esc_temp;
     uint16_t current_tot;
     int16_t motor_temp;
+    float error_rate;
 };
 
 struct PACKED log_CSRV {
@@ -846,37 +796,11 @@ struct PACKED log_MAV_Stats {
     // uint8_t state_retry_max;
 };
 
-struct PACKED log_ORGN {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    uint8_t origin_type;
-    int32_t latitude;
-    int32_t longitude;
-    int32_t altitude;
-};
-
 struct PACKED log_RPM {
     LOG_PACKET_HEADER;
     uint64_t time_us;
     float rpm1;
     float rpm2;
-};
-
-struct PACKED log_Rate {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    float   control_roll;
-    float   roll;
-    float   roll_out;
-    float   control_pitch;
-    float   pitch;
-    float   pitch_out;
-    float   control_yaw;
-    float   yaw;
-    float   yaw_out;
-    float   control_accel;
-    float   accel;
-    float   accel_out;
 };
 
 struct PACKED log_SbpLLH {
@@ -940,13 +864,6 @@ struct PACKED log_Rally {
     int32_t latitude;
     int32_t longitude;
     int16_t altitude;
-};
-
-struct PACKED log_AOA_SSA {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    float AOA;
-    float SSA;
 };
 
 struct PACKED log_Beacon {
@@ -1126,10 +1043,10 @@ struct PACKED log_PSC {
 #define ISBD_UNITS  "s--ooo"
 #define ISBD_MULTS  "F--???"
 
-#define PID_LABELS "TimeUS,Tar,Act,Err,P,I,D,FF,Dmod"
-#define PID_FMT    "Qffffffff"
-#define PID_UNITS  "s--------"
-#define PID_MULTS  "F--------"
+#define PID_LABELS "TimeUS,Tar,Act,Err,P,I,D,FF,Dmod,Limit"
+#define PID_FMT    "QffffffffB"
+#define PID_UNITS  "s---------"
+#define PID_MULTS  "F---------"
 
 // @LoggerMessage: ACC
 // @Description: IMU accelerometer data
@@ -1151,20 +1068,6 @@ struct PACKED log_PSC {
 // @Field: Hor_vel: Vehicle horizontal velocity
 // @Field: Ver_vel: Vehicle vertical velocity
 // @Field: Squark: Transponder squawk code
-
-// @LoggerMessage: AHR2
-// @Description: Backup AHRS data
-// @Field: TimeUS: Time since system startup
-// @Field: Roll: Estimated roll
-// @Field: Pitch: Estimated pitch
-// @Field: Yaw: Estimated yaw
-// @Field: Alt: Estimated altitude
-// @Field: Lat: Estimated latitude
-// @Field: Lng: Estimated longitude
-// @Field: Q1: Estimated attitude quaternion component 1
-// @Field: Q2: Estimated attitude quaternion component 2
-// @Field: Q3: Estimated attitude quaternion component 3
-// @Field: Q4: Estimated attitude quaternion component 4
 
 // @LoggerMessage: ARM
 // @Description: Arming status changes
@@ -1188,18 +1091,6 @@ struct PACKED log_PSC {
 // @Field: Hfp: Probability sensor has failed
 // @Field: Pri: True if sensor is the primary sensor
 
-// @LoggerMessage: ATT
-// @Description: Canonical vehicle attitude
-// @Field: TimeUS: Time since system startup
-// @Field: DesRoll: vehicle desired roll
-// @Field: Roll: achieved vehicle roll
-// @Field: DesPitch: vehicle desired pitch
-// @Field: Pitch: achieved vehicle pitch
-// @Field: DesYaw: vehicle desired yaw
-// @Field: Yaw: achieved vehicle yaw
-// @Field: ErrRP: lowest estimated gyro drift error
-// @Field: ErrYaw: difference between measured yaw and DCM yaw estimate
-
 // @LoggerMessage: BARO
 // @Description: Gathered Barometer data
 // @Field: TimeUS: Time since system startup
@@ -1212,36 +1103,6 @@ struct PACKED log_PSC {
 // @Field: Offset: raw adjustment of barometer altitude, zeroed on calibration, possibly set by GCS
 // @Field: GndTemp: temperature on ground, specified by parameter or measured while on ground
 // @Field: Health: true if barometer is considered healthy
-
-// @LoggerMessage: BAT
-// @Description: Gathered battery data
-// @Field: TimeUS: Time since system startup
-// @Field: Instance: battery instance number
-// @Field: Volt: measured voltage
-// @Field: VoltR: estimated resting voltage
-// @Field: Curr: measured current
-// @Field: CurrTot: current * time
-// @Field: EnrgTot: energy this battery has produced
-// @Field: Temp: measured temperature
-// @Field: Res: estimated battery resistance
-
-// @LoggerMessage: BCL
-// @Description: Battery cell voltage information
-// @Field: TimeUS: Time since system startup
-// @Field: Instance: battery instance number
-// @Field: Volt: battery voltage
-// @Field: V1: first cell voltage
-// @Field: V2: second cell voltage
-// @Field: V3: third cell voltage
-// @Field: V4: fourth cell voltage
-// @Field: V5: fifth cell voltage
-// @Field: V6: sixth cell voltage
-// @Field: V7: seventh cell voltage
-// @Field: V8: eighth cell voltage
-// @Field: V9: ninth cell voltage
-// @Field: V10: tenth cell voltage
-// @Field: V11: eleventh cell voltage
-// @Field: V12: twelfth cell voltage
 
 // @LoggerMessage: BCN
 // @Description: Beacon informtaion
@@ -1365,6 +1226,7 @@ struct PACKED log_PSC {
 // @Field: Temp: ESC temperature
 // @Field: CTot: current consumed total
 // @Field: MotTemp: measured motor temperature
+// @Field: Err: error rate
 
 // @LoggerMessage: EV
 // @Description: Specifically coded event messages
@@ -1606,14 +1468,6 @@ struct PACKED log_PSC {
 // @Field: bodyX: derived velocity, X-axis
 // @Field: bodyY: derived velocity, Y-axis
 
-// @LoggerMessage: ORGN
-// @Description: Vehicle navigation origin or other notable position
-// @Field: TimeUS: Time since system startup
-// @Field: Type: Position type
-// @Field: Lat: Position latitude
-// @Field: Lng: Position longitude
-// @Field: Alt: Position altitude
-
 // @LoggerMessage: PARM
 // @Description: parameter value
 // @Field: TimeUS: Time since system startup
@@ -1631,6 +1485,7 @@ struct PACKED log_PSC {
 // @Field: D: derivative part of PID
 // @Field: FF: controller feed-forward portion of response
 // @Field: Dmod: scaler applied to D gain to reduce limit cycling
+// @Field: Limit: 1 if I term is limited due to output saturation 
 
 // @LoggerMessage: PM
 // @Description: autopilot system performance and general data dumping ground
@@ -1647,15 +1502,6 @@ struct PACKED log_PSC {
 // @Field: I2CC: Number of i2c transactions processed
 // @Field: I2CI: Number of i2c interrupts serviced
 // @Field: Ex: number of microseconds being added to each loop to address scheduler overruns
-
-// @LoggerMessage: POS
-// @Description: Canonical vehicle position
-// @Field: TimeUS: Time since system startup
-// @Field: Lat: Canonical vehicle latitude
-// @Field: Lng: Canonical vehicle longitude
-// @Field: Alt: Canonical vehicle altitude
-// @Field: RelHomeAlt: Canonical vehicle altitude relative to home
-// @Field: RelOriginAlt: Canonical vehicle altitude relative to navigation origin
 
 // @LoggerMessage: POWR
 // @Description: System power information
@@ -1701,24 +1547,6 @@ struct PACKED log_PSC {
 // @Field: Lat: latitude of rally point
 // @Field: Lng: longitude of rally point
 // @Field: Alt: altitude of rally point
-
-// @LoggerMessage: RATE
-// @Description: Desired and achieved vehicle attitude rates
-// @Field: TimeUS: Time since system startup
-// @Field: RDes: vehicle desired roll rate
-// @Field: R: achieved vehicle roll rate
-// @Field: ROut: normalized output for Roll
-// @Field: PDes: vehicle desired pitch rate
-// @Field: P: vehicle pitch rate
-// @Field: POut: normalized output for Pitch
-// @Field: YDes: vehicle desired yaw rate
-// @Field: Y: achieved vehicle yaw rate
-// @Field: YOut: normalized output for Yaw
-// @Field: YDes: vehicle desired yaw rate
-// @Field: Y: achieved vehicle yaw rate
-// @Field: ADes: desired vehicle vertical acceleration
-// @Field: A: achieved vehicle vertical acceleration
-// @Field: AOut: percentage of vertical thrust output current being used
 
 // @LoggerMessage: RCIN
 // @Description: RC input channels to vehicle
@@ -1984,12 +1812,7 @@ struct PACKED log_PSC {
     { LOG_TRIGGER_MSG, sizeof(log_Camera), \
       "TRIG", "QIHLLeeeccC","TimeUS,GPSTime,GPSWeek,Lat,Lng,Alt,RelAlt,GPSAlt,Roll,Pitch,Yaw", "s--DUmmmddd", "F--GGBBBBBB" }, \
     { LOG_ARSP_MSG, sizeof(log_ARSP), "ARSP",  "QBffcffBBfB", "TimeUS,I,Airspeed,DiffPress,Temp,RawPress,Offset,U,H,Hfp,Pri", "s#nPOPP----", "F-00B00----" }, \
-    { LOG_CURRENT_MSG, sizeof(log_Current),                     \
-      "BAT", "QBfffffcf", "TimeUS,Instance,Volt,VoltR,Curr,CurrTot,EnrgTot,Temp,Res", "s#vvAiJOw", "F-000!/?0" },  \
-    { LOG_CURRENT_CELLS_MSG, sizeof(log_Current_Cells), \
-      "BCL", "QBfHHHHHHHHHHHH", "TimeUS,Instance,Volt,V1,V2,V3,V4,V5,V6,V7,V8,V9,V10,V11,V12", "s#vvvvvvvvvvvvv", "F-0CCCCCCCCCCCC" }, \
-	{ LOG_ATTITUDE_MSG, sizeof(log_Attitude),\
-      "ATT", "QccccCCCC", "TimeUS,DesRoll,Roll,DesPitch,Pitch,DesYaw,Yaw,ErrRP,ErrYaw", "sddddhhdh", "FBBBBBBBB" }, \
+    LOG_STRUCTURE_FROM_BATTMONITOR \
     { LOG_MAG_MSG, sizeof(log_MAG), \
       "MAG", "QBhhhhhhhhhBI",    "TimeUS,I,MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOX,MOY,MOZ,Health,S", "s#GGGGGGGGG-s", "F-CCCCCCCCC-F" }, \
     { LOG_MODE_MSG, sizeof(log_Mode), \
@@ -1999,7 +1822,7 @@ struct PACKED log_PSC {
     { LOG_MAV_STATS, sizeof(log_MAV_Stats), \
       "DMS", "QIIIIBBBBBBBBB",         "TimeUS,N,Dp,RT,RS,Fa,Fmn,Fmx,Pa,Pmn,Pmx,Sa,Smn,Smx", "s-------------", "F-------------" }, \
     { LOG_BEACON_MSG, sizeof(log_Beacon), \
-      "BCN", "QBBfffffff",  "TimeUS,Health,Cnt,D0,D1,D2,D3,PosX,PosY,PosZ", "s--mmmmmmm", "F--BBBBBBB" }, \
+      "BCN", "QBBfffffff",  "TimeUS,Health,Cnt,D0,D1,D2,D3,PosX,PosY,PosZ", "s--mmmmmmm", "F--0000000" }, \
     { LOG_PROXIMITY_MSG, sizeof(log_Proximity), \
       "PRX", "QBfffffffffff", "TimeUS,Health,D0,D45,D90,D135,D180,D225,D270,D315,DUp,CAn,CDis", "s-mmmmmmmmmhm", "F-00000000000" }, \
     { LOG_PERFORMANCE_MSG, sizeof(log_Performance),                     \
@@ -2012,10 +1835,6 @@ struct PACKED log_PSC {
       "OADJ","QBBBBLLLL","TimeUS,State,Err,CurrPoint,TotPoints,DLat,DLng,OALat,OALng", "sbbbbDUDU", "F----GGGG" }, \
     { LOG_SIMPLE_AVOID_MSG, sizeof(log_SimpleAvoid), \
       "SA",  "QBffffB","TimeUS,State,DVelX,DVelY,MVelX,MVelY,Back", "sbnnnnb", "F------"}, \
-    { LOG_AHR2_MSG, sizeof(log_AHRS), \
-      "AHR2","QccCfLLffff","TimeUS,Roll,Pitch,Yaw,Alt,Lat,Lng,Q1,Q2,Q3,Q4","sddhmDU????", "FBBB0GG????" }, \
-    { LOG_POS_MSG, sizeof(log_POS), \
-      "POS","QLLfff","TimeUS,Lat,Lng,Alt,RelHomeAlt,RelOriginAlt", "sDUmmm", "FGG000" }, \
     { LOG_SIMSTATE_MSG, sizeof(log_AHRS), \
       "SIM","QccCfLLffff","TimeUS,Roll,Pitch,Yaw,Alt,Lat,Lng,Q1,Q2,Q3,Q4", "sddhmDU????", "FBBB0GG????" }, \
     { LOG_TERRAIN_MSG, sizeof(log_TERRAIN), \
@@ -2031,7 +1850,7 @@ struct PACKED log_PSC {
     { LOG_GPS_RAWS_MSG, sizeof(log_GPS_RAWS), \
       "GRXS", "QddfBBBHBBBBB", "TimeUS,prMes,cpMes,doMes,gnss,sv,freq,lock,cno,prD,cpD,doD,trk", "s------------", "F------------" }, \
     { LOG_ESC_MSG, sizeof(log_Esc), \
-      "ESC",  "QBeCCcHc", "TimeUS,Instance,RPM,Volt,Curr,Temp,CTot,MotTemp", "s#qvAO-O", "F-BBBB-B" }, \
+      "ESC",  "QBeCCcHcf", "TimeUS,Instance,RPM,Volt,Curr,Temp,CTot,MotTemp,Err", "s#qvAO-O%", "F-BBBB-B-" }, \
     { LOG_CSRV_MSG, sizeof(log_CSRV), \
       "CSRV","QBfffB","TimeUS,Id,Pos,Force,Speed,Pow", "s#---%", "F-0000" }, \
     { LOG_CESC_MSG, sizeof(log_CESC), \
@@ -2058,17 +1877,14 @@ struct PACKED log_PSC {
       "ISBH",ISBH_FMT,ISBH_LABELS,ISBH_UNITS,ISBH_MULTS },  \
     { LOG_ISBD_MSG, sizeof(log_ISBD), \
       "ISBD",ISBD_FMT,ISBD_LABELS, ISBD_UNITS, ISBD_MULTS }, \
-    { LOG_ORGN_MSG, sizeof(log_ORGN), \
-      "ORGN","QBLLe","TimeUS,Type,Lat,Lng,Alt", "s-DUm", "F-GGB" },   \
 LOG_STRUCTURE_FROM_DAL \
 LOG_STRUCTURE_FROM_NAVEKF2 \
 LOG_STRUCTURE_FROM_NAVEKF3 \
+LOG_STRUCTURE_FROM_AHRS \
     { LOG_DF_FILE_STATS, sizeof(log_DSF), \
       "DSF", "QIHIIII", "TimeUS,Dp,Blk,Bytes,FMn,FMx,FAv", "s--b---", "F--0---" }, \
     { LOG_RPM_MSG, sizeof(log_RPM), \
       "RPM",  "Qff", "TimeUS,rpm1,rpm2", "sqq", "F00" }, \
-    { LOG_RATE_MSG, sizeof(log_Rate), \
-      "RATE", "Qffffffffffff",  "TimeUS,RDes,R,ROut,PDes,P,POut,YDes,Y,YOut,ADes,A,AOut", "skk-kk-kk-oo-", "F?????????BB-" }, \
     { LOG_RALLY_MSG, sizeof(log_Rally), \
       "RALY", "QBBLLh", "TimeUS,Tot,Seq,Lat,Lng,Alt", "s--DUm", "F--GGB" },  \
     { LOG_MAV_MSG, sizeof(log_MAV),   \
@@ -2150,7 +1966,7 @@ enum LogMessages : uint8_t {
     LOG_RSSI_MSG,
     LOG_BARO_MSG,
     LOG_POWR_MSG,
-    LOG_AHR2_MSG,
+    LOG_IDS_FROM_AHRS,
     LOG_SIMSTATE_MSG,
     LOG_CMD_MSG,
     LOG_MAVLINK_COMMAND_MSG,
@@ -2164,9 +1980,7 @@ enum LogMessages : uint8_t {
     LOG_CSRV_MSG,
     LOG_CESC_MSG,
     LOG_ARSP_MSG,
-    LOG_ATTITUDE_MSG,
-    LOG_CURRENT_MSG,
-    LOG_CURRENT_CELLS_MSG,
+    LOG_IDS_FROM_BATTMONITOR,
     LOG_MAG_MSG,
     LOG_MODE_MSG,
     LOG_GPS_RAW_MSG,
@@ -2181,7 +1995,6 @@ enum LogMessages : uint8_t {
     LOG_GPS_RAWS_MSG,
     LOG_ACC_MSG,
     LOG_GYR_MSG,
-    LOG_POS_MSG,
     LOG_PIDR_MSG,
     LOG_PIDP_MSG,
     LOG_PIDY_MSG,
@@ -2189,7 +2002,6 @@ enum LogMessages : uint8_t {
     LOG_PIDS_MSG,
     LOG_DSTL_MSG,
     LOG_VIBE_MSG,
-    LOG_ORGN_MSG,
     LOG_RPM_MSG,
     LOG_GPA_MSG,
     LOG_RFND_MSG,
@@ -2208,11 +2020,9 @@ enum LogMessages : uint8_t {
     LOG_MSG_SBPEVENT,
     LOG_TRIGGER_MSG,
 
-    LOG_RATE_MSG,
     LOG_RALLY_MSG,
     LOG_VISUALODOM_MSG,
     LOG_VISUALPOS_MSG,
-    LOG_AOA_SSA_MSG,
     LOG_BEACON_MSG,
     LOG_PROXIMITY_MSG,
     LOG_DF_FILE_STATS,

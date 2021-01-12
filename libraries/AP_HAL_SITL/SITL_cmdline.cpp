@@ -38,6 +38,7 @@
 // #include <SITL/SIM_Z1_Wrapper.h>
 #include <Zenith/Simulator/ZenithSim.h>
 #include <SITL/SIM_JSON.h>
+#include <AP_Filesystem/AP_Filesystem.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -83,6 +84,7 @@ void SITL_State::_usage(void)
            "\t--synthetic-clock|-S     set synthetic clock mode\n"
            "\t--home|-O HOME           set start location (lat,lng,alt,yaw)\n"
            "\t--state|-x STATE         set start state as a json { lat, lng, alt, pitch, roll, yaw }\n"
+           "\t--home|-O HOME           set start location (lat,lng,alt,yaw) or location name\n"
            "\t--model|-M MODEL         set simulation model\n"
            "\t--config string          set additional simulation config string\n"
            "\t--fg|-F ADDRESS          set Flight Gear view address, defaults to 127.0.0.1\n"
@@ -307,8 +309,12 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     while (!is_replay && (opt = gopt.getoption()) != -1) {
         switch (opt) {
         case 'w':
+#if HAL_LOGGING_FILESYSTEM_ENABLED
             AP_Param::erase_all();
+#endif
+#if HAL_LOGGING_SITL_ENABLED
             unlink(AP_Logger_SITL::filename);
+#endif
             break;
         case 'u':
             AP_Param::set_hide_disabled_groups(false);
@@ -449,7 +455,12 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             if (home_str != nullptr) {
                 Location home;
                 float home_yaw;
-                if (!parse_home(home_str, home, home_yaw)) {
+                if (strchr(home_str,',') == nullptr) {
+                    if (!lookup_location(home_str, home, home_yaw)) {
+                        ::printf("Failed to find location (%s).  Should be in locations.txt or LAT,LON,ALT,HDG e.g. 37.4003371,-122.0800351,0,353\n", home_str);
+                        exit(1);
+                    }
+                } else if (!parse_home(home_str, home, home_yaw)) {
                     ::printf("Failed to parse home string (%s).  Should be LAT,LON,ALT,HDG e.g. 37.4003371,-122.0800351,0,353\n", home_str);
                     exit(1);
                 }
@@ -625,4 +636,38 @@ bool SITL_State::parse_test_case(const char *test_case_fname, SITL_State::test_c
     return true;
 }
 
+/*
+  lookup a location in locations.txt in ROMFS
+ */
+bool SITL_State::lookup_location(const char *home_str, Location &loc, float &yaw_degrees)
+{
+    const char *locations = "@ROMFS/locations.txt";
+    FileData *fd = AP::FS().load_file(locations);
+    if (fd == nullptr) {
+        ::printf("Missing %s\n", locations);
+        return false;
+    }
+    char *str = strndup((const char *)fd->data, fd->length);
+    if (!str) {
+        delete fd;
+        return false;
+    }
+    size_t len = strlen(home_str);
+    char *saveptr = nullptr;
+    for (char *s = strtok_r(str, "\r\n", &saveptr);
+         s;
+         s=strtok_r(nullptr, "\r\n", &saveptr)) {
+        if (strncasecmp(s, home_str, len) == 0 && s[len]=='=') {
+            bool ok = parse_home(&s[len+1], loc, yaw_degrees);
+            free(str);
+            delete fd;
+            return ok;
+        }
+    }
+    free(str);
+    delete fd;
+    ::printf("Failed to find location '%s'\n", home_str);
+    return false;
+}
+    
 #endif

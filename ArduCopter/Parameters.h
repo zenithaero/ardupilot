@@ -218,6 +218,9 @@ public:
         k_param_takeoff_trigger_dz_old,
         k_param_gcs3,
         k_param_gcs_pid_mask,    // 126
+        k_param_gcs4,
+        k_param_gcs5,
+        k_param_gcs6,
 
         //
         // 135 : reserved for Solo until features merged with master
@@ -315,6 +318,7 @@ public:
         k_param_flight_mode6,
         k_param_simple_modes,
         k_param_flight_mode_chan,
+        k_param_initial_mode,
 
         //
         // 210: Waypoint data
@@ -404,9 +408,11 @@ public:
 
     AP_Int8         wp_yaw_behavior;            // controls how the autopilot controls yaw during missions
 
+#if MODE_POSHOLD_ENABLED == ENABLED
     AP_Int16        poshold_brake_rate;         // PosHold flight mode's rotation rate during braking in deg/sec
     AP_Int16        poshold_brake_angle_max;    // PosHold flight mode's max lean angle during braking in centi-degrees
-    
+#endif
+
     // Waypoints
     //
     AP_Int32        rtl_loiter_time;
@@ -431,6 +437,7 @@ public:
     AP_Int8         flight_mode6;
     AP_Int8         simple_modes;
     AP_Int8         flight_mode_chan;
+    AP_Int8         initial_mode;
 
     // Misc
     //

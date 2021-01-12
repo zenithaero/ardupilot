@@ -4,6 +4,7 @@
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
+#include <AP_Math/AP_Math.h>
 
 #define NUM_RC_CHANNELS 16
 
@@ -189,6 +190,7 @@ public:
         LANDING_FLARE =       89, // force flare, throttle forced idle, pitch to LAND_PITCH_CD, tilts up
         EKF_POS_SOURCE =      90, // change EKF position source between primary, secondary and tertiary sources
         ARSPD_CALIBRATE=      91, // calibrate airspeed ratio 
+        FBWA =                92, // Fly-By-Wire-A
 
         // entries from 100 onwards are expected to be developer
         // options used for testing
@@ -426,8 +428,22 @@ public:
         return _options & uint32_t(Option::ARMING_SKIP_CHECK_RPY);
     }
 
-    float override_timeout_ms() const {
-        return _override_timeout.get() * 1e3f;
+
+    // returns true if overrides should time out.  If true is returned
+    // then returned_timeout_ms will contain the timeout in
+    // milliseconds, with 0 meaning overrides are disabled.
+    bool get_override_timeout_ms(uint32_t &returned_timeout_ms) const {
+        const float value = _override_timeout.get();
+        if (is_positive(value)) {
+            returned_timeout_ms = uint32_t(value * 1e3f);
+            return true;
+        }
+        if (is_zero(value)) {
+            returned_timeout_ms = 0;
+            return true;
+        }
+        // overrides will not time out
+        return false;
     }
 
     // get mask of enabled protocols

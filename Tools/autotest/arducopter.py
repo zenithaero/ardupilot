@@ -1640,38 +1640,43 @@ class AutoTestCopter(AutoTest):
 
         self.takeoff(10, mode="LOITER")
 
-        self.mavproxy.send('mode CIRCLE\n')
-        self.wait_mode('CIRCLE')
+        self.change_mode('CIRCLE')
 
         self.delay_sim_time(20)
+
+        self.context_collect("STATUSTEXT")
 
         self.progress("Failing first compass")
         self.set_parameter("SIM_MAG1_FAIL", 1)
 
         # we want for the message twice, one for EK2 and again for EK3
-        self.wait_statustext("IMU0 switching to compass 1")
-        self.wait_statustext("IMU0 switching to compass 1")
+        self.wait_statustext("EKF2 IMU0 switching to compass 1", check_context=True)
+        self.wait_statustext("EKF3 IMU0 switching to compass 1", check_context=True)
         self.progress("compass switch 1 OK")
 
         self.delay_sim_time(2)
 
+        self.context_clear_collection("STATUSTEXT")
+
         self.progress("Failing 2nd compass")
         self.set_parameter("SIM_MAG2_FAIL", 1)
 
-        self.wait_statustext("IMU0 switching to compass 2")
-        self.wait_statustext("IMU0 switching to compass 2")
+        self.wait_statustext("EKF2 IMU0 switching to compass 2", check_context=True)
+        self.wait_statustext("EKF3 IMU0 switching to compass 2", check_context=True)
 
         self.progress("compass switch 2 OK")
 
         self.delay_sim_time(2)
+
+        self.context_clear_collection("STATUSTEXT")
 
         self.progress("Failing 3rd compass")
         self.set_parameter("SIM_MAG3_FAIL", 1)
         self.delay_sim_time(2)
         self.set_parameter("SIM_MAG1_FAIL", 0)
 
-        self.wait_statustext("IMU0 switching to compass 0")
-        self.wait_statustext("IMU0 switching to compass 0")
+        self.wait_statustext("EKF2 IMU0 switching to compass 0", check_context=True)
+        self.wait_statustext("EKF3 IMU0 switching to compass 0", check_context=True)
         self.progress("compass switch 0 OK")
 
         self.do_RTL()
@@ -2147,6 +2152,8 @@ class AutoTestCopter(AutoTest):
 
         self.context_pop()
 
+        self.reboot_sitl()
+
         if ex is not None:
             raise ex
 
@@ -2254,7 +2261,7 @@ class AutoTestCopter(AutoTest):
             self.set_parameter("EK3_SRC2_POSZ", 6)  # External Nav
             self.set_parameter("EK3_SRC2_VELXY", 6) # External Nav
             self.set_parameter("EK3_SRC2_VELZ", 6)  # External Nav
-            self.set_parameter("EK3_SRC2_YAW", 2)   # External Nav
+            self.set_parameter("EK3_SRC2_YAW", 6)   # External Nav
             self.set_parameter("RC7_OPTION", 80)    # RC aux switch 7 set to Viso Align
             self.set_parameter("RC8_OPTION", 90)    # RC aux switch 8 set to EKF source selector
             self.reboot_sitl()
@@ -3143,7 +3150,7 @@ class AutoTestCopter(AutoTest):
     def fly_guided_stop(self,
                         timeout=20,
                         groundspeed_tolerance=0.05,
-                        climb_tolerance=0.001):
+                        climb_tolerance=0.01):
         """stop the vehicle moving in guided mode"""
         self.progress("Stopping vehicle")
         tstart = self.get_sim_time()
@@ -5360,7 +5367,131 @@ class AutoTestCopter(AutoTest):
         if not self.current_onboard_log_contains_message("RFND"):
             raise NotAchievedException("No RFND messages in log")
 
+    def fly_rangefinder_mavlink_distance_sensor(self):
+        self.start_subtest("Test mavlink rangefinder using DISTANCE_SENSOR messages")
+        self.context_push()
+        self.set_parameter('RTL_ALT_TYPE', 0)
+        ex = None
+        try:
+            self.set_parameter("SERIAL5_PROTOCOL", 1)
+            self.set_parameter("RNGFND1_TYPE", 10)
+            self.reboot_sitl()
+            self.set_parameter("RNGFND1_MAX_CM", 32767)
+
+            self.progress("Should be unhealthy while we don't send messages")
+            self.assert_sensor_state(mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION, True, True, False)
+
+            self.progress("Should be healthy while we're sending good messages")
+            tstart = self.get_sim_time()
+            while True:
+                if self.get_sim_time() - tstart > 5:
+                    raise NotAchievedException("Sensor did not come good")
+                self.mav.mav.distance_sensor_send(
+                    0,  # time_boot_ms
+                    10, # min_distance
+                    50, # max_distance
+                    20, # current_distance
+                    mavutil.mavlink.MAV_DISTANCE_SENSOR_LASER, #  type
+                    21, #  id
+                    mavutil.mavlink.MAV_SENSOR_ROTATION_PITCH_270, #  orientation
+                    255  # covariance
+                )
+                if self.sensor_has_state(mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION, True, True, True):
+                    self.progress("Sensor has good state")
+                    break
+                self.delay_sim_time(0.1)
+
+            self.progress("Should be unhealthy again if we stop sending messages")
+            self.delay_sim_time(1)
+            self.assert_sensor_state(mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION, True, True, False)
+
+            self.progress("Landing gear should deploy with current_distance below min_distance")
+            self.change_mode('STABILIZE')
+            self.wait_ready_to_arm()
+            self.arm_vehicle()
+            self.set_parameter("SERVO10_FUNCTION", 29)
+            self.set_parameter("LGR_DEPLOY_ALT", 1)
+            self.set_parameter("LGR_RETRACT_ALT", 10)  # metres
+            self.delay_sim_time(1)  # servo function maps only periodically updated
+#            self.send_debug_trap()
+
+            self.run_cmd(mavutil.mavlink.MAV_CMD_AIRFRAME_CONFIGURATION,
+                         0,
+                         0,  # deploy
+                         0,
+                         0,
+                         0,
+                         0,
+                         0
+            )
+
+            self.mav.mav.distance_sensor_send(
+                0,  # time_boot_ms
+                100, # min_distance (cm)
+                2500, # max_distance (cm)
+                200, # current_distance (cm)
+                mavutil.mavlink.MAV_DISTANCE_SENSOR_LASER, #  type
+                21, #  id
+                mavutil.mavlink.MAV_SENSOR_ROTATION_PITCH_270, #  orientation
+                255  # covariance
+            )
+            self.context_collect("STATUSTEXT")
+            tstart = self.get_sim_time()
+            while True:
+                if self.get_sim_time_cached() - tstart > 5:
+                    raise NotAchievedException("Retraction did not happen")
+                self.mav.mav.distance_sensor_send(
+                    0,  # time_boot_ms
+                    100, # min_distance (cm)
+                    6000, # max_distance (cm)
+                    1500, # current_distance (cm)
+                    mavutil.mavlink.MAV_DISTANCE_SENSOR_LASER, #  type
+                    21, #  id
+                    mavutil.mavlink.MAV_SENSOR_ROTATION_PITCH_270, #  orientation
+                    255  # covariance
+                )
+                self.delay_sim_time(0.1)
+                try:
+                    self.wait_text("LandingGear: RETRACT", check_context=True, timeout=0.1)
+                except Exception:
+                    continue
+                self.progress("Retracted")
+                break
+#            self.send_debug_trap()
+            while True:
+                if self.get_sim_time_cached() - tstart > 5:
+                    raise NotAchievedException("Deployment did not happen")
+                self.progress("Sending distance-sensor message");
+                self.mav.mav.distance_sensor_send(
+                    0,  # time_boot_ms
+                    300, # min_distance
+                    500, # max_distance
+                    250, # current_distance
+                    mavutil.mavlink.MAV_DISTANCE_SENSOR_LASER, #  type
+                    21, #  id
+                    mavutil.mavlink.MAV_SENSOR_ROTATION_PITCH_270, #  orientation
+                    255  # covariance
+                )
+                try:
+                    self.wait_text("LandingGear: DEPLOY", check_context=True, timeout=0.1)
+                except Exception:
+                    continue
+                self.progress("Deployed")
+                break
+            self.disarm_vehicle()
+
+        except Exception as e:
+            self.progress("Caught exception: %s" %
+                          self.get_exception_stacktrace(e))
+            ex = e
+        self.context_pop()
+        self.reboot_sitl()
+        if ex is not None:
+            raise ex
+
     def fly_rangefinder_mavlink(self):
+        self.fly_rangefinder_mavlink_distance_sensor()
+
         # explicit test for the mavlink driver as it doesn't play so nice:
         self.set_parameter("SERIAL5_PROTOCOL", 1)
         self.set_parameter("RNGFND1_TYPE", 10)
@@ -5533,7 +5664,7 @@ class AutoTestCopter(AutoTest):
 
             self.context_push()
             self.start_subtest("missing required yaw source")
-            self.set_parameter("EK3_SRC3_YAW", 1)
+            self.set_parameter("EK3_SRC3_YAW", 3) # External Yaw with Compass Fallback
             self.set_parameter("COMPASS_USE", 0)
             self.set_parameter("COMPASS_USE2", 0)
             self.set_parameter("COMPASS_USE3", 0)
@@ -5613,6 +5744,16 @@ class AutoTestCopter(AutoTest):
         log_difference = [x for x in new_onboard_logs if x not in old_onboard_logs]
         print("log difference: %s" % str(log_difference))
         return log_difference[0]
+
+    def test_callisto(self):
+        self.customise_SITL_commandline([
+            "--defaults", self.model_defaults_filepath('ArduCopter', 'Callisto')
+        ],
+                                        model="octa-quad:@ROMFS/models/Callisto.json",
+                                        wipe=True,
+)
+        self.takeoff(10)
+        self.do_RTL()
 
     def test_replay(self):
         '''test replay correctness'''
@@ -5758,6 +5899,15 @@ class AutoTestCopter(AutoTest):
             ("BaroWindCorrection",
              "Test wind estimation and baro position error compensation",
              self.fly_wind_baro_compensation),
+
+            ("SetpointGlobalPos",
+             "Test setpoint global position",
+             lambda: self.test_set_position_global_int()),
+
+            ("SetpointGlobalVel",
+             "Test setpoint global velocity",
+             lambda: self.test_set_velocity_global_int()),
+
         ])
         return ret
 
@@ -6003,6 +6153,10 @@ class AutoTestCopter(AutoTest):
             ("DataFlashErase",
              "Test DataFlash Block backend erase",
              self.test_dataflash_erase),
+
+            ("Callisto",
+             "Test Callisto",
+             self.test_callisto),
 
             ("Replay",
              "Test Replay",

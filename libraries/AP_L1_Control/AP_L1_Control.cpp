@@ -81,7 +81,7 @@ int32_t AP_L1_Control::get_yaw_sensor() const
 int32_t AP_L1_Control::nav_roll_cd(void) const
 {
     float ret;
-    ret = cosf(_ahrs.pitch)*degrees(atanf(_latAccDem * 0.101972f) * 100.0f); // 0.101972 = 1/9.81
+    ret = cosf(_ahrs.pitch)*degrees(atanf(_latAccDem * (1.0f/GRAVITY_MSS)) * 100.0f);
     ret = constrain_float(ret, -9000, 9000);
     
     // printf("L1_dist %.2f, ground speed %.2f, latAccDem %.2f rollCmdDeg %.2f\n", _L1_dist, _ahrs.groundspeed_vector().length(), _latAccDem, ret/100);

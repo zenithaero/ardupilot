@@ -173,7 +173,7 @@ void Plane::update_speed_height(void)
     // Skip legacy function --------------------------
     return;
 
-    if (auto_throttle_mode) {
+    if (control_mode->does_auto_throttle()) {
 	    // Call TECS 50Hz update. Note that we call this regardless of
 	    // throttle suppressed, as this needs to be running for
 	    // takeoff detection
@@ -210,7 +210,7 @@ void Plane::update_logging1(void)
         logger.Write_IMU();
 
     if (should_log(MASK_LOG_ATTITUDE_MED))
-        logger.Write_AOA_SSA(ahrs);
+        ahrs.Write_AOA_SSA();
 }
 
 /*
@@ -489,7 +489,7 @@ void Plane::update_alt()
     // Skip legacy function -------------------------
     return;
 
-    if (auto_throttle_mode && !throttle_suppressed) {        
+    if (control_mode->does_auto_throttle() && !throttle_suppressed) {
 
         float distance_beyond_land_wp = 0;
         if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && current_loc.past_interval_finish_line(prev_WP_loc, next_WP_loc)) {
@@ -522,7 +522,7 @@ void Plane::update_alt()
 void Plane::update_flight_stage(void)
 {
     // Update the speed & height controller states
-    if (auto_throttle_mode && !throttle_suppressed) {        
+    if (control_mode->does_auto_throttle() && !throttle_suppressed) {
         if (control_mode == &mode_auto) {
             if (quadplane.in_vtol_auto()) {
                 set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_VTOL);

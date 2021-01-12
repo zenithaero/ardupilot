@@ -4,7 +4,7 @@ import sys, fnmatch
 import importlib
 
 # peripheral types that can be shared, wildcard patterns
-SHARED_MAP = ["I2C*", "USART*_TX", "UART*_TX", "SPI*", "TIM*_UP"]
+SHARED_MAP = ["I2C*", "USART*_TX", "UART*_TX", "SPI*", "TIM*_UP", "TIM*_CH*"]
 
 ignore_list = []
 dma_map = None
@@ -208,7 +208,7 @@ def generate_DMAMUX_map(peripheral_list, noshare_list, dma_exclude):
     # use neighboring channels then we sometimes lose a BDMA completion interrupt. To
     # avoid this we set the BDMA available mask to 0x33, which forces the channels not to be
     # adjacent. This issue was found on a CUAV-X7, with H743 RevV.
-    map2 = generate_DMAMUX_map_mask(dmamux2_peripherals, 0x33, noshare_list, dma_exclude)
+    map2 = generate_DMAMUX_map_mask(dmamux2_peripherals, 0x55, noshare_list, dma_exclude)
     # translate entries from map2 to "DMA controller 3", which is used for BDMA
     for p in map2.keys():
         streams = []
@@ -224,7 +224,10 @@ def generate_DMAMUX_map(peripheral_list, noshare_list, dma_exclude):
 def write_dma_header(f, peripheral_list, mcu_type, dma_exclude=[],
                      dma_priority='', dma_noshare=''):
     '''write out a DMA resolver header file'''
-    global dma_map, have_DMAMUX
+    global dma_map, have_DMAMUX, has_bdshot
+    timer_ch_periph = []
+
+    has_bdshot = False
 
     # form a list of DMA priorities
     priority_list = dma_priority.split()
@@ -247,6 +250,9 @@ def write_dma_header(f, peripheral_list, mcu_type, dma_exclude=[],
 
     if dma_map is None:
         have_DMAMUX = True
+        # ensure we don't assign dma for TIMx_CH as we share that with TIMx_UP
+        timer_ch_periph = [periph for periph in peripheral_list if "_CH" in periph]
+        dma_exclude += timer_ch_periph
         dma_map = generate_DMAMUX_map(peripheral_list, noshare_list, dma_exclude)
 
     print("Writing DMA map")
@@ -254,6 +260,8 @@ def write_dma_header(f, peripheral_list, mcu_type, dma_exclude=[],
     curr_dict = {}
 
     for periph in peripheral_list:
+        if "_CH" in periph:
+            has_bdshot = True # the list contains a CH port
         if periph in dma_exclude:
             continue
         assigned = False
@@ -336,6 +344,15 @@ def write_dma_header(f, peripheral_list, mcu_type, dma_exclude=[],
             f.write("#define %-30s STM32_DMA_STREAM_ID(%u, %u)%s\n" %
                     (chibios_dma_define_name(key)+'STREAM', dma_controller,
                         curr_dict[key][1], shared))
+            if have_DMAMUX and "_UP" in key:
+                # share the dma with rest of the _CH ports
+                for ch in range(1,5):
+                    chkey = key.replace('_UP', '_CH{}'.format(ch))
+                    if chkey not in timer_ch_periph:
+                        continue
+                    f.write("#define %-30s STM32_DMA_STREAM_ID(%u, %u)%s\n" %
+                        (chibios_dma_define_name(chkey)+'STREAM', dma_controller,
+                            curr_dict[key][1], shared))
         for streamchan in dma_map[key]:
             if stream == (streamchan[0], streamchan[1]):
                 if have_DMAMUX:
@@ -344,6 +361,15 @@ def write_dma_header(f, peripheral_list, mcu_type, dma_exclude=[],
                     chan = streamchan[2]
                 f.write("#define %-30s %s\n" %
                         (chibios_dma_define_name(key)+'CHAN', chan))
+                if have_DMAMUX and "_UP" in key:
+                    # share the devid with rest of the _CH ports
+                    for ch in range(1,5):
+                        chkey = key.replace('_UP', '_CH{}'.format(ch))
+                        if chkey not in timer_ch_periph:
+                            continue
+                        f.write("#define %-30s %s\n" %
+                                (chibios_dma_define_name(chkey)+'CHAN', 
+                                chan.replace('_UP', '_CH{}'.format(ch))))
                 break
 
     # now generate UARTDriver.cpp DMA config lines
