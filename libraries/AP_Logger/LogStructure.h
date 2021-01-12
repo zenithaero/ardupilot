@@ -2094,11 +2094,11 @@ LOG_STRUCTURE_FROM_NAVEKF3 \
     { LOG_AHRS_CTRL_MSG, sizeof(log_AhrsCtrl), \
       "AHRS", "Qffffffffffff", "TimeUS,phi,theta,psi,gx,gy,gz,vn,ve,vd,pn,pe,pd", "s------------", "F------------" }, \
     { LOG_PITCH_CTRL_MSG, sizeof(log_PitchCtrl), \
-      "PCTL", "Qfffff", "TimeUS,cmd,err,errI,maxI,ryCmd", "s------", "F------" }, \
+      "PCTL", "Qfffff", "TimeUS,cmd,err,errI,maxI,ryCmd", "s-----", "F-----" }, \
     { LOG_ROLLYAW_CTRL_MSG, sizeof(log_RollYawCtrl), \
-      "RCTL", "Qffffff", "TimeUS,cmd,err,errI,maxI,rxCmd,rzCmd", "s--------", "F--------" }, \
+      "RCTL", "Qffffff", "TimeUS,cmd,err,errI,maxI,rxCmd,rzCmd", "s------", "F------" }, \
     { LOG_SPDALT_CTRL_MSG, sizeof(log_SpdAltCtrl), \
-      "SCTL", "Qfffffffffff", "TimeUS,hCmd,tCmd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,pCmd,axCmd", "s------------", "F------------" }, \
+      "SCTL", "Qfffffffffff", "TimeUS,hCmd,tCmd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,pCmd,axCmd", "s-----------", "F-----------" }, \
     { LOG_WINCH_MSG, sizeof(log_Winch), \
       "WINC", "QBBBBBfffHfb", "TimeUS,Heal,ThEnd,Mov,Clut,Mode,DLen,Len,DRate,Tens,Vcc,Temp", "s-----mmn?vO", "F-----000000" }, \
     { LOG_PSC_MSG, sizeof(log_PSC), \

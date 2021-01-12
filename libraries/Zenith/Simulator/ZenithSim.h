@@ -90,7 +90,7 @@ protected:
     // float liftCoeff(float alpha) const;
     // float dragCoeff(float alpha) const;
     FM getAeroFM(const std::vector<double> lookup);
-    FM getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud, float thr);
+    FM getActuatorFM(const std::vector<double> lookup, float thrLeft, float thrRight, float ail, float elev, float rud);
     FM getDampingFM(const std::vector<double> lookup, Vector3f pqr);
     Vector3f getForce(float inputAileron, float inputElevator, float inputRudder) const;
     Vector3f getTorque(float inputAileron, float inputElevator, float inputRudder, float inputThrust, const Vector3f &force) const;

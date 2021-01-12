@@ -199,7 +199,7 @@ protected:
     // Added for logging
     Vector3f force_bf;
     Vector3f moment_bf;
-    float actuators[4];
+    float actuators[5];
 
     struct {
         // data from simulated laser scanner, if available

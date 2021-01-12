@@ -4,8 +4,8 @@
  * @author Bertrand Bevillard <bertrand@zenithaero.com>
  */
 
-#include "ControllerCommon.h"
 #include "ActuatorAllocation.h"
+#include "ControllerCommon.cpp"
 
 const char* spdAltFields[] = {"Ax", "Ay", "Az", "Rx", "Ry", "Rz"};
 

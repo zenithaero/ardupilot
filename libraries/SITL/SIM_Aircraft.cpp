@@ -897,10 +897,10 @@ void Aircraft::update_external_payload(const struct sitl_input &input)
     external_payload_mass = 0;
 
     // update sprayer
-    if (sprayer && sprayer->is_enabled()) {
-        sprayer->update(input);
-        external_payload_mass += sprayer->payload_mass();
-    }
+    // if (sprayer && sprayer->is_enabled()) {
+    //     sprayer->update(input);
+    //     external_payload_mass += sprayer->payload_mass();
+    // }
 
     // update i2c
     if (i2c) {

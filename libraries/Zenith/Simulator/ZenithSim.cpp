@@ -30,7 +30,7 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
 {
     mass = ModelConfig::M;
     frame_height = 0.1f;
-    num_motors = 1;
+    num_motors = 2;
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
     build_mat(ModelConfig::servoMap, servo_map);
     build_mat(ModelConfig::motorMap, motor_map);
@@ -89,7 +89,7 @@ FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
     return INTERP(0, lookup, 1, 0);
 }
 
-FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float elev, float rud, float thr) {
+FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float thrLeft, float thrRight, float ail, float elev, float rud) {
     FM fm;
     // Actuator map
     std::vector<float> vec = {ail, elev, rud, 0, 0};
@@ -97,7 +97,7 @@ FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float ail, float e
     for (size_t k = 0; k < act.size(); k++)
         fm += INTERP(dF, lookup, act.size(), k) * act[k] * ModelConfig::servoMaxDeg[0][k];
     // Motor map
-    vec = {thr, 0};
+    vec = {thrLeft, thrRight};
     act = matmul(motor_map, vec);
     for (size_t k = 0; k < act.size(); k++)
         fm += INTERP(dP, lookup, act.size(), k) * act[k] * ModelConfig::motorMax[0][k];
@@ -132,13 +132,20 @@ void denormalize(FM &fm, float qbar) {
 
 void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
 {
-    float ail  = filtered_servo_angle(input, 0);
-    float elev = filtered_servo_angle(input, 1);
-    float rud  = filtered_servo_angle(input, 3);
-    float thr = filtered_servo_range(input, 2); // TEMP
+    float thrLeft  = filtered_servo_angle(input, 0);
+    float thrRight  = filtered_servo_angle(input, 1);
+    float ail = filtered_servo_angle(input, 2);
+    float elev = filtered_servo_angle(input, 3);
+    float rud  = filtered_servo_angle(input, 4);
     // printf("thr")
 
-    printf("ail %.2f, elev %.2f, rud: %.2f, thr: %.2f\n", ail * 25, elev * 25, rud * 25, thr); // TODO: hook to controllerdata
+    printf("thr [%.2f, %.2f], ail %.2f, elev %.2f, rud %.2f\n",
+        thrLeft,
+        thrRight,
+        ail * ControllerData::rollYaw.maxAilDeg,
+        elev * ControllerData::pitch.maxElevDeg,
+        rud * ControllerData::rollYaw.maxRudDeg
+    );
 
     // Dummy state
     // gyro = Vector3f(3.5f, -4.f, -2.8f);
@@ -204,15 +211,20 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     //     exit(-1);
     // elev += 1;
     // TEMP END
+    printf("-1\n");
 
-    actuators[0] = ail;
-    actuators[1] = elev;
-    actuators[2] = rud;
-    actuators[3] = thr;
+    actuators[0] = thrLeft;
+    actuators[1] = thrRight;
+    actuators[2] = ail;
+    actuators[3] = elev;
+    actuators[4] = rud;
+    printf("0\n");
 
 
     // simulate engine RPM
-    rpm[0] = thr * 7000;
+    rpm[0] = thrLeft * 7000;
+    rpm[1] = thrRight * 7000;
+    printf("1\n");
 
     // calculate angle of attack
     angle_of_attack = atan2f(velocity_air_bf.z, velocity_air_bf.x);
@@ -233,7 +245,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // Get aero FM
     // printf("lookup (alpha %.2f, beta %.2f, airspeed %.2f)\n", angle_of_attack, beta, airspeed);
     FM aeroFM = getAeroFM(lookup);
-    FM actuatorFM = getActuatorFM(lookup, ail, elev, rud, thr);
+    FM actuatorFM = getActuatorFM(lookup, thrLeft, thrRight, ail, elev, rud);
     FM dampingFM = getDampingFM(lookup, gyro);
     // printf("qbar: %.2f\n", qbar);
     // printf("aeroFM (%.3f, %.3f, %.3f; %.3f, %.3f, %.3f)\n", aeroFM.force.x, aeroFM.force.y, aeroFM.force.z, aeroFM.moment.x, aeroFM.moment.y, aeroFM.moment.z);
@@ -244,7 +256,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // (0.03, 0.00, -0.54; 0.00, -0.00, -0.54)
 
     // printf("values F(%.2f %.2f %.2f) M(%.2f %.2f %.2f)\n", fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
-
+    printf("2\n");
     // Denormalize forces & moments
     denormalize(fm, qbar);
     const Vector3f CGOffset(ModelConfig::CG[0][0], ModelConfig::CG[0][1], ModelConfig::CG[0][2]);
@@ -252,7 +264,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     fm.moment += armMoment;
 
     // Add low speed thrust model (for takeoff)
-    std::vector<float> vec = {thr, 0};
+    std::vector<float> vec = {thrLeft, thrRight};
     std::vector<float> act = matmul(motor_map, vec);
     std::vector<double> lookup_0 = { lookup[0], lookup[1], 0.f };
     lookup_0 = aeroData->clamp(lookup_0);
@@ -263,7 +275,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     denormalize(fm_0, CLAMP(qbar_0 - qbar, 0, qbar_0));
     fm += fm_0;
 
-
+    printf("3\n");
     
     // AVL static thrust motor model
     // double coeff = ModelConfig::thrustStatic - qbar * ModelConfig::thrustGain;
