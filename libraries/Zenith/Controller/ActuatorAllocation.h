@@ -25,6 +25,11 @@ public:
 
     void allocate(const Accel &accel, float rudder_cmd_deg);
 
+    // Actuator flags
+    bool enable_throttle;
+    bool enable_attitude_long;
+    bool enable_attitude_lat;
+
     // Last commands
     float thr_left_cmd;
     float thr_right_cmd;

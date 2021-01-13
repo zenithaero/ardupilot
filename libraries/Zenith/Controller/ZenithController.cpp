@@ -50,23 +50,24 @@ bool DoubletHandler::udpate(float last_command) {
 
 
 // Main 400Hz entry point
-void ZenithController::update(bool should_update_spd_alt,
-							  float tas_cmd,
+void ZenithController::update(float tas_cmd,
 							  float h_cmd,
-							  bool should_update_attitude,
 							  float theta_cmd_deg,
 							  float roll_cmd_deg,
 							  float rudder_cmd_deg) {
 	// Reset active bitmask & log ahrs
 	active_logs = 0;
-	log_ahrs();
+	// log_ahrs();
 
-    if (should_update_spd_alt) {
+    if (actuator_allocation.enable_throttle) {
     	update_spd_alt(tas_cmd, h_cmd);
 	}
 
-	if (should_update_attitude) {
+	if (actuator_allocation.enable_attitude_long) {
 		stabilize_pitch(theta_cmd_deg);
+	}
+
+	if (actuator_allocation.enable_attitude_lat) {
 		stabilize_rollyaw(roll_cmd_deg, rudder_cmd_deg);
 	}
 

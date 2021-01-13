@@ -132,8 +132,8 @@ void denormalize(FM &fm, float qbar) {
 
 void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
 {
-    float thrLeft  = filtered_servo_angle(input, 0);
-    float thrRight  = filtered_servo_angle(input, 1);
+    float thrLeft  = filtered_servo_range(input, 0);
+    float thrRight  = filtered_servo_range(input, 1);
     float ail = filtered_servo_angle(input, 2);
     float elev = filtered_servo_angle(input, 3);
     float rud  = filtered_servo_angle(input, 4);
@@ -211,20 +211,17 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     //     exit(-1);
     // elev += 1;
     // TEMP END
-    printf("-1\n");
 
     actuators[0] = thrLeft;
     actuators[1] = thrRight;
     actuators[2] = ail;
     actuators[3] = elev;
     actuators[4] = rud;
-    printf("0\n");
 
 
     // simulate engine RPM
     rpm[0] = thrLeft * 7000;
     rpm[1] = thrRight * 7000;
-    printf("1\n");
 
     // calculate angle of attack
     angle_of_attack = atan2f(velocity_air_bf.z, velocity_air_bf.x);
@@ -256,7 +253,6 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // (0.03, 0.00, -0.54; 0.00, -0.00, -0.54)
 
     // printf("values F(%.2f %.2f %.2f) M(%.2f %.2f %.2f)\n", fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
-    printf("2\n");
     // Denormalize forces & moments
     denormalize(fm, qbar);
     const Vector3f CGOffset(ModelConfig::CG[0][0], ModelConfig::CG[0][1], ModelConfig::CG[0][2]);
@@ -275,7 +271,6 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     denormalize(fm_0, CLAMP(qbar_0 - qbar, 0, qbar_0));
     fm += fm_0;
 
-    printf("3\n");
     
     // AVL static thrust motor model
     // double coeff = ModelConfig::thrustStatic - qbar * ModelConfig::thrustGain;

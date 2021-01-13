@@ -96,6 +96,14 @@ public:
     // whether control input is ignored with STICK_MIXING=0
     virtual bool does_auto_throttle() const { return false; }
 
+
+    // true if the lateral attitude controllers are enabled
+    virtual bool does_auto_attitude_lat() const { return true; }
+
+    // true if the longitudinal attitude controllers are enabled
+    virtual bool does_auto_attitude_long() const { return true; }
+
+
 protected:
 
     // subclasses override this to perform checks before entering the mode
@@ -249,6 +257,10 @@ public:
     // methods that affect movement of the vehicle in this mode
     void update() override;
 
+    bool does_auto_attitude_lat() const override { return false; }
+
+    bool does_auto_attitude_long() const override { return false; }
+
 protected:
 
     void _exit() override;
@@ -371,7 +383,9 @@ public:
     bool get_target_heading_cd(int32_t &target_heading);
 
     bool landing;
-    bool does_auto_throttle() const override { return true; }
+    bool does_auto_throttle() const override { return !landing; }
+
+    bool does_auto_attitude_long() const override { return !landing; }
 
 protected:
 
@@ -598,6 +612,10 @@ public:
 
     // methods that affect movement of the vehicle in this mode
     void update() override;
+
+    bool does_auto_attitude_lat() const override { return false; }
+
+    bool does_auto_attitude_long() const override { return false; }
     
 protected:
     uint64_t start_time_us;

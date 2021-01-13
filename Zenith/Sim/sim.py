@@ -47,8 +47,6 @@ if __name__ == "__main__":
     parser.add_argument("--clear", action="store_true", help="clear sim data")
     parser.add_argument("--test", action="store_true", help="enable test case")
     parser.add_argument("--debug", action="store_true", help="debug mode")
-    parser.add_argument("--matlab", action="store_true", help="matlab socket communication")
-    parser.add_argument("--plane", action="store_true", help="fly regular plane")
     parser.add_argument("--no-logs", action="store_true", help="don't parse logs")
     parser.add_argument("--headless", action="store_true", help="headless sim")
     args = parser.parse_args()
@@ -63,11 +61,7 @@ if __name__ == "__main__":
 
     # Build sim command
     script = [SIM_PATH]
-    frame = "Z1_Lookup"
-    if args.matlab:
-        frame = "Z1_Matlab"
-    elif args.plane:
-        frame = "plane"
+    frame = "ZenithLookup"
 
     sim_args = ["-v", "ArduPlane", "-f", frame, "--no-rebuild", "--wipe-eeprom"]
     if args.joystick:

@@ -369,12 +369,18 @@ void Plane::stabilize_acro(float speed_scaler)
  */
 void Plane::stabilize()
 {
+    // Update controller flags
+    zenith_controller.actuator_allocation.enable_attitude_long = control_mode->does_auto_attitude_long();
+    zenith_controller.actuator_allocation.enable_attitude_lat = control_mode->does_auto_attitude_lat();
+    zenith_controller.actuator_allocation.enable_throttle = control_mode->does_auto_throttle();
+    
+
     // ZenithController - update pitch & yaw
-    bool update_attitude = control_mode != &mode_manual && control_mode != &mode_preflight;
+    bool update_attitude = control_mode->does_auto_attitude_long() || control_mode->does_auto_attitude_lat(); 
     float theta_cmd_deg = nav_pitch_cd / 100.f;
     float roll_cmd_deg = nav_roll_cd / 100.f;
     float rudder_cmd_deg = rudder_input();
-    bool update_spd_alt = auto_throttle_mode && !throttle_suppressed;
+    bool update_spd_alt = control_mode->does_auto_throttle() && !throttle_suppressed;
     float h_cmd = relative_target_altitude_cm() / 100.f;
     float tas_cmd = target_airspeed_cm / 100.f;
 
@@ -383,13 +389,10 @@ void Plane::stabilize()
         steer_state.locked_course = false;
         steer_state.locked_course_err = 0;
     }
-    
-    // Warning: If disabled, uncomment servos.cpp ln 739-740 to re-enable rudder control
+
     zenith_controller.update(
-        update_spd_alt,
         tas_cmd,
         h_cmd,
-        update_attitude,
         theta_cmd_deg,
         roll_cmd_deg,
         rudder_cmd_deg

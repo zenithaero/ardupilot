@@ -267,7 +267,7 @@ class VehicleInfo(object):
             "ASWING": {
                 "waf_target": "bin/arduplane",
             },
-            "Z1_Lookup": {
+            "ZenithLookup": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "default_params/xuav.parm",
             },

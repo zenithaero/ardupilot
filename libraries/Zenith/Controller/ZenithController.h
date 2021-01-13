@@ -14,10 +14,8 @@ public:
     ZenithController &operator=(const ZenithController&) = delete;
 
     void update(
-        bool update_spd_alt,
         float tas_cmd,
         float h_cmd,
-        bool update_attitude,
         float theta_cmd_deg,
         float roll_cmd_deg,
         float rudder_deg

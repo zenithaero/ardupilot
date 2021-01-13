@@ -333,7 +333,7 @@ private:
         Location location;
     } smoothing;
 
-    LowPassFilterFloat servo_filter[4];
+    LowPassFilterFloat servo_filter[6];
 
     Buzzer *buzzer;
     Sprayer *sprayer;
