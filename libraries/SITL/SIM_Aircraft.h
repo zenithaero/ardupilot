@@ -36,6 +36,12 @@
 
 namespace SITL {
 
+typedef struct {
+    bool trim;
+    bool open_loop;
+    bool auto_stop;
+} zenith_sim_opts_t;
+
 /*
   parent class for all simulator types
  */
@@ -59,6 +65,8 @@ public:
     } state_t;
 
     virtual void set_start_state(state_t state);
+
+    virtual void set_zenith_opts(zenith_sim_opts_t opts);
 
     /*
       set simulation speedup

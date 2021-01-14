@@ -81,6 +81,13 @@ if __name__ == "__main__":
     sim_args += ["--mavproxy-path", MAVPROXY_PATH]
     # Takeoff at specified location
     sim_args += ["--location", "Malesherbes"]
+    # Add trim args
+    sim_args += [
+        "--zenith-trim",
+        "--zenith-ol",
+        "--zenith-auto-stop"
+    ]
+
     # Create mav args
     mav_arg_list = ["--logfile logs/flight.tlog"]
     # mav_arg_list += ["--logfile logs/flight.tlog"]
@@ -98,6 +105,9 @@ if __name__ == "__main__":
     # Run command
     cmd = ["cd", OUTPUT_DIR, ";"] + script + sim_args + mav_args
     os.system(" ".join(cmd))
+
+
+
     # p = subprocess.Popen(cmd, cwd=LOCAL_DIR)
     # p.wait()
 

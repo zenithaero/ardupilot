@@ -63,6 +63,8 @@ public:
 
     ~ZenithSim();
 
+    virtual void set_zenith_opts(zenith_sim_opts_t _opts) override;
+
     /* update model by one time step */
     virtual void update(const struct sitl_input &input) override;
 
@@ -72,6 +74,7 @@ public:
     }
 
 protected:
+    zenith_sim_opts_t opts;
     Interp<double> *aeroData;
     const float hover_throttle = 0.7f;
     const float air_density = 1.225; // kg/m^3 at sea level, ISA conditions
@@ -84,7 +87,7 @@ protected:
     float thrust_scale;
 
     // Temp
-    uint64_t t0 = 0;
+    uint64_t trim_t0 = 0;
     float acc = 0;
 
     // float liftCoeff(float alpha) const;

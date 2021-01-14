@@ -24,7 +24,6 @@ Startup startup;
     _fm;                                                                                                                \
 })
 
-
 ZenithSim::ZenithSim(const char *frame_str) :
     Aircraft(frame_str)
 {
@@ -83,6 +82,10 @@ ZenithSim::~ZenithSim() {
     delete(aeroData);
 }
 
+void ZenithSim::set_zenith_opts(zenith_sim_opts_t _opts) {
+    opts = _opts;
+}
+
 FM ZenithSim::getAeroFM(const std::vector<double> lookup) {
     // auto fm = INTERP(0, lookup);
     // printf("lookup: [%.4f, %.4f, %.4f]: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n", lookup[0], lookup[1], lookup[2], fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
@@ -132,92 +135,77 @@ void denormalize(FM &fm, float qbar) {
 
 void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
 {
-    float thrLeft  = filtered_servo_range(input, 0);
-    float thrRight  = filtered_servo_range(input, 1);
+    
+    float thrLeft = filtered_servo_range(input, 0);
+    float thrRight = filtered_servo_range(input, 1);
     float ail = filtered_servo_angle(input, 2);
     float elev = filtered_servo_angle(input, 3);
     float rud  = filtered_servo_angle(input, 4);
+
+    size_t trim_idx = 1; // TODO: pass as a parameter
+    if (opts.open_loop) {
+        thrLeft = ControllerData::trim.thrLeft[trim_idx] / ModelConfig::motorMax[0][0];
+        thrRight = ControllerData::trim.thrRight[trim_idx]  / ModelConfig::motorMax[0][1];
+        ail = ControllerData::trim.ailDeg[trim_idx] / ModelConfig::servoMaxDeg[0][0];
+        elev = ControllerData::trim.elevDeg[trim_idx] / ModelConfig::servoMaxDeg[0][1];
+        rud = ControllerData::trim.rudDeg[trim_idx] / ModelConfig::servoMaxDeg[0][2];
+    }
     // printf("thr")
 
     printf("thr [%.2f, %.2f], ail %.2f, elev %.2f, rud %.2f\n",
         thrLeft,
         thrRight,
-        ail * ControllerData::rollYaw.maxAilDeg,
-        elev * ControllerData::pitch.maxElevDeg,
-        rud * ControllerData::rollYaw.maxRudDeg
+        ail * ModelConfig::servoMaxDeg[0][0],
+        elev * ModelConfig::servoMaxDeg[0][1],
+        rud * ModelConfig::servoMaxDeg[0][2]
     );
 
-    // Dummy state
-    // gyro = Vector3f(3.5f, -4.f, -2.8f);
-    // velocity_air_bf = Vector3f(14.f, 2.f, -4.f);
-    // dcm.from_euler(0.4, -0.6, 0.3);
-    // velocity_air_ef = dcm * velocity_air_bf;
-    // airspeed = velocity_air_ef.length();
-    // ail = 8.f;
-    // elev = -12.f;
-    // rud = 10.f;
-    // thr = 0.5f;
+    // Configure trim state if needed
+    if (trim_t0 == 0) {
+        trim_t0 = time_now_us;
+    }
+    if (opts.trim) {
+        float dt = (time_now_us - trim_t0) / 1e6f;
+        
+        if (dt < 15) {
+            gyro = Vector3f(0, 0, 0);
+            dcm.from_euler(0, 0, 0);
+            velocity_ef = Vector3f(0, 0, 0);
+            velocity_air_bf = Vector3f(0, 0, 0);
+            velocity_air_ef = Vector3f(0, 0, 0);
+            airspeed_pitot = 0.f;
+            airspeed = 0.f;
+        } else if (dt > 15 && dt < 45) {
+            gyro = Vector3f(0, 0, 0);
+            dcm.from_euler(
+                ControllerData::trim.phi[trim_idx],
+                ControllerData::trim.theta[trim_idx],
+                ControllerData::trim.psi[trim_idx]
+            );
+            Vector3f velocity_bf = {
+                ControllerData::trim.ux[trim_idx],
+                ControllerData::trim.uy[trim_idx],
+                ControllerData::trim.uz[trim_idx],
+            };
+            velocity_ef = dcm * velocity_bf;
+            velocity_air_bf = velocity_bf;
+            velocity_air_ef = velocity_ef;
+            airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+            airspeed = velocity_air_ef.length();
+            // Fix altitude
+            position.z = -100;
+        } else if (dt > 65 && opts.auto_stop) {
+            // Terminate the simulation
+            exit(-1);
+        }
+    }
 
-    // TEMP
-    // thr = 0.02124;
-    // ail = 0;
-    // rud = 0;
-    // elev = 0.86159 / 15;
-
-    // if (t0 == 0)
-    //     t0 = time_now_us;
-    // float dt = (time_now_us - t0) / 1e6f;
-    // if (dt < 15) {
-    //     gyro = Vector3f(0, 0, 0);
-    //     dcm.from_euler(0.00000, -0.02408, 0.00000);
-    //     velocity_ef = Vector3f(0, 0, 0);
-    //     velocity_air_bf = Vector3f(0, 0, 0);
-    //     velocity_air_ef = Vector3f(0, 0, 0);
-    //     airspeed_pitot = 0.f;
-    //     airspeed = 0.f;
-    // }
-    // if (dt > 15 && dt < 45) {
-    //     gyro = Vector3f(0, 0, 0);
-    //     dcm.from_euler(0.00000, -0.02408, 0.00000);
-    //     Vector3f velocity_bf = {14.99565, -0.00000, -0.36111};
-    //     velocity_ef = dcm * velocity_bf;
-    //     position.z = -200;
-
-    //     // update_position();
-    //     // AIS computations
-    //     velocity_air_bf = velocity_bf;
-    //     velocity_air_ef = velocity_ef;
-    //     airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
-    //     airspeed = velocity_air_ef.length();
-    // }
-    // if (dt > 45)
-    //     elev += 1.f / 15;
-    // if (dt > 65)
-    //     exit(-1);
-
-    // Force longitudinal
-    // float roll, pitch, yaw;
-    // dcm.to_euler(&roll, &pitch, &yaw);
-    // dcm.from_euler(0, pitch, 0);
-
-    // if (dt > 90)
-    //     exit(-1);
-
-    // else {
-    //     ail += 1;
-    //     elev -= 1;
-    // }
-    // if (dt > 30)
-    //     exit(-1);
-    // elev += 1;
-    // TEMP END
-
+    // Log actuator states
     actuators[0] = thrLeft;
     actuators[1] = thrRight;
     actuators[2] = ail;
     actuators[3] = elev;
     actuators[4] = rud;
-
 
     // simulate engine RPM
     rpm[0] = thrLeft * 7000;
@@ -232,9 +220,6 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
 
     // Create rotation transformation (clamped to lookup limits)
     std::vector<double> lookupClamped = aeroData->clamp(lookup);
-
-    // Extract normalization coefficients
-
 
     // Calculate dynamic pressure
     double qbar = dynamic_pressure(air_density, airspeed);

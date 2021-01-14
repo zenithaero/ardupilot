@@ -685,6 +685,14 @@ def start_vehicle(binary, opts, stuff, spawns=None, test_case=None):
 
         cmd.append("--start-time=%d" % start_time_UTC)
 
+    # Copy zenith args
+    if opts.zenith_trim:
+        cmd.extend(["--zenith-trim"])
+    if opts.zenith_ol:
+        cmd.extend(["--zenith-ol"])
+    if opts.zenith_auto_stop:
+        cmd.extend(["--zenith-auto-stop"])
+
     old_dir = os.getcwd()
     for i, i_dir in zip(instances, instance_dir):
         c = ["-I" + str(i)]
@@ -1083,6 +1091,10 @@ group_sim.add_option("", "--sysid",
                      type='int',
                      default=None,
                      help="Set SYSID_THISMAV")
+# Zenith opts
+group_sim.add_option("", "--zenith-trim", action="store_true", default=False)
+group_sim.add_option("", "--zenith-ol", action="store_true", default=False)
+group_sim.add_option("", "--zenith-auto-stop", action="store_true", default=False)
 parser.add_option_group(group_sim)
 
 

@@ -109,6 +109,9 @@ void SITL_State::_usage(void)
            "\t--irlock-port PORT       set port num for irlock\n"
            "\t--start-time TIMESTR     set simulation start time in UNIX timestamp\n"
            "\t--sysid ID               set SYSID_THISMAV\n"
+           "\t--zenith-trim            zenith - start simulator in trim state\n"
+           "\t--zenith-ol              zenith - ignore controller commands\n"
+           "\t--zenith-auto-stop       zenith - automatically stop the simulation\n"
         );
 }
 
@@ -225,6 +228,13 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     time_t start_time_UTC = first_tv.tv_sec;
     const bool is_replay = APM_BUILD_TYPE(APM_BUILD_Replay);
 
+    // Zenith opts
+    zenith_sim_opts_t zenith_opts = {
+        .trim = false,
+        .open_loop = false,
+        .auto_stop = false
+    };
+
     enum long_options {
         CMDLINE_GIMBAL = 1,
         CMDLINE_FGVIEW,
@@ -248,6 +258,9 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         CMDLINE_IRLOCK_PORT,
         CMDLINE_START_TIME,
         CMDLINE_SYSID,
+        CMDLINE_ZENITH_TRIM,
+        CMDLINE_ZENITH_OL,
+        CMDLINE_ZENITH_AUTO_STOP,
     };
 
     const struct GetOptLong::option options[] = {
@@ -287,6 +300,9 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         {"irlock-port",     true,   0, CMDLINE_IRLOCK_PORT},
         {"start-time",      true,   0, CMDLINE_START_TIME},
         {"sysid",           true,   0, CMDLINE_SYSID},
+        {"zenith-trim",     false,  0, CMDLINE_ZENITH_TRIM},
+        {"zenith-ol",       false,  0, CMDLINE_ZENITH_OL},
+        {"zenith-auto-stop",false,  0, CMDLINE_ZENITH_AUTO_STOP},
         {0, false, 0, 0}
     };
 
@@ -430,11 +446,22 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             printf("Setting SYSID_THISMAV=%d\n", sysid);
             break;
         }
+        case CMDLINE_ZENITH_TRIM:
+            zenith_opts.trim = true;
+            break;
+        case CMDLINE_ZENITH_OL:
+            zenith_opts.open_loop = true;
+            break;
+        case CMDLINE_ZENITH_AUTO_STOP:
+            zenith_opts.auto_stop = true;
+            break;
         default:
             _usage();
             exit(1);
         }
     }
+
+
 
     if (!model_str) {
         printf("You must specify a vehicle model.  Options are:\n");
@@ -478,6 +505,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             sitl_model->set_instance(_instance);
             sitl_model->set_autotest_dir(autotest_dir);
             sitl_model->set_config(config);
+            sitl_model->set_zenith_opts(zenith_opts);
             _synthetic_clock_mode = true;
             break;
         }

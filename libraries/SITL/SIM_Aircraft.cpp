@@ -116,6 +116,10 @@ void Aircraft::set_start_state(const Aircraft::state_t state)
              state.spd);
 }
 
+void Aircraft::set_zenith_opts(zenith_sim_opts_t opts) {
+    // Must be overridden
+}
+
 /*
    return difference in altitude between home position and current loc
 */
