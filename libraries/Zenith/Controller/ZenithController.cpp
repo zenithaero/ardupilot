@@ -72,6 +72,7 @@ void ZenithController::update(float tas_cmd,
 	}
 
 	// Now run allocator
+	// TODO: handle doublets
 	Accel accel_cmd(
 		Vector3f(spd_alt_controller.ax_command, 0.f, 0.f),
 		Vector3f(

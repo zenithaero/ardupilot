@@ -82,7 +82,6 @@ void SITL_State::_usage(void)
            "\t--instance|-I N          set instance of SITL (adds 10*instance to all port numbers)\n"
            // "\t--param|-P NAME=VALUE    set some param\n"  CURRENTLY BROKEN!
            "\t--synthetic-clock|-S     set synthetic clock mode\n"
-           "\t--home|-O HOME           set start location (lat,lng,alt,yaw)\n"
            "\t--state|-x STATE         set start state as a json { lat, lng, alt, pitch, roll, yaw }\n"
            "\t--home|-O HOME           set start location (lat,lng,alt,yaw) or location name\n"
            "\t--model|-M MODEL         set simulation model\n"

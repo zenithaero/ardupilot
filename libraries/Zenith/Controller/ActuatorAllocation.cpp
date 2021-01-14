@@ -31,9 +31,9 @@ void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 	table.update();
 
 	// Compute qbar
-	float tas = table.tas_value[0];
+	float tas = MAX(10.f, table.tas_value[0]); // TODO: Extract in config
 	float qbar = tas * tas * 0.5 * 1.225;
-	float qbarInv = 1.f / MAX(qbar, 1e-3);
+	float qbarInv = 1.f / qbar;
 
 	// Prepare the command vector
 	std::vector<float> vec = {
@@ -47,8 +47,8 @@ void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 
 	// Compute the controller output
 	std::vector<float> res = matmul(table.K, vec);
-	const size_t n = DIM(ControllerData::alloc.max);
-	if (soft_assert(res.size() == n, "Invalid output size %lu\n", res.size()))
+	const size_t n_act = DIM(ControllerData::alloc.max);
+	if (soft_assert(res.size() == n_act, "Invalid output size %lu\n", res.size()))
 		return;
 
 	// Denormalize output
@@ -59,14 +59,14 @@ void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 	// Compute max accelerations to avoid exceeding values
 	float a_max[6];
 	for (size_t i = 0; i < vec.size(); i ++) {
-		float max_val = 0.f;
-		for (size_t j = 0; j < n; j++) {
+		float min_val = INFINITY;
+		for (size_t j = 0; j < n_act; j++) {
 			float alloc_max = ControllerData::alloc.max[j];
-			float kij =  MAX(FLT_EPSILON, fabsf(table.K[j][i]) * qbarInv );
-			float sub_max = alloc_max / kij;
-			max_val = MAX(max_val, sub_max);
+			float kij =  fabsf(table.K[j][i]) * qbarInv;
+			float sub_min = alloc_max / MAX(FLT_EPSILON, kij);
+			min_val = MIN(min_val, sub_min);
 		}
-		a_max[i] = max_val;
+		a_max[i] = min_val;
 	}
 	accel_max.lin = Vector3f(a_max[0], a_max[1], a_max[2]);
 	accel_max.rot = Vector3f(a_max[3], a_max[4], a_max[5]);
@@ -84,6 +84,12 @@ void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 	ail_cmd = res[2] + thr_ail_ff;
 	elev_cmd = res[3] + thr_elev_ff;
 	rud_cmd = res[4] + thr_rud_ff + rudder_cmd_deg;
+
+
+	// printf("max int: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]\n", a_max[0], a_max[1], a_max[2], a_max[3], a_max[4], a_max[5]);
+	// printf("ff: [%.2f, %.2f, %.2f, %.2f, %.2f]\n", thr_left_ff, thr_right_ff, thr_ail_ff, thr_elev_ff, thr_rud_ff);
+	// printf("output: [%.2f, %.2f, %.2f, %.2f, %.2f]\n", thr_left_cmd, thr_right_cmd, ail_cmd, elev_cmd, rud_cmd);
+	
 
 	// Res gives allocation. Deal the allocation back to the actuators
 	if (enable_throttle) {
