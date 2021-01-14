@@ -164,7 +164,7 @@ static const struct {
     { "airsim",             AirSim::create},
     { "scrimmage",          Scrimmage::create },
     { "webots",             Webots::create },
-    { "ZenithLookup",       Z1_Lookup::create},
+    { "ZenithLookup",       ZenithSim::create},
     { "JSON",               JSON::create },
 };
 

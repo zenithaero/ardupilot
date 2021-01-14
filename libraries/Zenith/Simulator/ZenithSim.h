@@ -57,18 +57,18 @@ public:
 /*
   a very simple plane simulator
  */
-class Z1_Lookup : public Aircraft {
+class ZenithSim : public Aircraft {
 public:
-    Z1_Lookup(const char *frame_str);
+    ZenithSim(const char *frame_str);
 
-    ~Z1_Lookup();
+    ~ZenithSim();
 
     /* update model by one time step */
     virtual void update(const struct sitl_input &input) override;
 
     /* static object creator */
     static Aircraft *create(const char *frame_str) {
-        return new Z1_Lookup(frame_str);
+        return new ZenithSim(frame_str);
     }
 
 protected:

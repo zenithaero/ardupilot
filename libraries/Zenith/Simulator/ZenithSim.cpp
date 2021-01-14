@@ -25,7 +25,7 @@ Startup startup;
 })
 
 
-Z1_Lookup::Z1_Lookup(const char *frame_str) :
+ZenithSim::ZenithSim(const char *frame_str) :
     Aircraft(frame_str)
 {
     mass = ModelConfig::M;
@@ -79,17 +79,17 @@ Z1_Lookup::Z1_Lookup(const char *frame_str) :
     // // MATLAB // end
 }
 
-Z1_Lookup::~Z1_Lookup() {
+ZenithSim::~ZenithSim() {
     delete(aeroData);
 }
 
-FM Z1_Lookup::getAeroFM(const std::vector<double> lookup) {
+FM ZenithSim::getAeroFM(const std::vector<double> lookup) {
     // auto fm = INTERP(0, lookup);
     // printf("lookup: [%.4f, %.4f, %.4f]: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f]\n", lookup[0], lookup[1], lookup[2], fm.force.x, fm.force.y, fm.force.z, fm.moment.x, fm.moment.y, fm.moment.z);
     return INTERP(0, lookup, 1, 0);
 }
 
-FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float thrLeft, float thrRight, float ail, float elev, float rud) {
+FM ZenithSim::getActuatorFM(const std::vector<double> lookup, float thrLeft, float thrRight, float ail, float elev, float rud) {
     FM fm;
     // Actuator map
     std::vector<float> vec = {ail, elev, rud, 0, 0};
@@ -104,7 +104,7 @@ FM Z1_Lookup::getActuatorFM(const std::vector<double> lookup, float thrLeft, flo
     return fm;
 }
 
-FM Z1_Lookup::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
+FM ZenithSim::getDampingFM(const std::vector<double> lookup, Vector3f pqr) {
     FM fm;
     float denom = 2 * airspeed;
     if (!is_zero(denom)) {
@@ -130,7 +130,7 @@ void denormalize(FM &fm, float qbar) {
 } 
 
 
-void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
+void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
 {
     float thrLeft  = filtered_servo_range(input, 0);
     float thrRight  = filtered_servo_range(input, 1);
@@ -309,7 +309,7 @@ void Z1_Lookup::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
 /*
   update the plane simulation by one time step
  */
-void Z1_Lookup::update(const struct sitl_input &input)
+void ZenithSim::update(const struct sitl_input &input)
 {
     Vector3f rot_accel;
     update_wind(input);
