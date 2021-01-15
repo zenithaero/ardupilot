@@ -30,10 +30,11 @@ void Plane::Log_Write_Attitude(void)
         logger.Write_PID(LOG_PIQA_MSG, quadplane.pos_control->get_accel_z_pid().get_pid_info() );
     }
 
-    logger.Write_PID(LOG_PIDR_MSG, rollController.get_pid_info());
-    logger.Write_PID(LOG_PIDP_MSG, pitchController.get_pid_info());
-    logger.Write_PID(LOG_PIDY_MSG, yawController.get_pid_info());
-    logger.Write_PID(LOG_PIDS_MSG, steerController.get_pid_info());
+    // Zenith - skip legacy PID logging
+    // logger.Write_PID(LOG_PIDR_MSG, rollController.get_pid_info());
+    // logger.Write_PID(LOG_PIDP_MSG, pitchController.get_pid_info());
+    // logger.Write_PID(LOG_PIDY_MSG, yawController.get_pid_info());
+    // logger.Write_PID(LOG_PIDS_MSG, steerController.get_pid_info());
 
 #if AP_AHRS_NAVEKF_AVAILABLE
     AP::ahrs_navekf().Log_Write();
@@ -50,8 +51,6 @@ void Plane::Log_Write_Fast(void)
 {
     // ZenithController - write control logs
     zenith_controller.write_logs(logger);
-    return; // Skip legacy function ------------
-
     if (should_log(MASK_LOG_ATTITUDE_FAST)) {
         Log_Write_Attitude();
     }

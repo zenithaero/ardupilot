@@ -142,16 +142,6 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     float elev = filtered_servo_angle(input, 3);
     float rud  = filtered_servo_angle(input, 4);
 
-    size_t trim_idx = 1; // TODO: pass as a parameter
-    if (opts.open_loop) {
-        thrLeft = ControllerData::trim.thrLeft[trim_idx] / ModelConfig::motorMax[0][0];
-        thrRight = ControllerData::trim.thrRight[trim_idx]  / ModelConfig::motorMax[0][1];
-        ail = ControllerData::trim.ailDeg[trim_idx] / ModelConfig::servoMaxDeg[0][0];
-        elev = ControllerData::trim.elevDeg[trim_idx] / ModelConfig::servoMaxDeg[0][1];
-        rud = ControllerData::trim.rudDeg[trim_idx] / ModelConfig::servoMaxDeg[0][2];
-    }
-    // printf("thr")
-
     printf("thr [%.2f, %.2f], ail %.2f, elev %.2f, rud %.2f\n",
         thrLeft,
         thrRight,
@@ -163,6 +153,14 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // Configure trim state if needed
     if (trim_t0 == 0) {
         trim_t0 = time_now_us;
+    }
+    size_t trim_idx = 1; // TODO: pass as a parameter
+    if (opts.open_loop) {
+        thrLeft = ControllerData::trim.thrLeft[trim_idx] / ModelConfig::motorMax[0][0];
+        thrRight = ControllerData::trim.thrRight[trim_idx]  / ModelConfig::motorMax[0][1];
+        ail = ControllerData::trim.ailDeg[trim_idx] / ModelConfig::servoMaxDeg[0][0];
+        elev = ControllerData::trim.elevDeg[trim_idx] / ModelConfig::servoMaxDeg[0][1];
+        rud = ControllerData::trim.rudDeg[trim_idx] / ModelConfig::servoMaxDeg[0][2];
     }
     if (opts.trim) {
         float dt = (time_now_us - trim_t0) / 1e6f;
@@ -197,6 +195,9 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         } else if (dt > 65 && opts.auto_stop) {
             // Terminate the simulation
             exit(-1);
+        }
+        if (dt > 45) {
+            elev += 1 / ModelConfig::servoMaxDeg[0][1];
         }
     }
 
