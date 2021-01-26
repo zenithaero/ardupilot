@@ -84,13 +84,15 @@ if __name__ == "__main__":
     # Add trim args
     sim_args += [
         "--zenith-trim",
-        "--zenith-ol",
-        "--zenith-auto-stop"
+        # "--zenith-ol",
+        "--zenith-auto-stop",
+        "--zenith-long"
     ]
 
     # Create mav args
     mav_arg_list = ["--logfile logs/flight.tlog"]
-    # mav_arg_list += ["--logfile logs/flight.tlog"]
+    # if not args.joystick:
+    #     mav_arg_list += ['--cmd-imu-ready "mode auto; arm throttle"']
     if args.fp:
         mav_arg_list += [
             '--cmd-imu-ready "wp load {}"'.format(FP_PATH),

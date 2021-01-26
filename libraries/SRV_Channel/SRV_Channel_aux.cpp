@@ -20,6 +20,7 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_HAL/AP_HAL.h>
 #include <RC_Channel/RC_Channel.h>
+#include <Zenith/constants.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -159,13 +160,13 @@ void SRV_Channel::aux_servo_function_setup(void)
         set_angle(3000);
         break;
     case k_aileron:
-        set_angle(2500); // TODO Zenith :: hook to param
+        set_angle(ModelConfig::servoMaxDeg[0][0] * 100); // TODO Zenith :: hook to param
         break;
     case k_elevator:
-        set_angle(2500); // TODO Zenith :: hook to param
+        set_angle(ModelConfig::servoMaxDeg[0][1] * 100); // TODO Zenith :: hook to param
         break;
     case k_rudder:
-        set_angle(2500); // TODO Zenith :: hook to param
+        set_angle(ModelConfig::servoMaxDeg[0][2] * 100); // TODO Zenith :: hook to param
         break;
     // End
     case k_throttle:

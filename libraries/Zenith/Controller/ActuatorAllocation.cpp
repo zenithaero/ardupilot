@@ -45,6 +45,8 @@ void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 		accel.rot.z
 	};
 
+	printf("accel %.2f, %.2f, %.2f, %.2f, %.2f, %.2f\n", vec[0], vec[1], vec[2], vec[3], vec[4], vec[5]);
+
 	// Compute the controller output
 	std::vector<float> res = matmul(table.K, vec);
 	const size_t n_act = DIM(ControllerData::alloc.max);
@@ -79,17 +81,18 @@ void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 	float thr_rud_ff = table.tas_interp->get(ControllerData::trim.rudDeg, DIM(ControllerData::trim.rudDeg), table.tas_value);
 
 	// Set commands
-	thr_left_cmd = res[0] + thr_left_ff;
-	thr_right_cmd = res[1] + thr_right_ff;
-	ail_cmd = res[2] + thr_ail_ff;
+	// thr_left_cmd = res[0] + thr_left_ff;
+	// thr_right_cmd = res[1] + thr_right_ff;
+	// ail_cmd = res[2] + thr_ail_ff;
 	elev_cmd = res[3] + thr_elev_ff;
-	rud_cmd = res[4] + thr_rud_ff + rudder_cmd_deg;
+	// rud_cmd = res[4] + thr_rud_ff + rudder_cmd_deg;
 
-
-	// printf("max int: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]\n", a_max[0], a_max[1], a_max[2], a_max[3], a_max[4], a_max[5]);
-	// printf("ff: [%.2f, %.2f, %.2f, %.2f, %.2f]\n", thr_left_ff, thr_right_ff, thr_ail_ff, thr_elev_ff, thr_rud_ff);
-	// printf("output: [%.2f, %.2f, %.2f, %.2f, %.2f]\n", thr_left_cmd, thr_right_cmd, ail_cmd, elev_cmd, rud_cmd);
-	
+	// --
+	thr_left_cmd = thr_left_ff;
+	thr_right_cmd = thr_right_ff;
+	ail_cmd = thr_ail_ff;
+	// elev_cmd = thr_elev_ff;
+	rud_cmd = thr_rud_ff + rudder_cmd_deg;
 
 	// Res gives allocation. Deal the allocation back to the actuators
 	if (enable_throttle) {

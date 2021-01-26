@@ -40,6 +40,8 @@ typedef struct {
     bool trim;
     bool open_loop;
     bool auto_stop;
+    bool longitudinal;
+    bool lateral;
 } zenith_sim_opts_t;
 
 /*

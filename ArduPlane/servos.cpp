@@ -916,7 +916,9 @@ void Plane::servos_output(void)
     SRV_Channels::cork();
 
     // support twin-engine aircraft
-    servos_twin_engine_mix();
+    // Zenith - enable manual twin mixing
+    if (control_mode == &mode_manual)
+        servos_twin_engine_mix();
 
     // cope with tailsitters and bicopters
     quadplane.tailsitter_output();

@@ -88,6 +88,7 @@ protected:
 
     // Temp
     uint64_t trim_t0 = 0;
+    float trim_dt = 0.f;
     float acc = 0;
 
     // float liftCoeff(float alpha) const;

@@ -57,17 +57,25 @@ void ZenithController::update(float tas_cmd,
 							  float rudder_cmd_deg) {
 	// Reset active bitmask & log ahrs
 	active_logs = 0;
-	// log_ahrs();
+	log_ahrs();
+
+	actuator_allocation.enable_throttle = true;
+	actuator_allocation.enable_attitude_long = true;
+	actuator_allocation.enable_attitude_lat = true;
 
     if (actuator_allocation.enable_throttle) {
     	update_spd_alt(tas_cmd, h_cmd);
 	}
 
 	if (actuator_allocation.enable_attitude_long) {
+		// Override
+		theta_cmd_deg = 3.0f;
 		stabilize_pitch(theta_cmd_deg);
 	}
 
 	if (actuator_allocation.enable_attitude_lat) {
+		// Override
+		roll_cmd_deg = 0.f;
 		stabilize_rollyaw(roll_cmd_deg, rudder_cmd_deg);
 	}
 

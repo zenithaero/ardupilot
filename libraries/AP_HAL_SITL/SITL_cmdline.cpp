@@ -112,6 +112,8 @@ void SITL_State::_usage(void)
            "\t--zenith-trim            zenith - start simulator in trim state\n"
            "\t--zenith-ol              zenith - ignore controller commands\n"
            "\t--zenith-auto-stop       zenith - automatically stop the simulation\n"
+           "\t--zenith-long            zenith - longitudinal simulation only\n"
+           "\t--zenith-lat             zenith - lateral simulation only\n"
         );
 }
 
@@ -232,7 +234,9 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     zenith_sim_opts_t zenith_opts = {
         .trim = false,
         .open_loop = false,
-        .auto_stop = false
+        .auto_stop = false,
+        .lateral = false,
+        .longitudinal = false,
     };
 
     enum long_options {
@@ -261,6 +265,8 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         CMDLINE_ZENITH_TRIM,
         CMDLINE_ZENITH_OL,
         CMDLINE_ZENITH_AUTO_STOP,
+        CMDLINE_ZENITH_LONG,
+        CMDLINE_ZENITH_LAT,
     };
 
     const struct GetOptLong::option options[] = {
@@ -303,6 +309,8 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         {"zenith-trim",     false,  0, CMDLINE_ZENITH_TRIM},
         {"zenith-ol",       false,  0, CMDLINE_ZENITH_OL},
         {"zenith-auto-stop",false,  0, CMDLINE_ZENITH_AUTO_STOP},
+        {"zenith-long",     false,  0, CMDLINE_ZENITH_LONG},
+        {"zenith-lat",      false,  0, CMDLINE_ZENITH_LAT},
         {0, false, 0, 0}
     };
 
@@ -454,6 +462,12 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             break;
         case CMDLINE_ZENITH_AUTO_STOP:
             zenith_opts.auto_stop = true;
+            break;
+        case CMDLINE_ZENITH_LONG:
+            zenith_opts.longitudinal = true;
+            break;
+        case CMDLINE_ZENITH_LAT:
+            zenith_opts.lateral = true;
             break;
         default:
             _usage();

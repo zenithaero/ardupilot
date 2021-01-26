@@ -692,6 +692,10 @@ def start_vehicle(binary, opts, stuff, spawns=None, test_case=None):
         cmd.extend(["--zenith-ol"])
     if opts.zenith_auto_stop:
         cmd.extend(["--zenith-auto-stop"])
+    if opts.zenith_lat:
+        cmd.extend(["--zenith-lat"])
+    if opts.zenith_long:
+        cmd.extend(["--zenith-long"])
 
     old_dir = os.getcwd()
     for i, i_dir in zip(instances, instance_dir):
@@ -1095,6 +1099,8 @@ group_sim.add_option("", "--sysid",
 group_sim.add_option("", "--zenith-trim", action="store_true", default=False)
 group_sim.add_option("", "--zenith-ol", action="store_true", default=False)
 group_sim.add_option("", "--zenith-auto-stop", action="store_true", default=False)
+group_sim.add_option("", "--zenith-lat", action="store_true", default=False)
+group_sim.add_option("", "--zenith-long", action="store_true", default=False)
 parser.add_option_group(group_sim)
 
 
