@@ -94,12 +94,15 @@ void ActuatorAllocation::allocate(const Accel &accel, float rudder_cmd_deg) {
 	// elev_cmd = thr_elev_ff;
 	rud_cmd = thr_rud_ff + rudder_cmd_deg;
 
+	elev_cmd = accel.rot.y;
+
 	// Res gives allocation. Deal the allocation back to the actuators
 	if (enable_throttle) {
 		SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, (int16_t)(thr_left_cmd * 100));
 		SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, (int16_t)(thr_right_cmd * 100));
 	}
 	if (enable_attitude_long) {
+		printf("ELEV_CMD: %.2f\n", elev_cmd);
 		SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, (int16_t)(elev_cmd * 100));
 	}
 	if (enable_attitude_lat) {

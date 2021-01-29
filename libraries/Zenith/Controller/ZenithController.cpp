@@ -69,7 +69,7 @@ void ZenithController::update(float tas_cmd,
 
 	if (actuator_allocation.enable_attitude_long) {
 		// Override
-		theta_cmd_deg = 3.0f;
+		theta_cmd_deg = 0.69f;
 		stabilize_pitch(theta_cmd_deg);
 	}
 

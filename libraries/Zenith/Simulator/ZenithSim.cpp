@@ -151,12 +151,12 @@ void denormalize(FM &fm, float qbar) {
 
 void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
 {
-    printf("[%.2hu, %.2hu, %.2hu, %.2hu, %.2hu]\n", input.servos[0], input.servos[1], input.servos[2], input.servos[3], input.servos[4]);
     float thrLeft = filtered_servo_range(input, 0);
     float thrRight = filtered_servo_range(input, 1);
     float ail = filtered_servo_angle(input, 2);
     float elev = filtered_servo_angle(input, 3);
     float rud  = filtered_servo_angle(input, 4);
+    // printf("ELEV (SIM) %.2f\n", elev);
 
     // Configure trim state if needed
     if (trim_t0 == 0) {
@@ -245,9 +245,9 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // Log actuator states
     actuators[0] = thrLeft;
     actuators[1] = thrRight;
-    actuators[2] = ail;
-    actuators[3] = elev;
-    actuators[4] = rud;
+    actuators[2] = ail * ModelConfig::servoMaxDeg[0][0];
+    actuators[3] = elev * ModelConfig::servoMaxDeg[0][1];
+    actuators[4] = rud * ModelConfig::servoMaxDeg[0][2];
 
     // simulate engine RPM
     rpm[0] = thrLeft * 7000;
