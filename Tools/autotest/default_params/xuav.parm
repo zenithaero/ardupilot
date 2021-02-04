@@ -108,7 +108,7 @@ SIM_ACC2_RND 0 9
 SIM_GPS_NOISE 0 9
 
 
-# Disable servo filter
+# Set servo speed
 SIM_SERVO_SPEED  0.032
 
 # Update ground behavior to allow pitch rotation

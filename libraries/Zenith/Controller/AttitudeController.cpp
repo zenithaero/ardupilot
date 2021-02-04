@@ -21,12 +21,12 @@ PitchController::PitchController(AP_AHRS &_ahrs)
 static uint32_t counter, counter2 = 0; // TEMP
 
 void PitchController::reset() {
-	theta_err_i = 0;
+	theta_err_i = 0.f;
+	ry_command = 0.f;
 }
 
 void PitchController::update(float theta_cmd_deg, const Accel &accel_max) {
 	LinearController::update();
-
 	float theta_deg = ahrs.pitch_sensor / 100.f;
 	float theta_err_deg = theta_cmd_deg - theta_deg;
 	theta_err_deg = CLAMP(theta_err_deg, -ControllerData::pitch.maxCmdDeg, ControllerData::pitch.maxCmdDeg);
@@ -44,6 +44,7 @@ void PitchController::update(float theta_cmd_deg, const Accel &accel_max) {
 	// Clamp the integrator
 	float max_i = accel_max.rot.y / MAX(1e-3, abs(K[0][1]));
 	theta_err_i = CLAMP(theta_err_i, -max_i, max_i);
+	theta_err_i = 0.f;
 
 	// Retreive q
 	float q_deg = ToDeg(ahrs.get_gyro().y);
@@ -95,6 +96,12 @@ RollYawController::RollYawController(AP_AHRS &_ahrs)
 		ControllerData::rollYaw.Ktas,
 		ControllerData::rollYaw.K
 	) {};
+
+void RollYawController::reset() {
+	phi_err_i = 0.f;
+	rx_command = 0.f;
+	rz_command = 0.f;
+}
 
 void RollYawController::update(float phi_cmd_deg, const Accel &accel_max) {
 	LinearController::update();

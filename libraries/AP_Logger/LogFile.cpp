@@ -670,6 +670,14 @@ void AP_Logger::Write_CTRL(log_SpdAltCtrl &spdalt) {
     WriteBlock(&spdalt, sizeof(spdalt));
 }
 
+void AP_Logger::Write_CTRL(log_Alloc &alloc) {
+    alloc.msgid = LOG_SPDALT_CTRL_MSG;
+    alloc.head1 = HEAD_BYTE1;
+    alloc.head2 = HEAD_BYTE2;
+    alloc.time_us = AP_HAL::micros64();
+    WriteBlock(&alloc, sizeof(alloc));
+}
+
 void AP_Logger::Write_RPM(const AP_RPM &rpm_sensor)
 {
     float rpm1 = -1, rpm2 = -1;

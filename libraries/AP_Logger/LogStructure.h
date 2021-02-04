@@ -525,6 +525,7 @@ struct PACKED log_AhrsCtrl {
   float pn;
   float pe;
   float pd;
+  float tas;
   // float ax;
   // float ay;
   // float az;
@@ -566,6 +567,22 @@ struct PACKED log_SpdAltCtrl {
     float pitch_ff;
     float pitch_cmd;
     float ax_cmd;
+};
+
+struct PACKED log_Alloc {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float thr_left;
+    float thr_right;
+    float ail;
+    float elev;
+    float rud;
+    // FF
+    float thr_left_ff;
+    float thr_right_ff;
+    float ail_ff;
+    float elev_ff;
+    float rud_ff;
 };
 
 struct PACKED log_WheelEncoder {
@@ -1908,13 +1925,15 @@ LOG_STRUCTURE_FROM_AHRS \
     { LOG_ERROR_MSG, sizeof(log_Error), \
       "ERR",   "QBB",         "TimeUS,Subsys,ECode", "s--", "F--" }, \
     { LOG_AHRS_CTRL_MSG, sizeof(log_AhrsCtrl), \
-      "AHRS", "Qffffffffffff", "TimeUS,phi,theta,psi,gx,gy,gz,vn,ve,vd,pn,pe,pd", "s------------", "F------------" }, \
+      "AHRS", "Qfffffffffffff", "TimeUS,phi,theta,psi,gx,gy,gz,vn,ve,vd,pn,pe,pd,tas", "s-------------", "F-------------" }, \
     { LOG_PITCH_CTRL_MSG, sizeof(log_PitchCtrl), \
       "PCTL", "Qfffff", "TimeUS,cmd,err,errI,maxI,ryCmd", "s-----", "F-----" }, \
     { LOG_ROLLYAW_CTRL_MSG, sizeof(log_RollYawCtrl), \
       "RCTL", "Qffffff", "TimeUS,cmd,err,errI,maxI,rxCmd,rzCmd", "s------", "F------" }, \
     { LOG_SPDALT_CTRL_MSG, sizeof(log_SpdAltCtrl), \
       "SCTL", "Qfffffffffff", "TimeUS,hCmd,tCmd,hEr,tEr,hErI,tErI,hMxI,tMxI,pFF,pCmd,axCmd", "s-----------", "F-----------" }, \
+    { LOG_ALLOC_CTRL_MSG, sizeof(log_Alloc), \
+      "ALOC", "Qffffffffff", "TimeUS,lthr,rthr,ail,elev,rud,lthrFF,rthrFF,ailFF,elevFF,rudFF", "s----------", "F----------" }, \
     { LOG_WINCH_MSG, sizeof(log_Winch), \
       "WINC", "QBBBBBfffHfb", "TimeUS,Heal,ThEnd,Mov,Clut,Mode,DLen,Len,DRate,Tens,Vcc,Temp", "s-----mmn?vO", "F-----000000" }, \
     { LOG_PSC_MSG, sizeof(log_PSC), \
@@ -2049,6 +2068,7 @@ enum LogMessages : uint8_t {
     LOG_PITCH_CTRL_MSG,
     LOG_ROLLYAW_CTRL_MSG,
     LOG_SPDALT_CTRL_MSG,
+    LOG_ALLOC_CTRL_MSG,
 
     _LOG_LAST_MSG_
 };

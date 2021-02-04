@@ -25,15 +25,20 @@ if __name__ == "__main__":
     cmd = [sys.executable, MAVLOG_PATH, "--planner", "--format", "json", args.path]
     out = subprocess.check_output(cmd).decode("utf-8")
     logs = {}
-    start_time = None
+    start_time = 1e100
+    msgs = []
     for l in out.split("\n"):
         if not l:
             continue
         msg = json.loads(l)
-        msg_type = msg["meta"]["type"]
         msg_timestamp = msg["meta"]["timestamp"]
+        start_time = min(msg_timestamp, start_time)
+        msgs.append(msg)
+    for msg in msgs:
+        msg_type = msg["meta"]["type"]
         if not start_time:
             start_time = msg_timestamp
+        msg_timestamp = msg["meta"]["timestamp"]
         msg_timestamp -= start_time
         msg_data = msg["data"]
         if msg_type not in logs:

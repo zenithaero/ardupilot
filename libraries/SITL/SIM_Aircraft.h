@@ -241,6 +241,7 @@ protected:
     float target_speedup;
     uint64_t frame_time_us;
     uint64_t last_wall_time_us;
+    uint64_t first_time_us;
     uint32_t last_fps_report_ms;
     int64_t sleep_debt_us;
     uint32_t last_frame_count;

@@ -183,7 +183,7 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
             velocity_air_ef = Vector3f(0, 0, 0);
             airspeed_pitot = 0.f;
             airspeed = 0.f;
-        } else if (trim_dt > 15 && trim_dt < 45) {
+        } else if (trim_dt > 15 && trim_dt < 55) {
             gyro = Vector3f(0, 0, 0);
             dcm.from_euler(
                 ControllerData::trim.phi[trim_idx],
@@ -205,7 +205,7 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
 
             // Fix altitude
             position.z = -100;
-        } else if (trim_dt > 65 && opts.auto_stop) {
+        } else if (trim_dt > 75 && opts.auto_stop) {
             // Terminate the simulation
             exit(-1);
         }

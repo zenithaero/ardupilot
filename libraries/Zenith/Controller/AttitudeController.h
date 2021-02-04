@@ -22,6 +22,7 @@ class RollYawController: public LinearController {
 public:
     RollYawController(AP_AHRS &ahrs);
     void update(float phi_cmd_deg, const Accel &accel_max);
+    void reset();
 
     // Output
     float rx_command;

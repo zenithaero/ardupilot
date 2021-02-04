@@ -6,6 +6,7 @@ class SpdAltController: public LinearController {
 public:
     SpdAltController(AP_AHRS &ahrs);
     void update(float tas_cmd, float h_cmd, const Accel &accel_max);
+    void reset();
 
     // Output
     float pitch_command;

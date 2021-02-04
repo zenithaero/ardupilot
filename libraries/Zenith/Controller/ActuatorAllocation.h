@@ -38,6 +38,7 @@ public:
     float rud_cmd;
     // 
     Accel accel_max;
+    log_Alloc log;
 
 protected:
 	AP_AHRS &ahrs;

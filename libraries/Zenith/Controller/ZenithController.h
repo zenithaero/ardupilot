@@ -46,13 +46,13 @@ public:
     static const uint32_t PITCH_MASK = 0x2;
     static const uint32_t ROLLYAW_MASK = 0x4;
     static const uint32_t SPDALT_MASK = 0x8;
+    static const uint32_t ALLOC_MASK = 0x16;
     uint32_t active_logs = 0;
 
 protected:
 	AP_AHRS &ahrs;
     // CrossTrackController xtrack_controller{ahrs};
 
-    // TEMP
-    uint64_t t0 = 0;
+    uint64_t time_start_us = 0;
 };
 

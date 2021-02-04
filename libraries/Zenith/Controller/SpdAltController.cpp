@@ -18,6 +18,13 @@ SpdAltController::SpdAltController(AP_AHRS &_ahrs)
 		ControllerData::spdAlt.K
 	) {};
 
+void SpdAltController::reset() {
+	h_err_i = 0.f;
+	tas_err_i = 0.f;
+	ax_command = 0.f;
+	pitch_command = 0.f;
+}
+
 void SpdAltController::update(float tas_cmd, float h_cmd, const Accel &accel_max) {
 	LinearController::update();
 

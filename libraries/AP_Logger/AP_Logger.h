@@ -368,6 +368,7 @@ public:
     void Write_CTRL(log_PitchCtrl &pitch);
     void Write_CTRL(log_RollYawCtrl &rollyaw);
     void Write_CTRL(log_SpdAltCtrl &spdalt);
+    void Write_CTRL(log_Alloc &alloc);
 
     // returns true if logging of a message should be attempted
     bool should_log(uint32_t mask) const;

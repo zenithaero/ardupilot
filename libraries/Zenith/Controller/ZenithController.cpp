@@ -55,6 +55,9 @@ void ZenithController::update(float tas_cmd,
 							  float theta_cmd_deg,
 							  float roll_cmd_deg,
 							  float rudder_cmd_deg) {
+	if (time_start_us == 0)
+        time_start_us = AP_HAL::micros64();
+    float dt = (AP_HAL::micros64() - time_start_us) / 1e6f;
 	// Reset active bitmask & log ahrs
 	active_logs = 0;
 	log_ahrs();
@@ -63,22 +66,41 @@ void ZenithController::update(float tas_cmd,
 	actuator_allocation.enable_attitude_long = true;
 	actuator_allocation.enable_attitude_lat = true;
 
-    if (actuator_allocation.enable_throttle) {
+    if (actuator_allocation.enable_throttle && dt > 50) {
+		tas_cmd = 12.0; // TEMP UNIT TEST
+		h_cmd = 0.0;
+		if (dt > 55)
+			h_cmd += 5.f;
     	update_spd_alt(tas_cmd, h_cmd);
+		// TODO: check behavior when controlling speed only!
+	} else {
+		spd_alt_controller.reset();
 	}
 
-	if (actuator_allocation.enable_attitude_long) {
-		// Override
-		theta_cmd_deg = 0.69f;
+	if (actuator_allocation.enable_attitude_long && dt > 50) {
+		// theta_cmd_deg = 0.683f; // TEMP UNIT TEST
+		// if (dt > 55)
+		// 	theta_cmd_deg += 5.f;
+		// printf("dt: %.2f\n", dt);
+		// STEP COMMAND
 		stabilize_pitch(theta_cmd_deg);
+		active_logs |= ZenithController::ALLOC_MASK;
+	} else {
+		pitch_controller.reset();
 	}
 
 	if (actuator_allocation.enable_attitude_lat) {
 		// Override
 		roll_cmd_deg = 0.f;
 		stabilize_rollyaw(roll_cmd_deg, rudder_cmd_deg);
+		active_logs |= ZenithController::ALLOC_MASK;
+	} else {
+		roll_yaw_controller.reset();
 	}
 
+	// spd_alt_controller.ax_command = 0.f; // TEMP UNIT TEST
+	roll_yaw_controller.rx_command = 0.f; 
+	roll_yaw_controller.rz_command = 0.f;
 	// Now run allocator
 	// TODO: handle doublets
 	Accel accel_cmd(
@@ -94,22 +116,6 @@ void ZenithController::update(float tas_cmd,
 
 
 void ZenithController::stabilize_pitch(float theta_cmd_deg) {
-	// TEMP
-	// if (t0 == 0)
-    //     t0 = AP_HAL::micros64();
-    // float dt = (AP_HAL::micros64() - t0) / 1e6f;
-
-	// phi_cmd_deg = 0;
-	// theta_cmd_deg = degrees(0.00557);
-	// if (dt > 70)
-	// 	theta_cmd_deg += 5;
-	// else {
-	// 	// reset integrators
-	// 	pitch_controller.reset();
-	// }
-	// if (dt > 90)
-	// 	exit(-1);
-
 	// Execute doublets if needed
 	bool elev_doublet_active = elev_doublet.udpate(actuator_allocation.elev_cmd);
 
@@ -133,20 +139,6 @@ void ZenithController::stabilize_rollyaw(float phi_cmd_deg, float rudder_deg) {
 
 void ZenithController::update_spd_alt(float tas_cmd, float h_cmd) {
 	active_logs |= ZenithController::SPDALT_MASK;
-	// Step command
-
-	// TEMP
-	// h_cmd = 0;
-	// tas_cmd = 15;
-
-	// float dt = (AP_HAL::micros64() - t0) / 1e6f;
-	// if (dt > 90)
-	// 	h_cmd = 10;
-	// if (dt > 130)
-	// 	tas_cmd = 20;
-	// if (dt > 160)
-	// 	exit(-1);
-
 	spd_alt_controller.update(tas_cmd, h_cmd, actuator_allocation.accel_max);
 }
 
@@ -157,11 +149,14 @@ void ZenithController::log_ahrs() {
 	valid_ahrs &= ahrs.get_velocity_NED(vel);
 	Vector3f gyro = ahrs.get_gyro();
 	valid_ahrs &= ahrs.get_relative_position_NED_home(pos);
+	float tas = 0.f;
+	valid_ahrs &= ahrs.airspeed_estimate(tas);
 	auto acc = AP::ins().get_accel();
 	if (valid_ahrs) {
-		log.phi = ahrs.roll_sensor;
-		log.theta = ahrs.pitch_sensor;
-		log.psi = ahrs.yaw_sensor;
+		active_logs |= ZenithController::AHRS_MASK;
+		log.phi = ahrs.roll_sensor / 100.f;
+		log.theta = ahrs.pitch_sensor / 100.f;
+		log.psi = ahrs.yaw_sensor / 100.f;
 		log.gx = gyro.x;
 		log.gy = gyro.y;
 		log.gz = gyro.z;
@@ -171,6 +166,7 @@ void ZenithController::log_ahrs() {
 		log.pn = pos.x;
 		log.pe = pos.y;
 		log.pd = pos.z;
+		log.tas = tas;
 	}
 }
 
@@ -185,4 +181,6 @@ void ZenithController::write_logs(AP_Logger &logger) {
         logger.Write_CTRL(roll_yaw_controller.log);
     if (active_logs & ZenithController::SPDALT_MASK)
         logger.Write_CTRL(spd_alt_controller.log);
+    if (active_logs & ZenithController::ALLOC_MASK)
+        logger.Write_CTRL(actuator_allocation.log);
 }

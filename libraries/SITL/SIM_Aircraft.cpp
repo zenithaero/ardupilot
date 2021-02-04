@@ -198,14 +198,15 @@ void Aircraft::update_position(void)
         accel_body.x, accel_body.y, accel_body.z,
         gyro.x, gyro.y, gyro.z,
         alpha, beta, airspeed);
-
-    printf("LOGGING ELEV: %.2f; tick: %d\n", actuators[3], (int)(AP_HAL::micros64() / 1000000.f) % 2);
-    float fltval = (int)(AP_HAL::micros64() / 1000000.f) % 2 == 0 ? 11.f : -25.f;
+    // if (first_time_us == 0) first_time_us = AP_HAL::micros64();
+    // float fltval = (float)((AP_HAL::micros64() - first_time_us) / 1e6f);
+    // printf("time: %f\n", fltval);
+    // printf("LOGGING ELEV: %.2f; tick: %d\n", actuators[3], (int)(AP_HAL::micros64() / 1000000.f) % 2);
     AP::logger().Write("SIM3", "TimeUS,fx,fy,fz,mx,my,mz,lThr,rThr,ail,elev,rud,n,e,d", "Qffffffffffffff",
         AP_HAL::micros64(),
         force_bf.x, force_bf.y, force_bf.z,
         moment_bf.x, moment_bf.y, moment_bf.z,
-        actuators[0], actuators[1], actuators[2], fltval, actuators[4],
+        actuators[0], actuators[1], actuators[2], actuators[3], actuators[4],
         position.x, position.y, position.z);
 }
 
