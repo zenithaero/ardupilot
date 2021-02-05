@@ -86,7 +86,7 @@ if __name__ == "__main__":
         "--zenith-trim",
         # "--zenith-ol",
         "--zenith-auto-stop",
-        "--zenith-long"
+        # "--zenith-lat"
     ]
 
     # Create mav args

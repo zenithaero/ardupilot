@@ -67,10 +67,10 @@ void ZenithController::update(float tas_cmd,
 	actuator_allocation.enable_attitude_lat = true;
 
     if (actuator_allocation.enable_throttle && dt > 50) {
-		tas_cmd = 12.0; // TEMP UNIT TEST
+		// tas_cmd = 12.0; // TEMP UNIT TEST
 		h_cmd = 0.0;
-		if (dt > 55)
-			h_cmd += 5.f;
+		// if (dt > 55)
+		// 	h_cmd += 5.f;
     	update_spd_alt(tas_cmd, h_cmd);
 		// TODO: check behavior when controlling speed only!
 	} else {
@@ -92,6 +92,8 @@ void ZenithController::update(float tas_cmd,
 	if (actuator_allocation.enable_attitude_lat) {
 		// Override
 		roll_cmd_deg = 0.f;
+		if (dt > 55)
+			roll_cmd_deg += 5.f;
 		stabilize_rollyaw(roll_cmd_deg, rudder_cmd_deg);
 		active_logs |= ZenithController::ALLOC_MASK;
 	} else {
@@ -99,8 +101,8 @@ void ZenithController::update(float tas_cmd,
 	}
 
 	// spd_alt_controller.ax_command = 0.f; // TEMP UNIT TEST
-	roll_yaw_controller.rx_command = 0.f; 
-	roll_yaw_controller.rz_command = 0.f;
+	// roll_yaw_controller.rx_command = 0.f; 
+	// roll_yaw_controller.rz_command = 0.f;
 	// Now run allocator
 	// TODO: handle doublets
 	Accel accel_cmd(

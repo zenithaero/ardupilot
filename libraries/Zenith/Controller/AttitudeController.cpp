@@ -29,7 +29,6 @@ void PitchController::update(float theta_cmd_deg, const Accel &accel_max) {
 	LinearController::update();
 	float theta_deg = ahrs.pitch_sensor / 100.f;
 	float theta_err_deg = theta_cmd_deg - theta_deg;
-	printf("PITCH THETA CMD DEG: %.2f\n", theta_cmd_deg);
 	theta_err_deg = CLAMP(theta_err_deg, -ControllerData::pitch.maxCmdDeg, ControllerData::pitch.maxCmdDeg);
 
 	// Handle integrator
