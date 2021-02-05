@@ -49,6 +49,7 @@ void SpdAltController::update(float tas_cmd, float h_cmd, const Accel &accel_max
 	float h_err = h_cmd - h;
 	float tas_err = tas_cmd - tas;
 	float h_dot_err = 0 - h_dot;
+	printf("hErr: %.2f; tasErr: %.2f; hDotErr: %.2f\n", h_err, tas_err, h_dot_err);
 	h_err = CLAMP(h_err, -ControllerData::spdAlt.maxAltErr, ControllerData::spdAlt.maxAltErr);
 	tas_err = CLAMP(tas_err, -ControllerData::spdAlt.maxTasErr, ControllerData::spdAlt.maxTasErr);
 
@@ -97,7 +98,6 @@ void SpdAltController::update(float tas_cmd, float h_cmd, const Accel &accel_max
 		return;
 	float ax = res[0];
 	float pitch = res[1];
-
 	// Add feedforward
 	pitch += theta_trim_deg;
 
@@ -110,6 +110,7 @@ void SpdAltController::update(float tas_cmd, float h_cmd, const Accel &accel_max
 	// Assign the output
 	pitch_command = pitch_clamped;
 	ax_command = ax_clamped;
+	printf("/// res: ax: %.2f pitch: %.2f (theta trim deg: %.2f); axcmd: %.2f, pitchCmd: %.2f\n", ax, pitch, theta_trim_deg, ax_command, pitch_command);
 	// printf("tas_cmd: %.2f, tas: %.2f, tas_err: %.2f, tas_err_i %.2f, tas_err_max_i: %.2f, thr_cmd: %.2f\n", tas_cmd, tas, tas_err, tas_err_i, max_i_tas, thr_command);
 	// printf("h_cmd: %.2f, h: %.2f, h_err: %.2f, h_err_i %.2f, h_err_max_i: %.2f, pitch_cmd: %.2f\n", h_cmd, h, h_err, h_err_i, max_i_h, pitch_command);
 

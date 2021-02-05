@@ -152,6 +152,7 @@ void Plane::takeoff_calc_roll(void)
  */
 void Plane::takeoff_calc_pitch(void)
 {
+    printf("TAKEOFF ----");
     if (auto_state.highest_airspeed < g.takeoff_rotate_speed) {
         // we have not reached rotate speed, use a target pitch of 5
         // degrees. This should be enough to get the tail off the

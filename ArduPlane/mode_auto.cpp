@@ -55,11 +55,11 @@ void ModeAuto::update()
 
     if (plane.quadplane.in_vtol_auto()) {
         plane.quadplane.control_auto();
-    } else if (nav_cmd_id == MAV_CMD_NAV_TAKEOFF ||
-        (nav_cmd_id == MAV_CMD_NAV_LAND && plane.flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)) {
-        plane.takeoff_calc_roll();
-        plane.takeoff_calc_pitch();
-        plane.calc_throttle();
+    // } else if (nav_cmd_id == MAV_CMD_NAV_TAKEOFF ||
+    //     (nav_cmd_id == MAV_CMD_NAV_LAND && plane.flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)) {
+    //     plane.takeoff_calc_roll();
+    //     plane.takeoff_calc_pitch();
+    //     plane.calc_throttle();
     } else if (nav_cmd_id == MAV_CMD_NAV_LAND) {
         plane.calc_nav_roll();
         plane.calc_nav_pitch();

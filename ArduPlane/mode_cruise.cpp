@@ -37,7 +37,6 @@ void ModeCruise::update()
     } else {
         plane.calc_nav_roll();
     }
-
     if (landing) {
         plane.nav_pitch_cd = (int32_t)(plane.channel_pitch->norm_input() * ControllerData::pitch.maxCmdDeg * 100);
         plane.calc_throttle();

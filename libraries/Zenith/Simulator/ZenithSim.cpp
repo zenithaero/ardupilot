@@ -234,13 +234,13 @@ void ZenithSim::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         dcm.from_euler(r, 0.f, y);
     }
 
-    printf("thr [%.2f, %.2f], ail %.2f, elev %.2f, rud %.2f\n",
-        thrLeft,
-        thrRight,
-        ail * ModelConfig::servoMaxDeg[0][0],
-        elev * ModelConfig::servoMaxDeg[0][1],
-        rud * ModelConfig::servoMaxDeg[0][2]
-    );
+    // printf("thr [%.2f, %.2f], ail %.2f, elev %.2f, rud %.2f\n",
+    //     thrLeft,
+    //     thrRight,
+    //     ail * ModelConfig::servoMaxDeg[0][0],
+    //     elev * ModelConfig::servoMaxDeg[0][1],
+    //     rud * ModelConfig::servoMaxDeg[0][2]
+    // );
 
     // Log actuator states
     actuators[0] = thrLeft;
